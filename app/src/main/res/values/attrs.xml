@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="isLightTheme" format="boolean" />
+
+    <declare-styleable name="MaterialSliderPreference">
+        <attr name="android:max" />
+        <attr name="min" format="integer" />
+        <attr name="step" format="integer" />
+    </declare-styleable>
+</resources>

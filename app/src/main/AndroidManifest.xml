@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".HexKeyboardApplication"
+        android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.HexKeyboard"
+        tools:targetApi="31">
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.HexKeyboard">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_title"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.MainActivity"
+            android:theme="@style/Theme.HexKeyboard">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.example.hexkeyboard.ui.settings.MainActivity" />
+        </activity>
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity"
+            android:exported="false"
+            android:label="@string/themes_title"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.SettingsActivity"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.themes.ThemeEditorActivity"
+            android:exported="false"
+            android:label="@string/create_theme"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.fontselector.FontSelectorActivity"
+            android:exported="false"
+            android:label="Selector de Fuente"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.SettingsActivity"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.UserDictionaryActivity"
+            android:exported="false"
+            android:label="Diccionario Personal"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.SettingsActivity"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.themes.CropImageActivity"
+            android:exported="false"
+            android:label="Recortar imagen"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.PermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.HexKeyboard.Transparent" />
+
+        <!-- Declaración del InputMethodService -->
+        <service
+            android:name=".service.HexKeyboardService"
+            android:exported="true"
+            android:label="@string/keyboard_service_name"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:theme="@style/Theme.HexKeyboard">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.hexkeyboard.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PATHS"
+                android:resource="@xml/file_paths" />
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+</manifest>

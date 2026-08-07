@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Contorno de la tecla centrado -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M19,6 L8,6 L3,12 L8,18 L19,18 C20.1,18 21,17.1 21,16 L21,8 C21,6.9 20.1,6 19,6 Z"/>
+    <!-- X interior centrada -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M12.5,10 L16.5,14 M16.5,10 L12.5,14"/>
+</vector>

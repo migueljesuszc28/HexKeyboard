@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TECLADO PRINCIPAL                                             -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Altura base del teclado (se ajusta dinámicamente según preferencias) -->
+    <dimen name="keyboard_default_height">240dp</dimen>
+    <dimen name="keyboard_min_height">200dp</dimen>
+    <dimen name="keyboard_max_height">320dp</dimen>
+
+    <!-- Padding general del contenedor del teclado -->
+    <dimen name="keyboard_padding_top">8dp</dimen>
+    <dimen name="keyboard_padding_bottom">32dp</dimen>
+    <dimen name="keyboard_padding_horizontal">4dp</dimen>
+
+    <!-- Margen entre filas de teclas hexagonales -->
+    <dimen name="keyboard_row_spacing">2dp</dimen>
+
+    <!-- Factor de escala para teclas (0.80 = 80%, 1.0 = 100%) -->
+    <dimen name="keyboard_key_scale_default">0.92</dimen>
+    <dimen name="keyboard_key_scale_min">0.80</dimen>
+    <dimen name="keyboard_key_scale_max">1.00</dimen>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TECLAS HEXAGONALES                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Radio base del hexágono (se calcula dinámicamente, pero esto es referencia) -->
+    <dimen name="hex_key_radius_base">22dp</dimen>
+    <dimen name="hex_key_radius_small">18dp</dimen>
+    <dimen name="hex_key_radius_large">26dp</dimen>
+
+    <!-- Grosor del borde de las teclas -->
+    <dimen name="hex_key_stroke_width">1.5dp</dimen>
+    <dimen name="hex_key_stroke_width_pressed">2dp</dimen>
+
+    <!-- Tamaño de texto en teclas -->
+    <dimen name="hex_key_text_size">16sp</dimen>
+    <dimen name="hex_key_text_size_small">12sp</dimen>
+    <dimen name="hex_key_text_size_large">20sp</dimen>
+
+    <!-- Tamaño de iconos en teclas (shift, delete, enter) -->
+    <dimen name="hex_key_icon_size">24dp</dimen>
+    <dimen name="hex_key_icon_size_small">20dp</dimen>
+    <dimen name="hex_key_icon_padding">4dp</dimen>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- BARRA DE SUGERENCIAS                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Altura de la barra de sugerencias -->
+    <dimen name="suggestion_bar_height">35dp</dimen>
+    <dimen name="suggestion_bar_height_small">32dp</dimen>
+    <dimen name="suggestion_bar_height_large">48dp</dimen>
+
+    <!-- Padding interno de la barra de sugerencias -->
+    <dimen name="suggestion_bar_padding_horizontal">8dp</dimen>
+    <dimen name="suggestion_bar_padding_vertical">4dp</dimen>
+
+    <!-- Tamaño y padding de cada sugerencia individual -->
+    <dimen name="suggestion_item_min_width">48dp</dimen>
+    <dimen name="suggestion_item_padding_horizontal">20dp</dimen>
+    <dimen name="suggestion_item_padding_vertical">8dp</dimen>
+
+    <!-- Texto de las sugerencias -->
+    <dimen name="suggestion_text_size">14sp</dimen>
+    <dimen name="suggestion_text_size_small">12sp</dimen>
+    <dimen name="suggestion_text_size_large">16sp</dimen>
+
+    <!-- Margen entre sugerencias -->
+    <dimen name="suggestion_item_margin_horizontal">2dp</dimen>
+    <dimen name="suggestion_item_margin_vertical">4dp</dimen>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- POPUP DE LONG-PRESS (Alternativas de teclas)                  -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Escala del popup relativo al tamaño de la tecla -->
+    <dimen name="popup_scale_minuscule">0.4</dimen>
+    <dimen name="popup_scale_very_small">0.6</dimen>
+    <dimen name="popup_scale_small">0.8</dimen>
+    <dimen name="popup_scale_default">1.0</dimen>
+    <dimen name="popup_scale_large">1.2</dimen>
+
+    <!-- Dimensiones del popup -->
+    <dimen name="popup_key_width_multiplier">1.8</dimen>
+    <dimen name="popup_key_height_multiplier">1.6</dimen>
+    <dimen name="popup_gap_between_keys">3dp</dimen>
+    <dimen name="popup_padding_horizontal">8dp</dimen>
+    <dimen name="popup_padding_vertical">12dp</dimen>
+
+    <!-- Radio de bordes del contenedor del popup -->
+    <dimen name="popup_corner_radius">12dp</dimen>
+    <dimen name="popup_corner_radius_small">8dp</dimen>
+
+    <!-- Sombra del popup -->
+    <dimen name="popup_shadow_radius">8dp</dimen>
+    <dimen name="popup_shadow_offset_x">0dp</dimen>
+    <dimen name="popup_shadow_offset_y">2dp</dimen>
+    <integer name="popup_shadow_alpha">100</integer>
+
+    <!-- Texto dentro del popup -->
+    <dimen name="popup_text_size_multiplier">0.55</dimen>
+    <dimen name="popup_text_offset_vertical">4dp</dimen>
+
+    <!-- Posición vertical del popup relativo a la tecla -->
+    <dimen name="popup_vertical_offset_base">1.0</dimen>
+    <dimen name="popup_vertical_offset_scale">1.2</dimen>
+    <dimen name="popup_vertical_offset">2.2</dimen> <!-- multiplicador de key.ry (obsoleto, ahora dinámico) -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- PANEL DE EMOJIS                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Altura del panel de emojis (igual que el teclado por defecto) -->
+    <dimen name="emoji_panel_height">240dp</dimen>
+
+    <!-- Padding interno del panel de emojis -->
+    <dimen name="emoji_panel_padding">8dp</dimen>
+
+    <!-- Tamaño de los emojis en el picker -->
+    <dimen name="emoji_picker_item_size">36dp</dimen>
+    <dimen name="emoji_picker_item_size_small">28dp</dimen>
+    <dimen name="emoji_picker_item_size_large">44dp</dimen>
+
+    <!-- Botón de toggle emoji/teclado -->
+    <dimen name="emoji_toggle_button_size">40dp</dimen>
+    <dimen name="emoji_toggle_button_padding">8dp</dimen>
+    <dimen name="emoji_toggle_icon_size">24dp</dimen>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- COLORES Y ESTILOS (Referencias para código)                   -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Opacidades comunes -->
+    <integer name="alpha_full">255</integer>
+    <integer name="alpha_high">200</integer>
+    <integer name="alpha_medium">128</integer>
+    <integer name="alpha_low">64</integer>
+
+    <!-- Duraciones de animación (en milisegundos) -->
+    <integer name="anim_duration_short">150</integer>
+    <integer name="anim_duration_default">250</integer>
+    <integer name="anim_duration_long">400</integer>
+
+    <!-- Thresholds para gestos -->
+    <integer name="touch_slop">8</integer>
+    <integer name="double_tap_threshold">280</integer>
+    <integer name="long_press_timeout">450</integer>
+
+    <!-- Delete repeat timing -->
+    <integer name="delete_repeat_initial_delay">400</integer>
+    <integer name="delete_repeat_interval">80</integer>
+
+    <!-- Suggestion debounce -->
+    <integer name="suggestion_debounce_ms">120</integer>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ADAPTACIÓN POR TAMAÑO DE PANTALLA                            -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Valores para pantallas pequeñas (< 360dp de ancho) -->
+    <dimen name="keyboard_height_small">200dp</dimen>
+    <dimen name="hex_key_radius_small_screen">18dp</dimen>
+    <dimen name="suggestion_text_size_small_screen">12sp</dimen>
+
+    <!-- Valores para pantallas grandes (> 600dp de ancho, tablets) -->
+    <dimen name="keyboard_height_large">320dp</dimen>
+    <dimen name="hex_key_radius_large_screen">28dp</dimen>
+    <dimen name="suggestion_text_size_large_screen">18sp</dimen>
+    <dimen name="emoji_panel_height_large">320dp</dimen>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ACCESIBILIDAD                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Tamaños mínimos para toque (recomendación Material Design: 48dp) -->
+    <dimen name="touch_target_min_size">48dp</dimen>
+    <dimen name="touch_target_min_size_small">40dp</dimen>
+
+    <!-- Espaciado adicional para usuarios con dificultades motoras -->
+    <dimen name="accessibility_key_spacing">4dp</dimen>
+    <dimen name="accessibility_text_size_boost">2sp</dimen>
+
+    <!-- Alto de contraste: grosor de borde aumentado -->
+    <dimen name="high_contrast_stroke_width">3dp</dimen>
+
+</resources>

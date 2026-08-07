@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Colores base -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Fondo principal del teclado -->
+    <color name="keyboard_background">#FFFFFF</color>
+
+    <!-- Texto de sugerencias y labels -->
+    <color name="keyboard_suggestion_text">#000000</color>
+
+    <!-- Iconos de teclas especiales (shift, delete, enter) -->
+    <color name="keyboard_icon_tint">#000000</color>
+
+    <!-- Colores de teclas -->
+    <color name="key_background">#FFFFFF</color>
+    <color name="key_background_pressed">#E0E0E0</color>
+    <color name="key_background_special">#F5F5F5</color>
+    <color name="key_stroke">#000000</color>
+    <color name="key_text">#000000</color>
+    <color name="key_shift_active">#000000</color>
+
+    <!-- Popup de long-press -->
+    <color name="popup_background">#FFFFFF</color>
+    <color name="popup_text">#000000</color>
+    <color name="popup_selected_background">#000000</color>
+    <color name="popup_selected_text">#FFFFFF</color>
+    <color name="popup_shadow">#40000000</color>
+
+    <!-- Barra de sugerencias -->
+    <color name="suggestion_background">#FFFFFF</color>
+    <color name="suggestion_pressed">#E0E0E0</color>
+
+    <!-- Panel de emojis -->
+    <color name="emoji_panel_background">#FFFFFF</color>
+    <color name="emoji_picker_item_selected">#E0E0E0</color>
+    <!-- Colores para temas especiales -->
+    <color name="ocean_blue">#2196F3</color>
+    <color name="ocean_red">#F44336</color>
+</resources>

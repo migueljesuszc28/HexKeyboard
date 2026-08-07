@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Cuerpo sólido con esquinas redondeadas modernas y líneas internas caladas -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M17,2H7C4.79,2 3,3.79 3,6v12c0,2.21 1.79,4 4,4h10c2.21,0 4,-1.79 4,-4V6c0,-2.21 -1.79,-4 -4,-4z M15,18H9c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1h6c0.55,0 1,0.45 1,1s-0.45,1 -1,1z M15,13H9c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1h6c0.55,0 1,0.45 1,1s-0.45,1 -1,1z M15,8H9C8.45,8 8,7.55 8,7s0.45,-1 1,-1h6c0.55,0 1,0.45 1,1s-0.45,1 -1,1z"/>
+</vector>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.HexKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="isLightTheme">true</item>
+        <item name="android:fontFamily">@font/nunito</item>
+        <item name="fontFamily">@font/nunito</item>
+
+        <!-- Colores principales Material 3 -->
+        <item name="colorPrimary">@color/keyboard_suggestion_text</item>
+        <item name="colorOnPrimary">@color/keyboard_background</item>
+        <item name="colorPrimaryContainer">@color/key_background_special</item>
+        <item name="colorOnPrimaryContainer">@color/keyboard_suggestion_text</item>
+
+        <item name="colorSecondary">@color/keyboard_icon_tint</item>
+        <item name="colorOnSecondary">@color/keyboard_background</item>
+        <item name="colorSecondaryContainer">@color/key_background_pressed</item>
+        <item name="colorOnSecondaryContainer">@color/keyboard_suggestion_text</item>
+
+        <!-- Fondos y superficies -->
+        <item name="android:colorBackground">@color/keyboard_background</item>
+        <item name="colorSurface">@color/keyboard_background</item>
+        <item name="colorOnSurface">@color/keyboard_suggestion_text</item>
+        <item name="colorSurfaceVariant">@color/key_background_special</item>
+        <item name="colorOnSurfaceVariant">@color/keyboard_suggestion_text</item>
+        <item name="colorOutline">@color/key_stroke</item>
+
+        <!-- Para EmojiPickerView y componentes heredados -->
+        <item name="android:textColorPrimary">@color/keyboard_suggestion_text</item>
+        <item name="android:textColorSecondary">@color/keyboard_icon_tint</item>
+        <item name="android:windowBackground">@color/keyboard_background</item>
+
+        <!-- Barras de sistema transparentes para edge-to-edge -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+
+        <!-- Iconos de barra de estado según tema -->
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">?attr/isLightTheme</item>
+
+        <!-- Configuración de Preferencias -->
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+
+        <!-- Estilo de Switch Material 3 con icono de verificación -->
+        <item name="switchStyle">@style/Widget.App.Switch</item>
+        <item name="materialSwitchStyle">@style/Widget.App.Switch</item>
+    </style>
+
+    <style name="Widget.App.Switch" parent="Widget.Material3.CompoundButton.Switch">
+        <item name="thumbIcon">@drawable/sl_switch_thumb_icon</item>
+        <item name="thumbIconTint">?attr/colorPrimary</item>
+    </style>
+
+    <style name="Theme.HexKeyboard.Transparent" parent="Theme.HexKeyboard">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+</resources>

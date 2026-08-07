@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Contorno principal modernizado con esquinas suavizadas -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M17,2H7C4.79,2 3,3.79 3,6v12c0,2.21 1.79,4 4,4h10c2.21,0 4,-1.79 4,-4V6c0,-2.21 -1.79,-4 -4,-4zM19,18c0,1.1 -0.9,2 -2,2H7c-1.1,0 -2,-0.9 -2,-2V6c0,-1.1 0.9,-2 2,-2h10c1.1,0 2,0.9 2,2v12z"/>
+    <!-- Línea interna superior redondeada -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,8h6c0.55,0 1,-0.45 1,-1s-0.45,-1 -1,-1H9C8.45,6 8,6.45 8,7s0.45,1 1,1z"/>
+    <!-- Línea interna central redondeada -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,13h6c0.55,0 1,-0.45 1,-1s-0.45,-1 -1,-1H9C8.45,11 8,11.45 8,12s0.45,1 1,1z"/>
+    <!-- Línea interna inferior redondeada -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,18h6c0.55,0 1,-0.45 1,-1s-0.45,-1 -1,-1H9C8.45,16 8,16.45 8,17s0.45,1 1,1z"/>
+</vector>

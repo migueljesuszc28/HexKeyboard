@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hex Keyboard</string>
+
+    <string name="test_keyboard_hint">Prueba el teclado aquí...</string>
+    <string name="emoji_button_description">Cambiar a emojis</string>
+    <string name="functions_button_description">Más funciones</string>
+    <string name="functions_panel_description">Panel de funciones</string>
+    <string name="keyboard_view_description">Teclado hexagonal</string>
+
+    <string name="settings_title">Ajustes del teclado</string>
+
+    <string name="enable_keyboard_title">Habilitar teclado</string>
+    <string name="enable_keyboard_summary">Activa Hex Keyboard en los ajustes del sistema</string>
+
+    <string name="select_keyboard_title">Seleccionar teclado</string>
+    <string name="select_keyboard_summary">Elige Hex Keyboard como método de entrada activo</string>
+
+    <string name="keyboard_service_name">Hex Keyboard</string>
+    <string name="keyboard_service_description">Teclado hexagonal optimizado con sugerencias y gestos</string>
+    <string name="themes_title">Temas</string>
+    <string name="create_theme">Crear Tema</string>
+    <string name="edit_theme">Editar Tema</string>
+    <string name="preview_theme">Previsualización</string>
+    <string name="theme_name_hint">Nombre del tema</string>
+    <string name="colors_label">Colores</string>
+    <string name="bg_color_label">Color de fondo</string>
+    <string name="key_bg_color_label">Color de teclas</string>
+    <string name="key_text_color_label">Color de texto</string>
+    <string name="key_stroke_color_label">Color de borde</string>
+    <string name="key_press_color_label">Color al presionar</string>
+    <string name="icon_tint_label">Color de iconos</string>
+    <string name="edit_individual_keys">Editar Teclas Individuales</string>
+    <string name="save_theme">Guardar Tema</string>
+    <string name="shift_active_label">Shift Activo</string>
+    <string name="delete_pressed_label">Borrar Presionada</string>
+    <string name="toggle_borders_label">Bordes On/Off</string>
+    <string name="delete">Eliminar</string>
+    <string name="edit">Editar</string>
+</resources>
