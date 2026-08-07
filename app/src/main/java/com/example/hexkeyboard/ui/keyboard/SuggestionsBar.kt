@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -32,13 +30,16 @@ import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.settings.PermissionActivity
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
-fun SuggestionsBarSection(service: HexKeyboardService, theme: KeyboardTheme) {
-    val currentView by service.currentView.collectAsState()
-    val suggestions by service.suggestions.collectAsState()
-    val emojiSearchQuery by service.emojiSearchQuery.collectAsState()
+fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
+    val currentView by viewModel.currentView.collectAsState()
+    val suggestions by viewModel.suggestions.collectAsState()
+    val emojiSearchQuery by viewModel.emojiSearchQuery.collectAsState()
     val context = LocalContext.current
+    val service = context as? HexKeyboardService
 
     Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
         AnimatedVisibility(
@@ -50,13 +51,16 @@ fun SuggestionsBarSection(service: HexKeyboardService, theme: KeyboardTheme) {
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val isListening by service.voiceRecognitionHelper.isListening.collectAsState()
-                val partialVoiceResult by service.voiceRecognitionHelper.partialResult.collectAsState()
+                val isListeningFlow = remember(service) { service?.voiceRecognitionHelper?.isListening ?: MutableStateFlow(false) }
+                val partialVoiceResultFlow = remember(service) { service?.voiceRecognitionHelper?.partialResult ?: MutableStateFlow("") }
+                
+                val isListening by isListeningFlow.collectAsState()
+                val partialVoiceResult by partialVoiceResultFlow.collectAsState()
 
                 IconButton(
                     onClick = {
                         FeedbackManager.triggerFeedback(context)
-                        service.setCurrentView("functions")
+                        viewModel.setCurrentView("functions")
                     },
                     modifier = Modifier.size(48.dp)
                 ) {
@@ -86,7 +90,7 @@ fun SuggestionsBarSection(service: HexKeyboardService, theme: KeyboardTheme) {
                         items(suggestions, key = { it }) { suggestion ->
                             SuggestionChip(suggestion, theme) {
                                 FeedbackManager.triggerFeedback(context)
-                                service.replaceLastWord("$suggestion ")
+                                viewModel.onSuggestionClick(suggestion)
                             }
                         }
                     }
@@ -96,7 +100,7 @@ fun SuggestionsBarSection(service: HexKeyboardService, theme: KeyboardTheme) {
                     onClick = {
                         FeedbackManager.triggerFeedback(context)
                         if (isListening) {
-                            service.voiceRecognitionHelper.stopListening()
+                            service?.voiceRecognitionHelper?.stopListening()
                         } else {
                             val permission = Manifest.permission.RECORD_AUDIO
                             val granted = ContextCompat.checkSelfPermission(
@@ -104,10 +108,10 @@ fun SuggestionsBarSection(service: HexKeyboardService, theme: KeyboardTheme) {
                             ) == PackageManager.PERMISSION_GRANTED
 
                             if (granted) {
-                                service.voiceRecognitionHelper.startListening(
+                                service?.voiceRecognitionHelper?.startListening(
                                     object : VoiceRecognitionHelper.VoiceResultListener {
                                         override fun onVoiceResult(text: String) {
-                                            service.handleChar("$text ")
+                                            viewModel.onCharTyped("$text ")
                                         }
                                         override fun onVoiceError(error: Int) {}
                                     }
@@ -137,14 +141,14 @@ fun SuggestionsBarSection(service: HexKeyboardService, theme: KeyboardTheme) {
             visible = currentView == "emoji",
             enter = fadeIn(), exit = fadeOut()
         ) {
-            EmojiSearchBar(service, theme, emojiSearchQuery)
+            EmojiSearchBar(viewModel, theme, emojiSearchQuery)
         }
 
         AnimatedVisibility(
             visible = currentView != "keyboard" && currentView != "emoji",
             enter = fadeIn(), exit = fadeOut()
         ) {
-            PanelHeader(currentView, theme) { service.setCurrentView("keyboard") }
+            PanelHeader(currentView, theme) { viewModel.setCurrentView("keyboard") }
         }
     }
 }

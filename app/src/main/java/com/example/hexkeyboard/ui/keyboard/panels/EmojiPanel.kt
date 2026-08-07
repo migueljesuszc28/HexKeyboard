@@ -54,13 +54,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.*
 
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+
 @Composable
-fun EmojiPanel(onEmojiSelected: (String) -> Unit, onBack: () -> Unit, theme: KeyboardTheme) {
+fun EmojiPanel(
+    onEmojiSelected: (String) -> Unit,
+    onBack: () -> Unit,
+    theme: KeyboardTheme,
+    viewModel: KeyboardViewModel? = null
+) {
     val context = LocalContext.current
-    val service = context as? HexKeyboardService
-    val searchQuery by (service?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
-    val skinTone by (service?.selectedSkinTone ?: MutableStateFlow("")).collectAsState()
-    val genderIndex by (service?.selectedGenderIndex ?: MutableStateFlow(0)).collectAsState()
+    val searchQuery by (viewModel?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
+    val skinTone by (viewModel?.selectedSkinTone ?: MutableStateFlow("")).collectAsState()
+    val genderIndex by (viewModel?.selectedGenderIndex ?: MutableStateFlow(0)).collectAsState()
 
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
     var recentEmojis by remember {
@@ -144,8 +150,8 @@ fun EmojiPanel(onEmojiSelected: (String) -> Unit, onBack: () -> Unit, theme: Key
                                 family = item.family,
                                 skinTone = skinTone,
                                 genderIndex = genderIndex,
-                                onSkinToneSelected = { service?.setSkinTone(it) },
-                                onGenderSelected = { service?.setGenderIndex(it) },
+                                onSkinToneSelected = { viewModel?.setSkinTone(it) },
+                                onGenderSelected = { viewModel?.setGenderIndex(it) },
                                 onEmojiSelected = { finalEmoji ->
                                     FeedbackManager.triggerFeedback(context)
                                     val newList = (listOf(finalEmoji) + recentEmojis.filter { it != finalEmoji }).take(30)

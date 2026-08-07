@@ -3,7 +3,6 @@ package com.example.hexkeyboard.ui.keyboard.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Keyboard
@@ -19,10 +18,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 
 @Composable
-fun EmojiSearchBar(service: HexKeyboardService, theme: KeyboardTheme, query: String) {
+fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: String) {
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -34,7 +33,7 @@ fun EmojiSearchBar(service: HexKeyboardService, theme: KeyboardTheme, query: Str
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Color(theme.keyBackgroundColor).copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .clickable { service.setEmojiSearchActive(true) }
+                .clickable { viewModel.setEmojiSearchActive(true) }
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -57,7 +56,7 @@ fun EmojiSearchBar(service: HexKeyboardService, theme: KeyboardTheme, query: Str
         Spacer(modifier = Modifier.width(8.dp))
 
         IconButton(
-            onClick = { service.setCurrentView("keyboard") },
+            onClick = { viewModel.setCurrentView("keyboard") },
             modifier = Modifier.size(36.dp)
         ) {
             Icon(

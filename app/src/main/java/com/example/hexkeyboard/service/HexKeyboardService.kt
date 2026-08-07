@@ -50,6 +50,11 @@ import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.ui.keyboard.KeyboardScreen
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
+import androidx.lifecycle.ViewModelProvider
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import com.example.hexkeyboard.ui.settings.SettingsActivity
+import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
+import com.example.hexkeyboard.ui.settings.PermissionActivity
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import androidx.core.content.edit
@@ -91,36 +96,8 @@ class HexKeyboardService : InputMethodService(),
     internal var mHexKeyboardView: HexKeyboardView? = null
     private var mComposeView: ComposeView? = null
 
+    private lateinit var viewModel: KeyboardViewModel
     private lateinit var parallaxSensorManager: ParallaxSensorManager
-    private val _parallaxOffset = MutableStateFlow(ParallaxSensorManager.Offset(0f, 0f))
-    val parallaxOffset: StateFlow<ParallaxSensorManager.Offset> = _parallaxOffset.asStateFlow()
-
-    private val _suggestions = MutableStateFlow<List<String>>(emptyList())
-    val suggestions = _suggestions.asStateFlow()
-
-    private val _clipboardHistory = MutableStateFlow<List<ClipboardItem>>(emptyList())
-    val clipboardHistory = _clipboardHistory.asStateFlow()
-
-    private val _keyboardTheme = MutableStateFlow<KeyboardTheme?>(null)
-    val keyboardTheme = _keyboardTheme.asStateFlow()
-
-    private val _currentView = MutableStateFlow("keyboard")
-    val currentView = _currentView.asStateFlow()
-
-    private val _currentLocale = MutableStateFlow("es")
-    val currentLocale = _currentLocale.asStateFlow()
-
-    private val _emojiSearchQuery = MutableStateFlow("")
-    val emojiSearchQuery = _emojiSearchQuery.asStateFlow()
-
-    private val _selectedSkinTone = MutableStateFlow("")
-    val selectedSkinTone = _selectedSkinTone.asStateFlow()
-
-    private val _selectedGenderIndex = MutableStateFlow(0)
-    val selectedGenderIndex = _selectedGenderIndex.asStateFlow()
-
-    private val _isEmojiSearchActive = MutableStateFlow(value = false)
-    val isEmojiSearchActive = _isEmojiSearchActive.asStateFlow()
 
     private var lastUsedClipboardText: String? = null
     private var lastAutoCorrection: LastCorrection? = null
@@ -167,7 +144,7 @@ class HexKeyboardService : InputMethodService(),
             "keyboard_language" -> {
                 val lang = prefs.getString(key, "es") ?: "es"
                 Log.d("HexKB", "Preference changed to: $lang")
-                _currentLocale.value = lang
+                viewModel.updateCurrentLocale(lang)
                 serviceScope.launch(Dispatchers.IO) {
                     predictionEngine.initialize(lang)
                 }
@@ -281,8 +258,7 @@ class HexKeyboardService : InputMethodService(),
     )
 
     fun setEmojiSearchActive(active: Boolean) {
-        _isEmojiSearchActive.value = active
-        if (!active) _emojiSearchQuery.value = ""
+        viewModel.setEmojiSearchActive(active)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -299,7 +275,7 @@ class HexKeyboardService : InputMethodService(),
             prefs.edit { putString("keyboard_language", lang) }
         }
 
-        _currentLocale.value = lang
+        viewModel.updateCurrentLocale(lang)
         mHexKeyboardView?.let { view ->
             view.post { 
                 view.language = lang
@@ -339,6 +315,8 @@ class HexKeyboardService : InputMethodService(),
 
     override fun onCreate() {
         super.onCreate()
+        viewModel = ViewModelProvider(this)[KeyboardViewModel::class.java]
+        setupViewModelCallbacks()
 
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         registerReceiver(wallpaperReceiver, filter)
@@ -346,15 +324,15 @@ class HexKeyboardService : InputMethodService(),
         parallaxSensorManager = ParallaxSensorManager(this)
         serviceScope.launch {
             parallaxSensorManager.parallaxOffset.collect {
-                _parallaxOffset.value = it
+                viewModel.updateParallaxOffset(it)
             }
         }
 
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         
-        _selectedSkinTone.value = prefs.getString("selected_skin_tone", "") ?: ""
-        _selectedGenderIndex.value = prefs.getInt("selected_gender_index", 0)
+        viewModel.setSkinTone(prefs.getString("selected_skin_tone", "") ?: "")
+        viewModel.setGenderIndex(prefs.getInt("selected_gender_index", 0))
 
         clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         clipboardManager.addPrimaryClipChangedListener(clipboardListener)
@@ -366,7 +344,7 @@ class HexKeyboardService : InputMethodService(),
         serviceScope.launch(Dispatchers.IO) {
             val lang = prefs.getString("keyboard_language", "es") ?: "es"
             val layoutType = prefs.getString("keyboard_layout_type", "default") ?: "default"
-            _currentLocale.value = lang
+            viewModel.updateCurrentLocale(lang)
             predictionEngine.initialize(lang)
             predictionEngine.setLayoutType(layoutType)
             withContext(Dispatchers.Main) {
@@ -376,14 +354,14 @@ class HexKeyboardService : InputMethodService(),
 
         serviceScope.launch {
             ThemeUtils.getKeyboardThemeFlow(this@HexKeyboardService).collect { theme ->
-                _keyboardTheme.value = theme
+                viewModel.updateKeyboardTheme(theme)
             }
         }
 
         serviceScope.launch(Dispatchers.IO) {
             val history = ClipboardHistoryManager.getHistory(this@HexKeyboardService)
             withContext(Dispatchers.Main) {
-                _clipboardHistory.value = history
+                viewModel.updateClipboardHistory(history)
             }
         }
         
@@ -399,6 +377,31 @@ class HexKeyboardService : InputMethodService(),
         mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
     }
 
+    private fun setupViewModelCallbacks() {
+        viewModel.onActionRequested = { action ->
+            when (action) {
+                is KeyboardViewModel.Action.InsertText -> handleChar(action.text)
+                is KeyboardViewModel.Action.DeleteBackward -> handleDelete()
+                is KeyboardViewModel.Action.InsertNewLine -> handleEnter()
+                is KeyboardViewModel.Action.ReplaceLastWord -> replaceLastWord(action.newWord)
+                is KeyboardViewModel.Action.SetEmojiSearchActive -> {
+                    // La lógica ya está en el ViewModel, pero si el servicio necesita reaccionar:
+                }
+                is KeyboardViewModel.Action.OpenSettings -> {
+                    val intent = when (action.type) {
+                        KeyboardViewModel.SettingsType.GENERAL -> Intent(this, SettingsActivity::class.java)
+                        KeyboardViewModel.SettingsType.THEMES -> Intent(this, ThemeSettingsActivity::class.java)
+                        KeyboardViewModel.SettingsType.PERMISSIONS -> Intent(this, PermissionActivity::class.java)
+                    }.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    startActivity(intent)
+                }
+                KeyboardViewModel.Action.RefreshClipboard -> refreshClipboardHistory()
+                KeyboardViewModel.Action.SwitchToNextLanguage -> switchToNextLanguage()
+                KeyboardViewModel.Action.ShowLanguagePicker -> showLanguagePicker()
+            }
+        }
+    }
+
     override fun onCreateInputView(): View {
         mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         
@@ -411,12 +414,12 @@ class HexKeyboardService : InputMethodService(),
             setViewTreeSavedStateRegistryOwner(this@HexKeyboardService)
             
             setContent {
-                val keyboardTheme by this@HexKeyboardService.keyboardTheme.collectAsState()
+                val keyboardTheme by viewModel.keyboardTheme.collectAsState()
                 CompositionLocalProvider(
                     LocalLifecycleOwner provides this@HexKeyboardService
                 ) {
                     HexKeyboardTheme(dynamicColor = keyboardTheme?.id == "m3_dynamic") {
-                        KeyboardScreen(service = this@HexKeyboardService)
+                        KeyboardScreen(viewModel = viewModel)
                     }
                 }
             }
@@ -450,7 +453,7 @@ class HexKeyboardService : InputMethodService(),
 
     override fun onWindowShown() {
         super.onWindowShown()
-        val theme = _keyboardTheme.value ?: return
+        val theme = viewModel.keyboardTheme.value ?: return
         if (theme.parallaxEffect) {
             parallaxSensorManager.start()
         }
@@ -492,7 +495,7 @@ class HexKeyboardService : InputMethodService(),
                 it.shifted = false
                 it.resetState()
             }
-            _currentView.value = "keyboard"
+            viewModel.setCurrentView("keyboard")
         }
         updateShiftState()
         mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -503,7 +506,7 @@ class HexKeyboardService : InputMethodService(),
         super.onFinishInputView(finishingInput)
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         if (prefs.getBoolean("reset_on_close", true)) {
-            _currentView.value = "keyboard"
+            viewModel.setCurrentView("keyboard")
             mHexKeyboardView?.resetState()
         }
     }
@@ -515,7 +518,7 @@ class HexKeyboardService : InputMethodService(),
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val lang = prefs.getString("keyboard_language", "es") ?: "es"
         
-        _currentLocale.value = lang
+        viewModel.updateCurrentLocale(lang)
         serviceScope.launch(Dispatchers.IO) {
             predictionEngine.initialize(lang, forceUserDictReload = true)
         }
@@ -546,7 +549,7 @@ class HexKeyboardService : InputMethodService(),
         serviceScope.launch(Dispatchers.Default) {
             val localSuggestions = mutableListOf<String>()
             
-            val history = _clipboardHistory.value
+            val history = viewModel.clipboardHistory.value
             history.firstOrNull()?.text?.let { 
                 if ((it.isNotEmpty()) && (it != lastUsedClipboardText)) {
                     localSuggestions.add(it)
@@ -572,7 +575,7 @@ class HexKeyboardService : InputMethodService(),
             
             val finalSuggestions = localSuggestions.asSequence().distinct().take(6).toList()
             withContext(Dispatchers.Main) {
-                _suggestions.value = finalSuggestions
+                viewModel.updateSuggestions(finalSuggestions)
             }
         }
     }
@@ -584,7 +587,7 @@ class HexKeyboardService : InputMethodService(),
             textBefore.toString().split(" ", "\n", "\t").last().lowercase()
         } else ""
 
-        val currentList = _suggestions.value.toMutableList()
+        val currentList = viewModel.suggestions.value.toMutableList()
         val filteredSystem = systemSuggestions.filter { sugg ->
             sugg.lowercase() != lastWord 
         }
@@ -594,7 +597,7 @@ class HexKeyboardService : InputMethodService(),
         } else {
             currentList.asSequence().distinct().take(6).toList()
         }
-        _suggestions.value = final
+        viewModel.updateSuggestions(final)
     }
 
     override fun onUpdateSelection(
@@ -610,18 +613,15 @@ class HexKeyboardService : InputMethodService(),
     fun onEmojiSelected(emoji: String) {
         val ic = currentInputConnection ?: return
         ic.commitText(emoji, 1)
-        _isEmojiSearchActive.value = false
-        _emojiSearchQuery.value = ""
+        viewModel.setEmojiSearchActive(false)
         updateShiftState()
         updateSuggestions()
     }
 
     fun handleChar(text: String) {
-        if (_isEmojiSearchActive.value) {
-            _emojiSearchQuery.value += text
-            return
-        }
-
+        // La lógica de EmojiSearchQuery ahora se maneja en el ViewModel
+        // pero por seguridad, si llegamos aquí, insertamos.
+        
         mHexKeyboardView?.let { view ->
             if (view.layoutMode == HexKeyboardView.LayoutMode.NUMERIC || view.layoutMode == HexKeyboardView.LayoutMode.SYMBOLS) {
                 if (text == " ") {
@@ -671,7 +671,7 @@ class HexKeyboardService : InputMethodService(),
         }
 
         if (text == " " && prefs.getBoolean("auto_correct", false)) {
-            val suggestions = _suggestions.value
+            val suggestions = viewModel.suggestions.value
             if (suggestions.isNotEmpty() && !suggestions[0].contains(" ")) {
                 val textBefore = ic.getTextBeforeCursor(30, 0) ?: ""
                 val originalWord = textBefore.toString().split(" ", "\n").lastOrNull() ?: ""
@@ -703,18 +703,8 @@ class HexKeyboardService : InputMethodService(),
     }
 
     fun handleDelete() {
-        if (_isEmojiSearchActive.value) {
-            val current = _emojiSearchQuery.value
-            if (current.isNotEmpty()) {
-                mHexKeyboardView?.triggerVibration()
-                mHexKeyboardView?.triggerSound()
-                _emojiSearchQuery.value = current.dropLast(1)
-            } else {
-                _isEmojiSearchActive.value = false
-            }
-            return
-        }
-
+        // La lógica de borrar en búsqueda de emojis ahora se maneja en el ViewModel.
+        
         val ic = currentInputConnection ?: return
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
 
@@ -781,11 +771,6 @@ class HexKeyboardService : InputMethodService(),
     }
 
     fun handleEnter() {
-        if (_isEmojiSearchActive.value) {
-            _isEmojiSearchActive.value = false
-            return
-        }
-
         val ic = currentInputConnection ?: return
         val ei = currentInputEditorInfo ?: return
         val action = ei.imeOptions and EditorInfo.IME_MASK_ACTION
@@ -813,7 +798,7 @@ class HexKeyboardService : InputMethodService(),
                     if (best.score > 200) {
                         handleChar(best.text + " ")
                     } else {
-                        _suggestions.value = suggestions.map { it.text }
+                        viewModel.updateSuggestions(suggestions.map { it.text })
                     }
                 }
             }
@@ -822,7 +807,7 @@ class HexKeyboardService : InputMethodService(),
 
     fun replaceLastWord(newWord: String) {
         val ic = currentInputConnection ?: return
-        val latestClip = _clipboardHistory.value.firstOrNull()?.text ?: ""
+        val latestClip = viewModel.clipboardHistory.value.firstOrNull()?.text ?: ""
         if (newWord.trim() == latestClip.trim()) {
             lastUsedClipboardText = latestClip
         }
@@ -849,7 +834,7 @@ class HexKeyboardService : InputMethodService(),
     }
 
     fun useClipboardItem(text: String) {
-        val latestClip = _clipboardHistory.value.firstOrNull()?.text ?: ""
+        val latestClip = viewModel.clipboardHistory.value.firstOrNull()?.text ?: ""
         if (text.trim() == latestClip.trim()) {
             lastUsedClipboardText = latestClip
         }
@@ -888,20 +873,14 @@ class HexKeyboardService : InputMethodService(),
     }
 
     fun setCurrentView(view: String) {
-        _currentView.value = view
-        if (view == "clipboard") {
-            refreshClipboardHistory()
-        }
-        if (view != "emoji") {
-            _emojiSearchQuery.value = ""
-            _isEmojiSearchActive.value = false
-        }
+        viewModel.setCurrentView(view)
     }
 
     fun refreshClipboardHistory(triggerSuggestionsUpdate: Boolean = false) {
         serviceScope.launch {
             ClipboardHistoryManager.cleanUpExpiredItems(this@HexKeyboardService)
-            _clipboardHistory.value = ClipboardHistoryManager.getHistory(this@HexKeyboardService)
+            val history = ClipboardHistoryManager.getHistory(this@HexKeyboardService)
+            viewModel.updateClipboardHistory(history)
             if (triggerSuggestionsUpdate) {
                 updateSuggestions()
             }
@@ -914,20 +893,20 @@ class HexKeyboardService : InputMethodService(),
         if (level >= TRIM_MEMORY_MODERATE) {
             mHexKeyboardView?.clearCaches()
             predictionEngine.clearCaches()
-            _suggestions.value = emptyList()
-            _clipboardHistory.value = emptyList()
+            viewModel.updateSuggestions(emptyList())
+            viewModel.updateClipboardHistory(emptyList())
             System.gc()
         }
     }
 
     fun setSkinTone(modifier: String) {
-        _selectedSkinTone.value = modifier
+        viewModel.setSkinTone(modifier)
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         prefs.edit { putString("selected_skin_tone", modifier) }
     }
 
     fun setGenderIndex(index: Int) {
-        _selectedGenderIndex.value = index
+        viewModel.setGenderIndex(index)
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         prefs.edit { putInt("selected_gender_index", index) }
     }

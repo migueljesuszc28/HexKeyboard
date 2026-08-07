@@ -1,5 +1,6 @@
 package com.example.hexkeyboard.ui.keyboard
 
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,23 +18,22 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
-import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.data.repository.ThemeUtils
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.content.SharedPreferences
 
 @Composable
-fun KeyboardScreen(service: HexKeyboardService) {
+fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val context = LocalContext.current
-    val keyboardThemeOpt by service.keyboardTheme.collectAsState()
+    val keyboardThemeOpt by viewModel.keyboardTheme.collectAsState()
     val keyboardTheme = keyboardThemeOpt ?: return
 
-    val parallaxOffsetState = service.parallaxOffset.collectAsState()
+    val parallaxOffsetState = viewModel.parallaxOffset.collectAsState()
 
     val hazeState = remember { HazeState() }
     val isGlassTheme = keyboardTheme.id == "glass"
@@ -139,14 +139,14 @@ fun KeyboardScreen(service: HexKeyboardService) {
                 .then(if (isGlassTheme) Modifier.hazeSource(hazeState) else Modifier)
                 .navigationBarsPadding()
         ) {
-            SuggestionsBarSection(service, keyboardTheme)
+            SuggestionsBarSection(viewModel, keyboardTheme)
 
             Box(
                 modifier = Modifier.fillMaxWidth().wrapContentHeight(),
                 contentAlignment = Alignment.TopCenter
             ) {
-                KeyboardMainSection(service, keyboardTheme, hasBackgroundImage) { x, y -> }
-                PanelsSection(service, keyboardTheme)
+                KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
+                PanelsSection(viewModel, keyboardTheme)
             }
 
             if (bottomOffset > 0) {

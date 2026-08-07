@@ -25,10 +25,16 @@ import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import kotlin.math.abs
 
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+
 @Composable
-fun FunctionsPanel(onBack: () -> Unit, onSettings: () -> Unit, theme: KeyboardTheme) {
+fun FunctionsPanel(
+    onBack: () -> Unit,
+    onSettings: () -> Unit,
+    theme: KeyboardTheme,
+    viewModel: KeyboardViewModel? = null
+) {
     val context = LocalContext.current
-    val service = context as? HexKeyboardService
 
     Column(
         modifier = Modifier
@@ -55,10 +61,10 @@ fun FunctionsPanel(onBack: () -> Unit, onSettings: () -> Unit, theme: KeyboardTh
                 icon = Icons.Default.Language,
                 label = "Idioma",
                 onClick = {
-                    service?.switchToNextLanguage()
+                    viewModel?.switchToNextLanguage()
                 },
                 onLongClick = {
-                    service?.showLanguagePicker()
+                    viewModel?.showLanguagePicker()
                 },
                 theme = theme
             )
