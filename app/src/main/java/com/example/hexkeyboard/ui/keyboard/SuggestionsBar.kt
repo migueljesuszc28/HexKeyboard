@@ -148,7 +148,12 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
             visible = currentView != "keyboard" && currentView != "emoji",
             enter = fadeIn(), exit = fadeOut()
         ) {
-            PanelHeader(currentView, theme) { viewModel.setCurrentView("keyboard") }
+            val title = when(currentView) {
+                "clipboard" -> "Portapapeles"
+                "functions" -> "Funciones"
+                else -> currentView
+            }
+            PanelHeader(title, theme) { viewModel.setCurrentView("keyboard") }
         }
     }
 }

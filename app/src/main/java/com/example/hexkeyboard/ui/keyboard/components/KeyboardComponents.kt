@@ -22,12 +22,36 @@ import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 
 @Composable
 fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: String) {
+    val iconColor = Color(theme.keyboardIconTint)
+    val baseBgColor = Color(theme.backgroundColor)
+    val useAdaptiveColor = theme.backgroundImageUri != null
+    val isLightBg = baseBgColor.red * 0.299 + baseBgColor.green * 0.587 + baseBgColor.blue * 0.114 > 0.5
+    
+    val finalIconColor = if (useAdaptiveColor) {
+        if (isLightBg) Color.Black else Color.White
+    } else {
+        iconColor
+    }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(
+            onClick = { viewModel.setCurrentView("keyboard") },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Keyboard,
+                contentDescription = "Cerrar",
+                tint = finalIconColor
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -52,24 +76,31 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
                 )
             }
         }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        IconButton(
-            onClick = { viewModel.setCurrentView("keyboard") },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Keyboard,
-                contentDescription = "Cerrar",
-                tint = Color(theme.keyboardIconTint)
-            )
-        }
     }
 }
 
 @Composable
 fun PanelHeader(title: String, theme: KeyboardTheme, onBack: () -> Unit) {
+    val textColor = Color(theme.keyTextColor)
+    val iconColor = Color(theme.keyboardIconTint)
+    val baseBgColor = Color(theme.backgroundColor)
+    
+    // Lógica de color adaptable al fondo
+    val useAdaptiveColor = theme.backgroundImageUri != null
+    val isLightBg = baseBgColor.red * 0.299 + baseBgColor.green * 0.587 + baseBgColor.blue * 0.114 > 0.5
+    
+    val finalTextColor = if (useAdaptiveColor) {
+        if (isLightBg) Color.Black else Color.White
+    } else {
+        textColor
+    }
+
+    val finalIconColor = if (useAdaptiveColor) {
+        if (isLightBg) Color.Black else Color.White
+    } else {
+        iconColor
+    }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -80,12 +111,12 @@ fun PanelHeader(title: String, theme: KeyboardTheme, onBack: () -> Unit) {
             Icon(
                 imageVector = Icons.Default.Keyboard,
                 contentDescription = "Volver",
-                tint = Color(theme.keyboardIconTint)
+                tint = finalIconColor
             )
         }
         Text(
             text = title.uppercase(),
-            color = Color(theme.keyTextColor),
+            color = finalTextColor,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 8.dp)
