@@ -1,5 +1,6 @@
 package com.example.hexkeyboard.ui.keyboard.panels
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -10,8 +11,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -108,6 +112,27 @@ fun EmojiPanel(
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
 
+    // Lógica para mostrar/ocultar la barra de categorías según el scroll
+    var isCategoriesVisible by remember { mutableStateOf(true) }
+
+    LaunchedEffect(gridState) {
+        var lastScrollIndex = 0
+        var lastScrollOffset = 0
+        
+        snapshotFlow { Pair(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
+            .collect { (currentIndex, currentOffset) ->
+                if (gridState.isScrollInProgress) {
+                    if (currentIndex > lastScrollIndex || (currentIndex == lastScrollIndex && currentOffset > lastScrollOffset)) {
+                        isCategoriesVisible = false
+                    } else if (currentIndex < lastScrollIndex || (currentIndex == lastScrollIndex && currentOffset < lastScrollOffset)) {
+                        isCategoriesVisible = true
+                    }
+                }
+                lastScrollIndex = currentIndex
+                lastScrollOffset = currentOffset
+            }
+    }
+
     val currentCategoryIndex by remember(emojiList) {
         derivedStateOf {
             val firstIndex = gridState.firstVisibleItemIndex
@@ -122,68 +147,106 @@ fun EmojiPanel(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f)) {
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(8),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 8.dp)
-            ) {
-                items(
-                    items = emojiList,
-                    key = { item ->
-                        when(item) {
-                            is EmojiProvider.EmojiGridItem.Header -> "header_${item.name}"
-                            is EmojiProvider.EmojiGridItem.Emoji -> "${item.category}_${item.code}"
-                        }
-                    },
-                    span = { item -> GridItemSpan(if (item is EmojiProvider.EmojiGridItem.Header) maxLineSpan else 1) },
-                    contentType = { item -> if (item is EmojiProvider.EmojiGridItem.Header) "header" else "emoji" }
-                ) { item ->
-                    when (item) {
-                        is EmojiProvider.EmojiGridItem.Header -> EmojiHeader(name = item.name, theme = theme)
-                        is EmojiProvider.EmojiGridItem.Emoji -> {
-                            EmojiItem(
-                                emoji = item.code,
-                                canonical = item.canonical,
-                                family = item.family,
-                                skinTone = skinTone,
-                                genderIndex = genderIndex,
-                                onSkinToneSelected = { viewModel?.setSkinTone(it) },
-                                onGenderSelected = { viewModel?.setGenderIndex(it) },
-                                onEmojiSelected = { finalEmoji ->
-                                    FeedbackManager.triggerFeedback(context)
-                                    val newList = (listOf(finalEmoji) + recentEmojis.filter { it != finalEmoji }).take(30)
-                                    prefs.edit().putString("recent_emojis", newList.joinToString(",")).apply()
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(8),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 60.dp)
+        ) {
+            items(
+                items = emojiList,
+                key = { item ->
+                    when(item) {
+                        is EmojiProvider.EmojiGridItem.Header -> "header_${item.name}"
+                        is EmojiProvider.EmojiGridItem.Emoji -> "${item.category}_${item.code}"
+                    }
+                },
+                span = { item -> GridItemSpan(if (item is EmojiProvider.EmojiGridItem.Header) maxLineSpan else 1) },
+                contentType = { item -> if (item is EmojiProvider.EmojiGridItem.Header) "header" else "emoji" }
+            ) { item ->
+                when (item) {
+                    is EmojiProvider.EmojiGridItem.Header -> EmojiHeader(name = item.name, theme = theme)
+                    is EmojiProvider.EmojiGridItem.Emoji -> {
+                        EmojiItem(
+                            emoji = item.code,
+                            canonical = item.canonical,
+                            family = item.family,
+                            skinTone = skinTone,
+                            genderIndex = genderIndex,
+                            onSkinToneSelected = { viewModel?.setSkinTone(it) },
+                            onGenderSelected = { viewModel?.setGenderIndex(it) },
+                            onEmojiSelected = { finalEmoji ->
+                                FeedbackManager.triggerFeedback(context)
+                                val newList = (listOf(finalEmoji) + recentEmojis.filter { it != finalEmoji }).take(30)
+                                prefs.edit().putString("recent_emojis", newList.joinToString(",")).apply()
 
-                                    if (item.category != "Recientes" || !recentEmojis.contains(finalEmoji)) {
-                                        recentEmojis = newList
-                                    }
-                                    onEmojiSelected(finalEmoji)
-                                },
-                                theme = theme
-                            )
-                        }
+                                if (item.category != "Recientes" || !recentEmojis.contains(finalEmoji)) {
+                                    recentEmojis = newList
+                                }
+                                onEmojiSelected(finalEmoji)
+                            },
+                            theme = theme
+                        )
                     }
                 }
             }
         }
 
         if (searchQuery.isEmpty()) {
-            EmojiCategoryTabs(
-                selectedTabIndex = currentCategoryIndex,
-                onCategoryClick = { categoryName ->
-                    val index = emojiList.indexOfFirst { it is EmojiProvider.EmojiGridItem.Header && it.name == categoryName }
-                    if (index >= 0) { 
-                        scope.launch { 
-                            // Salto instantáneo directo para todas las categorías
-                            gridState.scrollToItem(index)
-                        } 
-                    }
-                },
-                theme = theme
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                AnimatedVisibility(
+                    visible = isCategoriesVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { it / 2 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.9f),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it / 2 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    EmojiCategoryTabs(
+                        modifier = Modifier.fillMaxWidth(),
+                        selectedTabIndex = currentCategoryIndex,
+                        onCategoryClick = { categoryName ->
+                            val index = emojiList.indexOfFirst { it is EmojiProvider.EmojiGridItem.Header && it.name == categoryName }
+                            if (index >= 0) { 
+                                scope.launch { 
+                                    gridState.scrollToItem(index)
+                                } 
+                            }
+                        },
+                        theme = theme
+                    )
+                }
+
+                if (isCategoriesVisible) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                EmojiDeleteButton(
+                    onDelete = {
+                        val service = context as? HexKeyboardService
+                        service?.handleDelete()
+                    },
+                    theme = theme
+                )
+            }
         }
     }
 }
@@ -209,7 +272,7 @@ fun EmojiHeader(name: String, theme: KeyboardTheme) {
 }
 
 @Composable
-fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, theme: KeyboardTheme) {
+fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, theme: KeyboardTheme, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val categoryIcons = remember {
         mapOf<String, Any>(
@@ -221,50 +284,51 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
         )
     }
 
-    Surface(modifier = Modifier.fillMaxWidth(), color = Color.Transparent, tonalElevation = 0.dp) {
-        Row(modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            @OptIn(ExperimentalMaterial3Api::class)
-            CompositionLocalProvider(LocalRippleConfiguration provides null) {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTabIndex, containerColor = Color.Transparent,
-                    contentColor = Color(theme.keyboardIconTint), edgePadding = 8.dp,
-                    modifier = Modifier.weight(1f), divider = {}, indicator = {}
-                ) {
-                    EmojiProvider.categories.forEachIndexed { index, category ->
-                        val isSelected = index == selectedTabIndex
-                        Tab(
-                            selected = isSelected,
-                            onClick = {
-                                FeedbackManager.triggerFeedback(context)
-                                onCategoryClick(category.name)
-                            },
-                            unselectedContentColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f),
-                            selectedContentColor = Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint),
-                            icon = {
-                                val iconData = categoryIcons[category.name]
-                                val tint = if (isSelected) Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint) else Color(theme.keyboardIconTint).copy(alpha = 0.5f)
-                                when (iconData) {
-                                    is ImageVector -> Icon(imageVector = iconData, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
-                                    is Int -> Icon(painter = painterResource(iconData), contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
-                                    else -> Text(category.icon, fontSize = 18.sp, color = tint)
-                                }
+    Surface(
+        modifier = modifier.height(38.dp),
+        color = Color(theme.keyBackgroundColor),
+        shape = RoundedCornerShape(20.dp),
+        shadowElevation = 2.dp,
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f))
+    ) {
+        @OptIn(ExperimentalMaterial3Api::class)
+        CompositionLocalProvider(LocalRippleConfiguration provides null) {
+            ScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = Color.Transparent,
+                contentColor = Color(theme.keyboardIconTint),
+                edgePadding = 4.dp,
+                modifier = Modifier.fillMaxWidth(),
+                divider = {},
+                indicator = {}
+            ) {
+                EmojiProvider.categories.forEachIndexed { index, category ->
+                    val isSelected = index == selectedTabIndex
+                    Tab(
+                        selected = isSelected,
+                        onClick = {
+                            FeedbackManager.triggerFeedback(context)
+                            onCategoryClick(category.name)
+                        },
+                        unselectedContentColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f),
+                        selectedContentColor = Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint),
+                        icon = {
+                            val iconData = categoryIcons[category.name]
+                            val tint = if (isSelected) Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint) else Color(theme.keyboardIconTint).copy(alpha = 0.5f)
+                            when (iconData) {
+                                is ImageVector -> Icon(imageVector = iconData, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
+                                is Int -> Icon(painter = painterResource(iconData), contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
+                                else -> Text(category.icon, fontSize = 18.sp, color = tint)
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
-
-            EmojiDeleteButton(
-                onDelete = {
-                    val service = context as? HexKeyboardService
-                    service?.handleDelete()
-                },
-                theme = theme
-            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -288,16 +352,27 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
         }
     }
 
-    IconButton(
-        onClick = { onDelete() }, interactionSource = interactionSource,
-        modifier = Modifier.size(48.dp).graphicsLayer { scaleX = scale; scaleY = scale }
-    ) {
-        Icon(
-            painter = painterResource(if (isPressed) R.drawable.ic_delete_filled else R.drawable.ic_delete),
-            contentDescription = "Borrar",
-            tint = if (isPressed) Color(theme.deletePressedIconColor ?: theme.keyboardIconTint) else Color(theme.keyboardIconTint).copy(alpha = 0.7f),
-            modifier = Modifier.size(40.dp)
-        )
+    CompositionLocalProvider(LocalRippleConfiguration provides null) {
+        Surface(
+            onClick = { onDelete() },
+            interactionSource = interactionSource,
+            modifier = Modifier.size(45.dp).graphicsLayer { scaleX = scale; scaleY = scale },
+            shape = CircleShape,
+            color = Color(theme.keyBackgroundColor),
+            shadowElevation = 2.dp
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isPressed) Icons.AutoMirrored.Filled.Backspace else Icons.AutoMirrored.Outlined.Backspace,
+                    contentDescription = "Borrar",
+                    tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint).copy(alpha = 0.7f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
     }
 }
 
@@ -318,7 +393,7 @@ fun EmojiItem(
     var isPressed by remember { mutableStateOf(false) }
     var showVariationSelector by remember { mutableStateOf(false) }
 
-    // Sincronización Global Total (Estilo Gboard): 
+    // Sincronización Global Total (Estilo Gboard):
     // Los emojis reaccionan dinámicamente al tono y género global usando la familia pre-calculada
     val displayEmoji = remember(canonical, skinTone, genderIndex) {
         val gendered = when (genderIndex) {
