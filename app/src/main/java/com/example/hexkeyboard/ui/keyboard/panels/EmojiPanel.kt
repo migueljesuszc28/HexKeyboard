@@ -288,8 +288,7 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
         modifier = modifier.height(38.dp),
         color = Color(theme.keyBackgroundColor),
         shape = RoundedCornerShape(20.dp),
-        shadowElevation = 2.dp,
-        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f))
+        shadowElevation = 2.dp
     ) {
         @OptIn(ExperimentalMaterial3Api::class)
         CompositionLocalProvider(LocalRippleConfiguration provides null) {
