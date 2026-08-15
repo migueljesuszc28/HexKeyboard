@@ -150,7 +150,7 @@ class HexKeyboardService : InputMethodService(),
                 }
                 spellCheckerManager.closeSession()
                 spellCheckerManager.clearSuggestions()
-                spellCheckerManager.initSession(Locale.forLanguageTag(lang))
+                spellCheckerManager.initSession()
                 switchToLanguage(lang)
                 mHexKeyboardView?.let { view ->
                     view.post { 
@@ -338,7 +338,7 @@ class HexKeyboardService : InputMethodService(),
         clipboardManager.addPrimaryClipChangedListener(clipboardListener)
 
         predictionEngine = PredictionEngine(this)
-        spellCheckerManager = SpellCheckerManager(this, predictionEngine)
+        spellCheckerManager = SpellCheckerManager(predictionEngine)
         voiceRecognitionHelper = VoiceRecognitionHelper(this)
         
         serviceScope.launch(Dispatchers.IO) {
@@ -366,9 +366,9 @@ class HexKeyboardService : InputMethodService(),
         }
         
         serviceScope.launch {
-            spellCheckerManager.suggestionsState.collect { systemSuggestions ->
-                if (systemSuggestions.isNotEmpty()) {
-                    combineAndFilterSuggestions(systemSuggestions)
+            spellCheckerManager.suggestionsState.collect { suggestions ->
+                if (suggestions.isNotEmpty()) {
+                    viewModel.updateSuggestions(suggestions)
                 }
             }
         }
@@ -526,7 +526,7 @@ class HexKeyboardService : InputMethodService(),
 
         spellCheckerManager.closeSession()
         spellCheckerManager.clearSuggestions()
-        spellCheckerManager.initSession(Locale.forLanguageTag(lang))
+        spellCheckerManager.initSession()
         val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
         mHexKeyboardView?.setImeAction(action)
         
@@ -578,26 +578,6 @@ class HexKeyboardService : InputMethodService(),
                 viewModel.updateSuggestions(finalSuggestions)
             }
         }
-    }
-
-    private fun combineAndFilterSuggestions(systemSuggestions: List<String>) {
-        val ic = currentInputConnection ?: return
-        val textBefore = ic.getTextBeforeCursor(40, 0) ?: ""
-        val lastWord = if (textBefore.isNotEmpty() && !textBefore.endsWith(" ")) {
-            textBefore.toString().split(" ", "\n", "\t").last().lowercase()
-        } else ""
-
-        val currentList = viewModel.suggestions.value.toMutableList()
-        val filteredSystem = systemSuggestions.filter { sugg ->
-            sugg.lowercase() != lastWord 
-        }
-
-        val final = if (filteredSystem.isNotEmpty()) {
-            (filteredSystem + currentList).asSequence().distinct().take(6).toList()
-        } else {
-            currentList.asSequence().distinct().take(6).toList()
-        }
-        viewModel.updateSuggestions(final)
     }
 
     override fun onUpdateSelection(
