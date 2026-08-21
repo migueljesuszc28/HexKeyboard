@@ -368,7 +368,7 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
                     imageVector = if (isPressed) Icons.AutoMirrored.Filled.Backspace else Icons.AutoMirrored.Outlined.Backspace,
                     contentDescription = "Borrar",
                     tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint).copy(alpha = 0.7f),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp).offset(x = (-1).dp)
                 )
             }
         }

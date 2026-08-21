@@ -150,7 +150,7 @@ class HexKeyboardService : InputMethodService(),
                 }
                 spellCheckerManager.closeSession()
                 spellCheckerManager.clearSuggestions()
-                spellCheckerManager.initSession()
+                    spellCheckerManager.initSession()
                 switchToLanguage(lang)
                 mHexKeyboardView?.let { view ->
                     view.post { 
