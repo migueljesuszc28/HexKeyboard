@@ -1,6 +1,5 @@
 package com.example.hexkeyboard.ui.keyboard
 
-import android.content.SharedPreferences
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import kotlinx.coroutines.flow.map
 import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val context = LocalContext.current
+    val dataStore = ThemeUtils.getDataStore(context)
     val keyboardThemeOpt by viewModel.keyboardTheme.collectAsState()
     val keyboardTheme = keyboardThemeOpt ?: return
 
@@ -75,18 +76,8 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
         }
     }
 
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var bottomOffset by remember { mutableIntStateOf(prefs.getInt("keyboard_bottom_offset", 35)) }
-
-    DisposableEffect(context) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
-            if (key == "keyboard_bottom_offset") {
-                bottomOffset = p.getInt(key, 0)
-            }
-        }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
+    val bottomOffsetFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 35 } }
+    val bottomOffset by bottomOffsetFlow.collectAsState(35)
 
     Box(
         modifier = Modifier

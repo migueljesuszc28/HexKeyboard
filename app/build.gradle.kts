@@ -58,7 +58,6 @@ dependencies {
     implementation(libs.androidx.preference)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.gson)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)

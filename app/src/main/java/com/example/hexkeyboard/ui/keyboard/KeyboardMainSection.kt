@@ -1,11 +1,11 @@
 package com.example.hexkeyboard.ui.keyboard
 
-import android.content.SharedPreferences
 import android.graphics.PointF
 import android.graphics.Typeface
 import android.view.View
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -21,6 +21,9 @@ import com.example.hexkeyboard.ui.keyboard.panels.EmojiPanel
 import com.example.hexkeyboard.ui.keyboard.panels.FunctionsPanel
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -37,18 +40,13 @@ fun KeyboardMainSection(
 
     val context = LocalContext.current
     val service = context as? HexKeyboardService
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var fontPath by remember { mutableStateOf(prefs.getString("custom_font_path", "system") ?: "system") }
-
-    DisposableEffect(prefs) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
-            if (key == "custom_font_path") {
-                fontPath = p.getString(key, "system") ?: "system"
-            }
-        }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
+    val dataStore = ThemeUtils.getDataStore(context)
+    
+    val fontPathFlow = remember { dataStore.data.map { it[stringPreferencesKey("custom_font_path")] ?: "system" } }
+    val fontPath by fontPathFlow.collectAsState("system")
+    
+    val layoutTypeFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default" } }
+    val layoutType by layoutTypeFlow.collectAsState("default")
 
     val nunitoTypeface = remember(fontPath) {
         when (fontPath) {
@@ -77,7 +75,7 @@ fun KeyboardMainSection(
                 this.fontPages = service?.fontPages ?: emptyList()
                 this.longPressAlternatives = service?.longPressAlternatives ?: emptyMap()
                 this.language = currentLocale
-                this.layoutType = prefs.getString("keyboard_layout_type", "default") ?: "default"
+                this.layoutType = layoutType
                 service?.mHexKeyboardView = this
                 this.drawBackground = !hasBackgroundImage
                 listener = object : HexKeyboardView.Listener {
@@ -106,6 +104,7 @@ fun KeyboardMainSection(
             view.sharedTypeface = nunitoTypeface
             view.keyboardTheme = theme
             view.language = currentLocale
+            view.layoutType = layoutType
             view.drawBackground = !hasBackgroundImage
             view.visibility = if (keyboardVisible) View.VISIBLE else View.INVISIBLE
 
@@ -145,6 +144,7 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
     val service = context as? HexKeyboardService
 
     if (currentView != "keyboard") {
+        val scope = rememberCoroutineScope()
         val panelModifier = if (isEmojiSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
         Box(modifier = panelModifier) {
             when (currentView) {
@@ -153,12 +153,16 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                     history = clipboardHistory,
                     onItemSelected = { item -> viewModel.onClipboardItemClick(item) },
                     onDelete = { item -> 
-                        ClipboardHistoryManager.deleteItem(context, item)
-                        service?.refreshClipboardHistory() 
+                        scope.launch {
+                            ClipboardHistoryManager.deleteItem(context, item)
+                            service?.refreshClipboardHistory() 
+                        }
                     },
                     onTogglePin = { item -> 
-                        ClipboardHistoryManager.togglePin(context, item)
-                        service?.refreshClipboardHistory() 
+                        scope.launch {
+                            ClipboardHistoryManager.togglePin(context, item)
+                            service?.refreshClipboardHistory() 
+                        }
                     },
                     onBack = { viewModel.setCurrentView("keyboard") },
                     theme = theme

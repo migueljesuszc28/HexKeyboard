@@ -29,7 +29,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.preference.PreferenceManager
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 import com.example.hexkeyboard.ui.theme.NunitoFontFamily
 import java.io.File
@@ -50,10 +55,13 @@ class FontSelectorActivity : ComponentActivity() {
 @Composable
 fun FontSelectorScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val isPreview = LocalInspectionMode.current
+    val dataStore = ThemeUtils.getDataStore(context)
+    val customFontKey = stringPreferencesKey("custom_font_path")
     
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var selectedFontPath by remember { mutableStateOf(if (isPreview) "system" else prefs.getString("custom_font_path", "system")) }
+    val selectedFontPathFlow = remember { dataStore.data.map { it[customFontKey] ?: "system" } }
+    val selectedFontPath by selectedFontPathFlow.collectAsState("system")
     var customFonts by remember { mutableStateOf(emptyList<File>()) }
 
     LaunchedEffect(Unit) {
@@ -121,8 +129,9 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                     isSelected = selectedFontPath == "system",
                     fontFamily = FontFamily.Default,
                     onClick = {
-                        selectedFontPath = "system"
-                        prefs.edit().putString("custom_font_path", "system").apply()
+                        scope.launch {
+                            dataStore.edit { it[customFontKey] = "system" }
+                        }
                     }
                 )
             }
@@ -132,8 +141,9 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                     isSelected = selectedFontPath == "nunito",
                     fontFamily = NunitoFontFamily,
                     onClick = {
-                        selectedFontPath = "nunito"
-                        prefs.edit().putString("custom_font_path", "nunito").apply()
+                        scope.launch {
+                            dataStore.edit { it[customFontKey] = "nunito" }
+                        }
                     }
                 )
             }
@@ -157,13 +167,15 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                         FontManager.deleteFont(fontFile)
                         customFonts = FontManager.listCustomFonts(context)
                         if (selectedFontPath == fontFile.absolutePath) {
-                            selectedFontPath = "system"
-                            prefs.edit().putString("custom_font_path", "system").apply()
+                            scope.launch {
+                                dataStore.edit { it[customFontKey] = "system" }
+                            }
                         }
                     },
                     onClick = {
-                        selectedFontPath = fontFile.absolutePath
-                        prefs.edit().putString("custom_font_path", fontFile.absolutePath).apply()
+                        scope.launch {
+                            dataStore.edit { it[customFontKey] = fontFile.absolutePath }
+                        }
                     }
                 )
             }

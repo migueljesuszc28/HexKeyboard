@@ -5,7 +5,12 @@ import android.media.AudioManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import androidx.preference.PreferenceManager
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 object FeedbackManager {
     private var vibrator: Vibrator? = null
@@ -16,6 +21,8 @@ object FeedbackManager {
     private var soundEnabled: Boolean = true
     private var soundVolume: Float = 0.5f
     private var isInitialized = false
+    
+    private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     fun initialize(context: Context) {
         if (isInitialized) return
@@ -29,31 +36,18 @@ object FeedbackManager {
         }
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         
-        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-        updateSettings(prefs)
-        
-        prefs.registerOnSharedPreferenceChangeListener { p, key ->
-            if (key == null || key.startsWith("keyboard_vibration") || key.startsWith("keyboard_sound")) {
-                updateSettings(p)
+        managerScope.launch {
+            ThemeUtils.getDataStore(context).data.collectLatest { prefs ->
+                vibrationEnabled = prefs[ThemeUtils.KEYBOARD_VIBRATION] ?: true
+                vibrationIntensity = prefs[ThemeUtils.KEYBOARD_VIBRATION_INTENSITY] ?: 30
+                
+                soundEnabled = prefs[ThemeUtils.KEYBOARD_SOUND] ?: true
+                val volumeInt = prefs[ThemeUtils.KEYBOARD_SOUND_VOLUME] ?: 50
+                soundVolume = volumeInt / 100f
             }
         }
-        isInitialized = true
-    }
-
-    private fun updateSettings(prefs: android.content.SharedPreferences) {
-        vibrationEnabled = prefs.getBoolean("keyboard_vibration", true)
-        vibrationIntensity = try {
-            prefs.getInt("keyboard_vibration_intensity", 30)
-        } catch (e: Exception) {
-            prefs.getString("keyboard_vibration_intensity", "30")?.toIntOrNull() ?: 30
-        }
         
-        soundEnabled = prefs.getBoolean("keyboard_sound", true)
-        soundVolume = try {
-            prefs.getInt("keyboard_sound_volume", 50) / 100f
-        } catch (e: Exception) {
-            (prefs.getString("keyboard_sound_volume", "50")?.toIntOrNull() ?: 50) / 100f
-        }
+        isInitialized = true
     }
 
     fun triggerFeedback(context: Context) {

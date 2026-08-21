@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.draw.clip
@@ -81,15 +83,9 @@ fun CropImageScreen(
     
     // Alturas en DP para dibujar la silueta
     val suggestionsHeightDp = 46f
-    val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-    val bottomOffsetDp = try {
-        val v = prefs.all["keyboard_bottom_offset"]
-        when (v) {
-            is Int -> v
-            is String -> v.toIntOrNull() ?: 0
-            else -> 0
-        }
-    } catch (_: Exception) { 0 }.toFloat()
+    val bottomOffsetDp = runBlocking {
+        ThemeUtils.getDataStore(context).data.first()[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
+    }.toFloat()
 
     // GBoard-like Crop: Image moves, fixed frame in center
     Surface(

@@ -1,40 +1,53 @@
 package com.example.hexkeyboard.logic.managers
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.preference.PreferenceManager
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import androidx.datastore.preferences.core.edit
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.concurrent.TimeUnit
 
+@Serializable
 data class ClipboardItem(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
 )
 
 object ClipboardHistoryManager {
-    private const val PREF_HISTORY = "clipboard_history_json"
-    private val gson = Gson()
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
-    fun getHistory(context: Context): List<ClipboardItem> {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-        val json = prefs.getString(PREF_HISTORY, null) ?: return emptyList()
-        return try {
-            val type = object : com.google.gson.reflect.TypeToken<List<ClipboardItem>>() {}.type
-            gson.fromJson(json, type)
-        } catch (e: Exception) {
-            emptyList()
+    fun getHistoryFlow(context: Context): Flow<List<ClipboardItem>> {
+        return ThemeUtils.getDataStore(context).data.map { prefs ->
+            val jsonString = prefs[ThemeUtils.CLIPBOARD_HISTORY] ?: return@map emptyList()
+            try {
+                json.decodeFromString<List<ClipboardItem>>(jsonString)
+            } catch (_: Exception) {
+                emptyList()
+            }
         }
     }
 
-    fun saveHistory(context: Context, history: List<ClipboardItem>) {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-        val json = gson.toJson(history)
-        prefs.edit().putString(PREF_HISTORY, json).apply()
+    fun getHistory(context: Context): List<ClipboardItem> = runBlocking {
+        getHistoryFlow(context).first()
     }
 
-    fun addItem(context: Context, text: String) {
+    suspend fun saveHistory(context: Context, history: List<ClipboardItem>) {
+        ThemeUtils.getDataStore(context).edit { prefs ->
+            val jsonString = json.encodeToString(history)
+            prefs[ThemeUtils.CLIPBOARD_HISTORY] = jsonString
+        }
+    }
+
+    suspend fun addItem(context: Context, text: String) {
         if (text.isBlank()) return
         val currentHistory = getHistory(context).toMutableList()
         
@@ -51,27 +64,28 @@ object ClipboardHistoryManager {
         cleanUpExpiredItems(context)
     }
 
-    fun deleteItem(context: Context, item: ClipboardItem) {
+    suspend fun deleteItem(context: Context, item: ClipboardItem) {
         val currentHistory = getHistory(context).toMutableList()
-        currentHistory.removeAll { it.text == item.text && it.timestamp == item.timestamp }
+        currentHistory.removeAll { (it.text == item.text) && (it.timestamp == item.timestamp) }
         saveHistory(context, currentHistory)
     }
 
-    fun togglePin(context: Context, item: ClipboardItem) {
+    suspend fun togglePin(context: Context, item: ClipboardItem) {
         val currentHistory = getHistory(context).map {
-            if (it.text == item.text && it.timestamp == item.timestamp) {
+            if ((it.text == item.text) && (it.timestamp == item.timestamp)) {
                 it.copy(isPinned = !it.isPinned)
             } else it
         }
         saveHistory(context, currentHistory)
     }
 
-    fun cleanUpExpiredItems(context: Context) {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-        if (!prefs.getBoolean("clipboard_auto_delete", true)) return
+    suspend fun cleanUpExpiredItems(context: Context) {
+        val dataStore = ThemeUtils.getDataStore(context)
+        val prefs = dataStore.data.first()
+        
+        if (!(prefs[ThemeUtils.CLIPBOARD_AUTO_DELETE] ?: true)) return
 
-        val expiryHoursStr = prefs.getString("clipboard_expiry_hours", "1") ?: "1"
-        // Asegurar que usamos el punto decimal independientemente del locale
+        val expiryHoursStr = prefs[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] ?: "1"
         val expiryHours = expiryHoursStr.replace(',', '.').toDoubleOrNull() ?: 1.0
         val expiryMillis = (expiryHours * 3600000).toLong()
         

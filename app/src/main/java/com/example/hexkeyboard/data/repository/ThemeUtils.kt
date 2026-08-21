@@ -13,6 +13,7 @@ import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.compose.ui.graphics.toArgb
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.preference.PreferenceManager
@@ -56,7 +57,12 @@ data class KeyboardTheme(
     val isKeyTextColorCustom: Boolean = false,
 )
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "settings",
+    produceMigrations = { context ->
+        listOf(SharedPreferencesMigration(context, context.packageName + "_preferences"))
+    }
+)
 
 object ThemeUtils {
     val json = Json {
@@ -64,9 +70,44 @@ object ThemeUtils {
         encodeDefaults = true
     }
 
-    private val APP_THEME = stringPreferencesKey("app_theme")
-    private val KEYBOARD_THEME = stringPreferencesKey("keyboard_theme")
-    private val CUSTOM_THEMES = stringPreferencesKey("custom_themes")
+    // Keys
+    val APP_THEME = stringPreferencesKey("app_theme")
+    val KEYBOARD_THEME = stringPreferencesKey("keyboard_theme")
+    val CUSTOM_THEMES = stringPreferencesKey("custom_themes")
+    
+    val KEYBOARD_LANGUAGE = stringPreferencesKey("keyboard_language")
+    val KEYBOARD_LAYOUT_TYPE = stringPreferencesKey("keyboard_layout_type")
+    val SELECTED_SKIN_TONE = stringPreferencesKey("selected_skin_tone")
+    val SELECTED_GENDER_INDEX = intPreferencesKey("selected_gender_index")
+    
+    val CLIPBOARD_HISTORY = stringPreferencesKey("clipboard_history_json")
+    val RECENT_EMOJIS = stringPreferencesKey("recent_emojis")
+    
+    val KEYBOARD_VIBRATION = booleanPreferencesKey("keyboard_vibration")
+    val KEYBOARD_VIBRATION_INTENSITY = intPreferencesKey("keyboard_vibration_intensity")
+    val KEYBOARD_SOUND = booleanPreferencesKey("keyboard_sound")
+    val KEYBOARD_SOUND_VOLUME = intPreferencesKey("keyboard_sound_volume")
+    
+    val KEYBOARD_HEIGHT = intPreferencesKey("keyboard_height")
+    val KEYBOARD_KEY_SIZE = intPreferencesKey("keyboard_key_size")
+    val KEYBOARD_BOTTOM_OFFSET = intPreferencesKey("keyboard_bottom_offset")
+    val RESET_ON_CLOSE = booleanPreferencesKey("reset_on_close")
+    
+    val CLIPBOARD_AUTO_DELETE = booleanPreferencesKey("clipboard_auto_delete")
+    val CLIPBOARD_EXPIRY_HOURS = stringPreferencesKey("clipboard_expiry_hours")
+
+    val AUTO_CAPITALIZE = booleanPreferencesKey("auto_capitalize")
+    val AUTO_CORRECT = booleanPreferencesKey("auto_correct")
+    val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
+    val UNDO_CORRECTION_ON_BACKSPACE = booleanPreferencesKey("undo_correction_on_backspace")
+    val SHOW_KEY_POPUP = booleanPreferencesKey("show_key_popup")
+    val SHOW_LONG_PRESS_INDICATORS = booleanPreferencesKey("show_long_press_indicators")
+    val POPUP_SCALE = intPreferencesKey("popup_scale")
+    val LONG_PRESS_DURATION = intPreferencesKey("long_press_duration")
+    val NUMERIC_KEY_SIZE_SCALE = intPreferencesKey("numeric_key_size_scale")
+    val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+
+    fun getDataStore(context: Context) = context.dataStore
 
     /**
      * Trigger manual para forzar la recomposición del tema cuando algo externo
@@ -90,17 +131,11 @@ object ThemeUtils {
 
 
 
-    /**
-     * Obtiene el tema del teclado de forma síncrona.
-     * ADVERTENCIA: Solo usar si es estrictamente necesario y fuera del hilo UI.
-     */
-    suspend fun getKeyboardTheme(context: Context): KeyboardTheme = getKeyboardThemeFlow(context).first()
-
     fun getKeyboardThemeFlow(context: Context): Flow<KeyboardTheme> = combine(
         context.dataStore.data.catch { exception ->
             if (exception is IOException) emit(emptyPreferences()) else throw exception
         },
-        themeRefreshTrigger
+        themeRefreshTrigger,
     ) { prefs, _ -> prefs }
         .map { prefs ->
             val themeId = prefs[KEYBOARD_THEME] ?: "default"
@@ -448,7 +483,7 @@ object ThemeUtils {
             if ((options.outHeight > maxDim) || (options.outWidth > maxDim)) {
                 val halfHeight = options.outHeight / 2
                 val halfWidth = options.outWidth / 2
-                while (halfHeight / inSampleSize >= maxDim && halfWidth / inSampleSize >= maxDim) {
+                while ((halfHeight / inSampleSize >= maxDim) && (halfWidth / inSampleSize >= maxDim)) {
                     inSampleSize *= 2
                 }
             }
@@ -480,7 +515,7 @@ object ThemeUtils {
         val r = (radius * scale).toInt().coerceAtLeast(1)
         stackBlur(blurred, r)
 
-        val result = blurred.scale(bitmap.width, bitmap.height, true)
+        val result = blurred.scale(width = bitmap.width, height = bitmap.height, filter = true)
         blurred.recycle()
 
         return result
@@ -501,7 +536,7 @@ object ThemeUtils {
         val g = IntArray(wh)
         val b = IntArray(wh)
         var rsum: Int; var gsum: Int; var bsum: Int
-        var p = 0; var yp = 0; var yi = 0; var yw = 0
+        var p: Int; var yp: Int; var yi: Int; var yw: Int
 
         val vmin = IntArray(maxOf(w, h))
         val vmax = IntArray(maxOf(w, h))
@@ -663,31 +698,11 @@ object ThemeUtils {
         bitmap.setPixels(pix, 0, w, 0, 0, w, h)
     }
 
-    fun getKeyboardAspectRatio(context: Context): Float {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-        val hPref = try {
-            when (val v = prefs.all["keyboard_height"]) {
-                is Int -> v
-                is String -> v.toIntOrNull() ?: 50
-                else -> 50
-            }
-        } catch (_: Exception) { 50 }
-
-        val ksPref = try {
-            when (val v = prefs.all["keyboard_key_size"]) {
-                is Int -> v
-                is String -> v.toIntOrNull() ?: 90
-                else -> 90
-            }
-        } catch (_: Exception) { 90 }
-
-        val boPref = try {
-            when (val v = prefs.all["keyboard_bottom_offset"]) {
-                is Int -> v
-                is String -> v.toIntOrNull() ?: 0
-                else -> 0
-            }
-        } catch (_: Exception) { 0 }
+    fun getKeyboardAspectRatio(context: Context): Float = runBlocking {
+        val prefs = context.dataStore.data.first()
+        val hPref = prefs[KEYBOARD_HEIGHT] ?: 50
+        val ksPref = prefs[KEYBOARD_KEY_SIZE] ?: 90
+        val boPref = prefs[KEYBOARD_BOTTOM_OFFSET] ?: 0
 
         val f = 0.7f + (hPref / 100f) * 0.6f
         val keyScale = ksPref / 100f
@@ -709,6 +724,6 @@ object ThemeUtils {
 
         val totalHeight = keysHeight + suggestionsHeightUnits + bottomMarginUnits
 
-        return 1000f / totalHeight
+        1000f / totalHeight
     }
 }

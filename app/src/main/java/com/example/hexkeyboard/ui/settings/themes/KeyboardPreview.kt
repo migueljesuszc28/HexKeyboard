@@ -3,7 +3,9 @@ package com.example.hexkeyboard.ui.settings.themes
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.preference.PreferenceManager
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.hexkeyboard.data.repository.KeyboardTheme
-import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import kotlinx.coroutines.Dispatchers
@@ -150,15 +151,9 @@ fun KeyboardPreview(
             )
             
             // Bottom Margin
-            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-            val bottomOffset = try {
-                val v = prefs.all["keyboard_bottom_offset"]
-                when (v) {
-                    is Int -> v
-                    is String -> v.toIntOrNull() ?: 0
-                    else -> 0
-                }
-            } catch (_: Exception) { 0 }
+            val bottomOffset = runBlocking {
+                ThemeUtils.getDataStore(context).data.first()[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
+            }
             
             if (bottomOffset > 0) {
                 Spacer(modifier = Modifier.height(bottomOffset.dp))

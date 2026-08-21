@@ -1,7 +1,15 @@
 package com.example.hexkeyboard.ui.keyboard.components
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.datastore.preferences.core.edit
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.media.AudioManager
@@ -28,7 +36,8 @@ import androidx.preference.PreferenceManager
 import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.R
-import com.example.hexkeyboard.data.repository.ThemeUtils
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import kotlin.math.*
 
 class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
@@ -119,10 +128,19 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private var vibrationEnabled: Boolean = true
     private var soundEnabled: Boolean = true
 
-    private val prefsByLazy: SharedPreferences? by lazy {
-        try { PreferenceManager.getDefaultSharedPreferences(context) } catch (_: Exception) { null }
+    private val viewScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    private fun getIntPrefSafely(key: Preferences.Key<Int>, default: Int): Int {
+        return runBlocking {
+            ThemeUtils.getDataStore(context).data.first()[key] ?: default
+        }
     }
-    private val prefs: SharedPreferences? get() = prefsByLazy
+
+    private fun getBooleanPrefSafely(key: Preferences.Key<Boolean>, default: Boolean): Boolean {
+        return runBlocking {
+            ThemeUtils.getDataStore(context).data.first()[key] ?: default
+        }
+    }
 
     // ── Propiedades inyectadas desde HexKeyboardService ──────────────────────
     var longPressAlternatives: Map<Char, List<String>> = emptyMap()
@@ -265,28 +283,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
     }
 
-    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
-        when (key) {
-            "app_theme", "keyboard_theme", "keyboard_height", "keyboard_key_size", "keyboard_language", "numeric_key_size_scale" -> {
-                updateColors(); updateKeyScale(); requestLayout(); invalidate()
-            }
-            "show_key_popup" -> showKeyPopup = p.getBoolean("show_key_popup", true)
-            "show_long_press_indicators" -> showLongPressIndicators = p.getBoolean("show_long_press_indicators", true)
-            "popup_scale" -> popupScale = getIntPrefSafely(p, "popup_scale", 95) / 100f
-            "keyboard_vibration" -> vibrationEnabled = p.getBoolean("keyboard_vibration", true)
-            "keyboard_sound" -> soundEnabled = p.getBoolean("keyboard_sound", true)
-        }
-    }
-
-    private fun getIntPrefSafely(p: SharedPreferences, key: String, default: Int): Int {
-        val value = try { p.all?.get(key) } catch (_: Exception) { null }
-        return when (value) {
-            is Int -> value
-            is String -> value.toIntOrNull() ?: default
-            else -> default
-        }
-    }
-
+    
     fun resetState() {
         layoutMode = LayoutMode.ALPHA
         // shifted y capsLock serán gestionados por HexKeyboardService
@@ -295,29 +292,43 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         invalidate()
     }
 
-    private fun updateKeyScale() { keyScale = (prefs?.getInt("keyboard_key_size", 90) ?: 88) / 100f }
+    private fun updateKeyScale() {
+        keyScale = getIntPrefSafely(ThemeUtils.KEYBOARD_KEY_SIZE, 90) / 100f
+    }
+
+    private fun loadPrefs() {
+        showKeyPopup = getBooleanPrefSafely(ThemeUtils.SHOW_KEY_POPUP, true)
+        showLongPressIndicators = getBooleanPrefSafely(ThemeUtils.SHOW_LONG_PRESS_INDICATORS, true)
+        popupScale = getIntPrefSafely(ThemeUtils.POPUP_SCALE, 95) / 100f
+        vibrationEnabled = getBooleanPrefSafely(ThemeUtils.KEYBOARD_VIBRATION, true)
+        soundEnabled = getBooleanPrefSafely(ThemeUtils.KEYBOARD_SOUND, true)
+        updateColors(); updateKeyScale()
+        if (keys.isEmpty() && width > 0) buildLayout(width.toFloat())
+    }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isSoundEffectsEnabled = true
         isHapticFeedbackEnabled = true
-        prefs?.registerOnSharedPreferenceChangeListener(prefsListener)
-        showKeyPopup = prefs?.getBoolean("show_key_popup", true) ?: true
-        showLongPressIndicators = prefs?.getBoolean("show_long_press_indicators", true) ?: true
-        popupScale = getIntPrefSafely(prefs ?: return, "popup_scale", 95) / 100f
-        vibrationEnabled = prefs?.getBoolean("keyboard_vibration", true) ?: true
-        soundEnabled = prefs?.getBoolean("keyboard_sound", true) ?: true
-        updateColors(); updateKeyScale()
-        if (keys.isEmpty() && width > 0) buildLayout(width.toFloat())
+        loadPrefs()
+        viewScope.launch {
+            ThemeUtils.getDataStore(context).data.collect {
+                loadPrefs()
+                buildLayoutExternally()
+            }
+        }
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         hidePopup()
-        prefs?.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        viewScope.cancel()
     }
 
-    private fun getHeightFactor(): Float { val h = prefs?.getInt("keyboard_height", 50) ?: 50; return 0.7f + (h / 100f) * 0.6f }
+    private fun getHeightFactor(): Float {
+        val h = getIntPrefSafely(ThemeUtils.KEYBOARD_HEIGHT, 50)
+        return 0.7f + (h / 100f) * 0.6f
+    }
 
     enum class KeyType { CHAR, SHIFT, DELETE, ENTER, SPACE, TOGGLE, SYMBOL_PAGE, EMOJI, CLIPBOARD, FUNCTIONS, FONT_PAGE, LANGUAGE }
 
@@ -887,10 +898,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private val handler = Handler(Looper.getMainLooper())
     private var longPressTriggered = false; private var longPressStarted = false
     private val longPressTimeout: Long
-        get() {
-            val p = prefs ?: return 259L
-            return getIntPrefSafely(p, "long_press_duration", 259).toLong()
-        }
+        get() = getIntPrefSafely(ThemeUtils.LONG_PRESS_DURATION, 259).toLong()
     private val longPressRunnable = Runnable { pressedKey?.let { if (it.alternatives.isNotEmpty() && !isGestureActive) { longPressStarted = true; popupVisibleKey = it; popupSelectedIndex = 0; showPopup(it, true) } } }
     private var deleteRepeatRunnable: Runnable? = null
     private val deleteRepeatDelay = 400L; private val deleteRepeatInterval = 80L
@@ -899,9 +907,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private val keysToIgnoreDuringNGesture = setOf("l", "d", "g", "p", "c", "f", "u")
 
     private fun getHexR(vw: Float): Float = if (vw <= 0) 0f else (vw / 8.0f) / sqrt(3.0f).toFloat()
+
     private fun getNumericR(vw: Float): Float {
         if (vw <= 0) return 0f
-        val scale = getIntPrefSafely(prefs ?: return 0f, "numeric_key_size_scale", 85) / 100f
+        val scale = getIntPrefSafely(ThemeUtils.NUMERIC_KEY_SIZE_SCALE, 85) / 100f
         return (vw / (5.6f / scale)) / sqrt(3.0f).toFloat()
     }
 
@@ -1651,7 +1660,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     fun triggerVibration() {
         if (!vibrationEnabled) return
-        val intensity = getIntPrefSafely(prefs ?: return, "keyboard_vibration_intensity", 30)
+        val intensity = getIntPrefSafely(ThemeUtils.KEYBOARD_VIBRATION_INTENSITY, 30)
         if (intensity <= 0) return
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -1664,7 +1673,8 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     fun triggerSound() {
         if (!soundEnabled) return
-        val volume = getIntPrefSafely(prefs ?: return, "keyboard_sound_volume", 50) / 100f
+        val volumeInt = getIntPrefSafely(ThemeUtils.KEYBOARD_SOUND_VOLUME, 50)
+        val volume = volumeInt / 100f
         audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, volume)
     }
 

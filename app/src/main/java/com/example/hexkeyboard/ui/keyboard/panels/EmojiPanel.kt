@@ -46,7 +46,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.preference.PreferenceManager
-import com.example.hexkeyboard.*
+import androidx.datastore.preferences.core.edit
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
@@ -72,11 +80,13 @@ fun EmojiPanel(
     val skinTone by (viewModel?.selectedSkinTone ?: MutableStateFlow("")).collectAsState()
     val genderIndex by (viewModel?.selectedGenderIndex ?: MutableStateFlow(0)).collectAsState()
 
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var recentEmojis by remember {
-        mutableStateOf(
-            prefs.getString("recent_emojis", "")?.split(",")?.filter { it.isNotEmpty() } ?: emptyList()
-        )
+    var recentEmojis by remember { mutableStateOf<List<String>>(emptyList()) }
+    
+    LaunchedEffect(Unit) {
+        ThemeUtils.getDataStore(context).data.map { it[ThemeUtils.RECENT_EMOJIS] ?: "" }
+            .collect { json ->
+                recentEmojis = json.split(",").filter { it.isNotEmpty() }
+            }
     }
 
     // ELIMINADA la dependencia de skinTone y genderIndex. La lista base es estática y súper ligera.
@@ -124,7 +134,7 @@ fun EmojiPanel(
                 if (gridState.isScrollInProgress) {
                     if (currentIndex > lastScrollIndex || (currentIndex == lastScrollIndex && currentOffset > lastScrollOffset)) {
                         isCategoriesVisible = false
-                    } else if (currentIndex < lastScrollIndex || (currentIndex == lastScrollIndex && currentOffset < lastScrollOffset)) {
+                    } else if (currentIndex < lastScrollIndex || currentOffset < lastScrollOffset) {
                         isCategoriesVisible = true
                     }
                 }
@@ -179,7 +189,11 @@ fun EmojiPanel(
                             onEmojiSelected = { finalEmoji ->
                                 FeedbackManager.triggerFeedback(context)
                                 val newList = (listOf(finalEmoji) + recentEmojis.filter { it != finalEmoji }).take(30)
-                                prefs.edit().putString("recent_emojis", newList.joinToString(",")).apply()
+                                scope.launch {
+                                    ThemeUtils.getDataStore(context).edit { prefs ->
+                                        prefs[ThemeUtils.RECENT_EMOJIS] = newList.joinToString(",")
+                                    }
+                                }
 
                                 if (item.category != "Recientes" || !recentEmojis.contains(finalEmoji)) {
                                     recentEmojis = newList
@@ -275,7 +289,7 @@ fun EmojiHeader(name: String, theme: KeyboardTheme) {
 fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, theme: KeyboardTheme, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val categoryIcons = remember {
-        mapOf<String, Any>(
+        mapOf(
             "Recientes" to Icons.Default.History, "Principales" to R.drawable.ic_emoji,
             "Personas" to Icons.Default.EmojiPeople, "Animales" to Icons.Default.Pets,
             "Comida" to Icons.Default.Restaurant, "Actividades" to Icons.Default.EmojiEvents,
@@ -406,8 +420,8 @@ fun EmojiItem(
     val variationGrid = remember(canonical) { EmojiProvider.getEmojiVariationGrid(canonical) }
     val hasVariations = remember(canonical) { EmojiProvider.hasVariations(canonical) }
 
-    var itemX by remember { mutableStateOf(0f) }
-    var itemWidth by remember { mutableStateOf(0f) }
+    var itemX by remember { mutableFloatStateOf(0f) }
+    var itemWidth by remember { mutableFloatStateOf(0f) }
     val configuration = LocalConfiguration.current
     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.toPx() }
 

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,11 +25,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.preference.PreferenceManager
+import androidx.datastore.preferences.core.*
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.example.hexkeyboard.ui.settings.fontselector.FontSelectorActivity
 import com.example.hexkeyboard.R
-import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 
@@ -51,7 +53,7 @@ class SettingsActivity : ComponentActivity() {
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
+    val dataStore = ThemeUtils.getDataStore(context)
 
     Scaffold(
         topBar = {
@@ -79,7 +81,8 @@ fun SettingsScreen(onBack: () -> Unit) {
         ) {
             item { CategoryHeader("Idioma") }
             item {
-                var langValue by remember { mutableStateOf(prefs.getString("keyboard_language", "es") ?: "es") }
+                val langValueFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es" } }
+                val langValue by langValueFlow.collectAsState("es")
                 var showLangDialog by remember { mutableStateOf(false) }
 
                 ListItem(
@@ -106,8 +109,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                langValue = value
-                                                prefs.edit().putString("keyboard_language", value).apply()
+                                                scope.launch {
+                                                    dataStore.edit { it[ThemeUtils.KEYBOARD_LANGUAGE] = value }
+                                                }
                                                 showLangDialog = false
                                             }
                                             .padding(16.dp),
@@ -129,7 +133,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             item { CategoryHeader("Distribución") }
             item {
-                var layoutValue by remember { mutableStateOf(prefs.getString("keyboard_layout_type", "default") ?: "default") }
+                val layoutValueFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default" } }
+                val layoutValue by layoutValueFlow.collectAsState("default")
                 var showLayoutDialog by remember { mutableStateOf(false) }
 
                 ListItem(
@@ -156,8 +161,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                layoutValue = value
-                                                prefs.edit().putString("keyboard_layout_type", value).apply()
+                                                scope.launch {
+                                                    dataStore.edit { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] = value }
+                                                }
                                                 showLayoutDialog = false
                                             }
                                             .padding(16.dp),
@@ -189,7 +195,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             item { CategoryHeader("Tema") }
             item {
-                var themeValue by remember { mutableStateOf(prefs.getString("app_theme", "system") ?: "system") }
+                val themeValueFlow = remember { dataStore.data.map { it[ThemeUtils.APP_THEME] ?: "system" } }
+                val themeValue by themeValueFlow.collectAsState("system")
                 var showThemeDialog by remember { mutableStateOf(false) }
 
                 ListItem(
@@ -216,12 +223,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                themeValue = value
-                                            scope.launch {
-                                                ThemeUtils.saveAppTheme(context, value)
-                                            }
-                                            applyAppTheme(value)
-                                            showThemeDialog = false
+                                                scope.launch {
+                                                    ThemeUtils.saveAppTheme(context, value)
+                                                }
+                                                applyAppTheme(value)
+                                                showThemeDialog = false
                                             }
                                             .padding(16.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -253,14 +259,15 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             item { CategoryHeader("Apariencia") }
             item {
+                val fontPathFlow = remember { dataStore.data.map { it[ThemeUtils.CUSTOM_FONT_PATH] ?: "system" } }
+                val fontPath by fontPathFlow.collectAsState("system")
                 ListItem(
                     headlineContent = { Text("Fuente") },
                     supportingContent = { 
-                        val fontPath = prefs.getString("custom_font_path", "system")
                         Text(when(fontPath) {
                             "system" -> "Sistema"
                             "nunito" -> "Nunito"
-                            else -> fontPath?.substringAfterLast("/") ?: "Personalizada"
+                            else -> fontPath.substringAfterLast("/")
                         })
                     },
                     leadingContent = { Icon(Icons.Default.FontDownload, contentDescription = null) },
@@ -272,7 +279,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Altura del teclado",
-                    key = "keyboard_height",
+                    key = ThemeUtils.KEYBOARD_HEIGHT,
                     defaultValue = 50,
                     min = 0,
                     max = 100,
@@ -283,7 +290,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Tamaño de las teclas",
-                    key = "keyboard_key_size",
+                    key = ThemeUtils.KEYBOARD_KEY_SIZE,
                     defaultValue = 90,
                     min = 50,
                     max = 100,
@@ -293,7 +300,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Escala teclado numérico",
-                    key = "numeric_key_size_scale",
+                    key = ThemeUtils.NUMERIC_KEY_SIZE_SCALE,
                     defaultValue = 85,
                     min = 70,
                     max = 120,
@@ -303,8 +310,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Margen inferior",
-                    key = "keyboard_bottom_offset",
-                    defaultValue = 35,
+                    key = ThemeUtils.KEYBOARD_BOTTOM_OFFSET,
+                    defaultValue = 30,
                     min = 0,
                     max = 100,
                     context = context
@@ -315,7 +322,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Sonido al presionar",
-                    key = "keyboard_sound",
+                    key = ThemeUtils.KEYBOARD_SOUND,
                     defaultValue = true,
                     icon = Icons.Default.VolumeUp,
                     context = context
@@ -324,7 +331,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Volumen del sonido",
-                    key = "keyboard_sound_volume",
+                    key = ThemeUtils.KEYBOARD_SOUND_VOLUME,
                     defaultValue = 50,
                     min = 0,
                     max = 100,
@@ -334,7 +341,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Vibración al presionar",
-                    key = "keyboard_vibration",
+                    key = ThemeUtils.KEYBOARD_VIBRATION,
                     defaultValue = true,
                     icon = Icons.Default.Vibration,
                     context = context
@@ -343,7 +350,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Intensidad de vibración",
-                    key = "keyboard_vibration_intensity",
+                    key = ThemeUtils.KEYBOARD_VIBRATION_INTENSITY,
                     defaultValue = 30,
                     min = 0,
                     max = 100,
@@ -353,7 +360,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Auto-corrección",
-                    key = "auto_correct",
+                    key = ThemeUtils.AUTO_CORRECT,
                     defaultValue = false,
                     context = context
                 )
@@ -361,7 +368,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Deshacer corrección al borrar",
-                    key = "undo_correction_on_backspace",
+                    key = ThemeUtils.UNDO_CORRECTION_ON_BACKSPACE,
                     defaultValue = true,
                     context = context
                 )
@@ -369,7 +376,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Auto-mayúsculas",
-                    key = "auto_capitalize",
+                    key = ThemeUtils.AUTO_CAPITALIZE,
                     defaultValue = true,
                     context = context
                 )
@@ -377,7 +384,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Punto automático",
-                    key = "double_space_period",
+                    key = ThemeUtils.DOUBLE_SPACE_PERIOD,
                     defaultValue = true,
                     context = context
                 )
@@ -385,7 +392,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Mostrar Pop-Up de tecla",
-                    key = "show_key_popup",
+                    key = ThemeUtils.SHOW_KEY_POPUP,
                     defaultValue = true,
                     context = context
                 )
@@ -393,7 +400,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Tamaño del Pop-Up",
-                    key = "popup_scale",
+                    key = ThemeUtils.POPUP_SCALE,
                     defaultValue = 95,
                     min = 40,
                     max = 150,
@@ -403,7 +410,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SliderPreference(
                     title = "Duración toque prolongado",
-                    key = "long_press_duration",
+                    key = ThemeUtils.LONG_PRESS_DURATION,
                     defaultValue = 259,
                     min = 100,
                     max = 1000,
@@ -413,7 +420,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Reiniciar al cerrar",
-                    key = "reset_on_close",
+                    key = ThemeUtils.RESET_ON_CLOSE,
                     defaultValue = true,
                     context = context
                 )
@@ -421,7 +428,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Indicadores de acentos",
-                    key = "show_long_press_indicators",
+                    key = ThemeUtils.SHOW_LONG_PRESS_INDICATORS,
                     defaultValue = true,
                     context = context
                 )
@@ -431,14 +438,15 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SwitchPreference(
                     title = "Eliminación automática",
-                    key = "clipboard_auto_delete",
+                    key = ThemeUtils.CLIPBOARD_AUTO_DELETE,
                     defaultValue = true,
                     icon = Icons.Default.ContentPaste,
                     context = context
                 )
             }
             item {
-                var expiryValue by remember { mutableStateOf(prefs.getString("clipboard_expiry_hours", "1") ?: "1") }
+                val expiryValueFlow = remember { dataStore.data.map { it[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] ?: "1" } }
+                val expiryValue by expiryValueFlow.collectAsState("1")
                 var showExpiryDialog by remember { mutableStateOf(false) }
 
                 ListItem(
@@ -471,8 +479,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                expiryValue = value
-                                                prefs.edit().putString("clipboard_expiry_hours", value).apply()
+                                                scope.launch {
+                                                    dataStore.edit { it[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] = value }
+                                                }
                                                 showExpiryDialog = false
                                             }
                                             .padding(16.dp),
@@ -501,12 +510,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ) {
                     Button(
                         onClick = {
-                            prefs.edit().clear().apply()
-                            applyAppTheme("system")
-                            // Reiniciar la actividad para aplicar cambios
-                            val intent = Intent(context, SettingsActivity::class.java)
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                            context.startActivity(intent)
+                            scope.launch {
+                                dataStore.edit { it.clear() }
+                                applyAppTheme("system")
+                                // Reiniciar la actividad para aplicar cambios
+                                val intent = Intent(context, SettingsActivity::class.java)
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                context.startActivity(intent)
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.fillMaxWidth()
@@ -534,15 +545,17 @@ fun CategoryHeader(title: String) {
 @Composable
 fun SliderPreference(
     title: String,
-    key: String,
+    key: Preferences.Key<Int>,
     defaultValue: Int,
     min: Int,
     max: Int,
     icon: ImageVector? = null,
     context: Context
 ) {
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var value by remember { mutableIntStateOf(prefs.getInt(key, defaultValue)) }
+    val dataStore = ThemeUtils.getDataStore(context)
+    val scope = rememberCoroutineScope()
+    val valueFlow = remember { dataStore.data.map { it[key] ?: defaultValue } }
+    val value by valueFlow.collectAsState(defaultValue)
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -556,10 +569,13 @@ fun SliderPreference(
         }
         Slider(
             value = value.toFloat(),
-            onValueChange = { value = it.toInt() },
-            onValueChangeFinished = { prefs.edit().putInt(key, value).apply() },
+            onValueChange = { newValue ->
+                scope.launch {
+                    dataStore.edit { it[key] = newValue.toInt() }
+                }
+            },
             valueRange = min.toFloat()..max.toFloat(),
-            modifier = Modifier.padding(start = if (icon != null) 40.dp else 40.dp)
+            modifier = Modifier.padding(start = 40.dp)
         )
     }
 }
@@ -567,14 +583,16 @@ fun SliderPreference(
 @Composable
 fun SwitchPreference(
     title: String,
-    key: String,
+    key: Preferences.Key<Boolean>,
     defaultValue: Boolean,
     icon: ImageVector? = null,
     context: Context,
     onCheckedChange: ((Boolean) -> Unit)? = null
 ) {
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var checked by remember { mutableStateOf(prefs.getBoolean(key, defaultValue)) }
+    val dataStore = ThemeUtils.getDataStore(context)
+    val scope = rememberCoroutineScope()
+    val checkedFlow = remember { dataStore.data.map { it[key] ?: defaultValue } }
+    val checked by checkedFlow.collectAsState(defaultValue)
 
     ListItem(
         headlineContent = { Text(title) },
@@ -582,17 +600,20 @@ fun SwitchPreference(
         trailingContent = {
             Switch(
                 checked = checked,
-                onCheckedChange = {
-                    checked = it
-                    prefs.edit().putBoolean(key, it).apply()
-                    onCheckedChange?.invoke(it)
+                onCheckedChange = { newValue ->
+                    scope.launch {
+                        dataStore.edit { it[key] = newValue }
+                        onCheckedChange?.invoke(newValue)
+                    }
                 }
             )
         },
         modifier = Modifier.clickable {
-            checked = !checked
-            prefs.edit().putBoolean(key, checked).apply()
-            onCheckedChange?.invoke(checked)
+            val newValue = !checked
+            scope.launch {
+                dataStore.edit { it[key] = newValue }
+                onCheckedChange?.invoke(newValue)
+            }
         }
     )
 }

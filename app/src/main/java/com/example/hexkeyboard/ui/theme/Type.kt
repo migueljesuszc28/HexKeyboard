@@ -1,6 +1,5 @@
 package com.example.hexkeyboard.ui.theme
 
-import android.content.SharedPreferences
 import android.graphics.Typeface
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.*
@@ -10,7 +9,9 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import androidx.preference.PreferenceManager
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.flow.map
 import com.example.hexkeyboard.R
 import java.io.File
 
@@ -26,25 +27,11 @@ val Typography = Typography()
 @Composable
 fun getTypography(): Typography {
     val context = LocalContext.current
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-
-    // Estado reactivo para el path de la fuente
-    var fontPath by remember {
-        mutableStateOf(prefs.getString("custom_font_path", "system") ?: "system")
-    }
-
-    // Listener para actualizar el estado cuando cambie la preferencia
-    DisposableEffect(prefs) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
-            if (key == "custom_font_path") {
-                fontPath = p.getString(key, "system") ?: "system"
-            }
-        }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose {
-            prefs.unregisterOnSharedPreferenceChangeListener(listener)
-        }
-    }
+    val dataStore = ThemeUtils.getDataStore(context)
+    val customFontKey = stringPreferencesKey("custom_font_path")
+    
+    val fontPathFlow = remember { dataStore.data.map { it[customFontKey] ?: "system" } }
+    val fontPath by fontPathFlow.collectAsState("system")
 
     val family = when (fontPath) {
         "nunito" -> NunitoFontFamily
