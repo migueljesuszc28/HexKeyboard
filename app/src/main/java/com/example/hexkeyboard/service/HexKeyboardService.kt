@@ -537,6 +537,12 @@ class HexKeyboardService : InputMethodService(),
                 
                 val inputType = info.inputType
                 val classMask = inputType and InputType.TYPE_MASK_CLASS
+                
+                // Prioridad: Si es multilinea, la acción por defecto es ENTER
+                val isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
+                        (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
+                mHexKeyboardView?.isMultiLine = isMultiLine
+
                 if ((classMask == InputType.TYPE_CLASS_NUMBER) ||
                     (classMask == InputType.TYPE_CLASS_PHONE)) {
                     mHexKeyboardView?.layoutMode = HexKeyboardView.LayoutMode.PURE_NUMERIC
@@ -758,8 +764,17 @@ class HexKeyboardService : InputMethodService(),
     fun handleEnter() {
         val ic = currentInputConnection ?: return
         val ei = currentInputEditorInfo ?: return
+        
+        val inputType = ei.inputType
+        val classMask = inputType and InputType.TYPE_MASK_CLASS
+        val isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
+                (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
+
         val action = ei.imeOptions and EditorInfo.IME_MASK_ACTION
-        if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
+        
+        if (isMultiLine) {
+            ic.commitText("\n", 1)
+        } else if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
             ic.performEditorAction(action)
         } else {
             ic.commitText("\n", 1)

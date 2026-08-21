@@ -632,6 +632,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private var currentImeAction: Int = EditorInfo.IME_ACTION_NONE
+    var isMultiLine: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
     private var isScrollingCursor = false
     private var lastScrollX = 0f
     private var lastScrollY = 0f
@@ -1500,7 +1505,23 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     loc.getDisplayLanguage(loc).uppercase()
                 } catch (_: Exception) { language.uppercase() }
             }
-            KeyType.ENTER -> if (isEnterWithText) customLabel = "INTRO"
+            KeyType.ENTER -> {
+                if (isEnterWithText) {
+                    customLabel = if (isMultiLine) {
+                        "INTRO"
+                    } else {
+                        when (currentImeAction) {
+                            EditorInfo.IME_ACTION_GO -> "IR"
+                            EditorInfo.IME_ACTION_SEARCH -> "BUSCAR"
+                            EditorInfo.IME_ACTION_SEND -> "ENVIAR"
+                            EditorInfo.IME_ACTION_NEXT -> "SIG."
+                            EditorInfo.IME_ACTION_DONE -> "HECHO"
+                            EditorInfo.IME_ACTION_PREVIOUS -> "ANT."
+                            else -> "INTRO"
+                        }
+                    }
+                }
+            }
             else -> {}
         }
 
@@ -1523,12 +1544,16 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         } else {
             when (key.type) {
                 KeyType.ENTER -> {
-                    when (currentImeAction) {
-                        EditorInfo.IME_ACTION_SEND -> iconSend
-                        EditorInfo.IME_ACTION_SEARCH -> iconSearch
-                        EditorInfo.IME_ACTION_DONE -> iconDone
-                        EditorInfo.IME_ACTION_GO -> iconGo
-                        else -> iconEnter
+                    if (isMultiLine) {
+                        iconEnter
+                    } else {
+                        when (currentImeAction) {
+                            EditorInfo.IME_ACTION_SEND -> iconSend
+                            EditorInfo.IME_ACTION_SEARCH -> iconSearch
+                            EditorInfo.IME_ACTION_DONE -> iconDone
+                            EditorInfo.IME_ACTION_GO -> iconGo
+                            else -> iconEnter
+                        }
                     }
                 }
                 KeyType.SYMBOL_PAGE -> iconSymbols

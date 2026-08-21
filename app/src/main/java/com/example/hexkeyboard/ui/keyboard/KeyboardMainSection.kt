@@ -2,7 +2,9 @@ package com.example.hexkeyboard.ui.keyboard
 
 import android.graphics.PointF
 import android.graphics.Typeface
+import android.text.InputType
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -109,6 +111,15 @@ fun KeyboardMainSection(
             view.visibility = if (keyboardVisible) View.VISIBLE else View.INVISIBLE
 
             view.fontPages = service?.fontPages ?: emptyList()
+
+            service?.currentInputEditorInfo?.let { info ->
+                val inputType = info.inputType
+                val classMask = inputType and InputType.TYPE_MASK_CLASS
+                view.isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
+                        (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
+                val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
+                view.setImeAction(action)
+            }
 
             view.listener = object : HexKeyboardView.Listener {
                 override fun onChar(text: String) { viewModel.onCharTyped(text) }
