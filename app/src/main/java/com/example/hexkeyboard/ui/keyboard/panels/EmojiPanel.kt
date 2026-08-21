@@ -187,7 +187,7 @@ fun EmojiPanel(
                             onSkinToneSelected = { viewModel?.setSkinTone(it) },
                             onGenderSelected = { viewModel?.setGenderIndex(it) },
                             onEmojiSelected = { finalEmoji ->
-                                FeedbackManager.triggerFeedback(context)
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                 val newList = (listOf(finalEmoji) + recentEmojis.filter { it != finalEmoji }).take(30)
                                 scope.launch {
                                     ThemeUtils.getDataStore(context).edit { prefs ->
@@ -320,7 +320,7 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
                     Tab(
                         selected = isSelected,
                         onClick = {
-                            FeedbackManager.triggerFeedback(context)
+                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                             onCategoryClick(category.name)
                         },
                         unselectedContentColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f),
@@ -439,14 +439,14 @@ fun EmojiItem(
             .pointerInput(displayEmoji, hasVariations) {
                 detectTapGestures(
                     onPress = {
-                        FeedbackManager.triggerFeedback(context)
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                         isPressed = true
                         try { awaitRelease() } finally { isPressed = false }
                     },
                     onTap = { onEmojiSelected(displayEmoji) },
                     onLongPress = {
                         if (hasVariations) {
-                            FeedbackManager.triggerFeedback(context)
+                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
                             showVariationSelector = true
                         }
                     }
@@ -507,7 +507,7 @@ fun EmojiItem(
                                         isSelected = (displayEmoji == variant),
                                         theme = theme,
                                         onClick = {
-                                            FeedbackManager.triggerFeedback(context)
+                                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                             service?.saveStickyVariant(canonical, variant)
                                             onEmojiSelected(variant)
                                             showVariationSelector = false

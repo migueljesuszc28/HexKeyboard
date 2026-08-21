@@ -38,17 +38,10 @@ import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.R
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import com.example.hexkeyboard.logic.managers.FeedbackManager
 import kotlin.math.*
 
 class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
-
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-        (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-    }
 
     init {
         isClickable = true
@@ -1658,24 +1651,12 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         p.close()
     }
 
-    fun triggerVibration() {
-        if (!vibrationEnabled) return
-        val intensity = getIntPrefSafely(ThemeUtils.KEYBOARD_VIBRATION_INTENSITY, 30)
-        if (intensity <= 0) return
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(intensity.toLong(), (intensity * 2.55).toInt().coerceIn(1, 255)))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(intensity.toLong())
-        }
+    fun triggerVibration(type: FeedbackManager.HapticType = FeedbackManager.HapticType.KEY_CLICK) {
+        FeedbackManager.triggerVibration(context, type)
     }
 
     fun triggerSound() {
-        if (!soundEnabled) return
-        val volumeInt = getIntPrefSafely(ThemeUtils.KEYBOARD_SOUND_VOLUME, 50)
-        val volume = volumeInt / 100f
-        audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, volume)
+        FeedbackManager.triggerSound(context)
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -1697,7 +1678,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     // No sonar ni vibrar automáticamente para la tecla de borrado.
                     // El HexKeyboardService se encargará de ello si hay texto que borrar.
                     if (hit.type != KeyType.DELETE) {
-                        triggerVibration()
+                        triggerVibration(FeedbackManager.HapticType.KEY_CLICK)
                         triggerSound()
                     }
 
@@ -1815,7 +1796,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             gesturePoints.clear()
                             cancelKeyLongPress()
                             hidePopup()
-                            triggerVibration()
+                            triggerVibration(FeedbackManager.HapticType.LONG_PRESS)
                             triggerSound()
                             val char = if (shifted || capsLock) "Ñ" else "ñ"
                             listener?.onChar(char)
@@ -1943,7 +1924,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             if (popupSelectedIndex >= 0) {
                                 val a = listOf(popupVisibleKey!!.value) + popupVisibleKey!!.alternatives
                                 if (popupSelectedIndex < a.size) {
-                                    triggerVibration()
+                                    triggerVibration(FeedbackManager.HapticType.KEY_CLICK)
                                     val selectedValue = a[popupSelectedIndex]
                                     when (popupVisibleKey!!.type) {
                                         KeyType.LANGUAGE -> {
@@ -2098,7 +2079,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
         if (newIndex != popupSelectedIndex) {
             popupSelectedIndex = newIndex
-            triggerVibration()
+            triggerVibration(FeedbackManager.HapticType.TICK)
             popupContentView?.selectedIndex = newIndex
             popupContentView?.invalidate()
         }

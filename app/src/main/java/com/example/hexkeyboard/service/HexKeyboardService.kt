@@ -44,6 +44,7 @@ import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.engine.PredictionEngine
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.ClipboardItem
+import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
@@ -696,7 +697,7 @@ class HexKeyboardService : InputMethodService(),
             lastAutoCorrection?.let { correction ->
                 val textBefore = ic.getTextBeforeCursor(correction.corrected.length + 1, 0)
                 if (textBefore != null && textBefore.toString() == "${correction.corrected} ") {
-                    mHexKeyboardView?.triggerVibration()
+                    mHexKeyboardView?.triggerVibration(FeedbackManager.HapticType.DELETE)
                     mHexKeyboardView?.triggerSound()
                     ic.beginBatchEdit()
                     ic.deleteSurroundingText(correction.corrected.length + 1, 0)
@@ -719,7 +720,7 @@ class HexKeyboardService : InputMethodService(),
         val hasTextBefore = !textBefore.isNullOrEmpty()
 
         if (hasSelection || hasTextBefore) {
-            mHexKeyboardView?.triggerVibration()
+            mHexKeyboardView?.triggerVibration(FeedbackManager.HapticType.DELETE)
             mHexKeyboardView?.triggerSound()
             if (symbolsTypedCount > 0) symbolsTypedCount--
         } else {

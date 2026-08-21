@@ -59,7 +59,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
 
                 IconButton(
                     onClick = {
-                        FeedbackManager.triggerFeedback(context)
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                         viewModel.setCurrentView("functions")
                     },
                     modifier = Modifier.size(48.dp)
@@ -89,7 +89,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                     } else {
                         items(suggestions, key = { it }) { suggestion ->
                             SuggestionChip(suggestion, theme) {
-                                FeedbackManager.triggerFeedback(context)
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                 viewModel.onSuggestionClick(suggestion)
                             }
                         }
@@ -98,7 +98,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
 
                 IconButton(
                     onClick = {
-                        FeedbackManager.triggerFeedback(context)
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                         if (isListening) {
                             service?.voiceRecognitionHelper?.stopListening()
                         } else {

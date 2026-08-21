@@ -65,11 +65,11 @@ fun ClipboardPanel(
                                 .heightIn(min = 48.dp)
                                 .combinedClickable(
                                     onClick = { 
-                                        FeedbackManager.triggerFeedback(context)
+                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                         onItemSelected(item.text) 
                                     },
                                     onLongClick = { 
-                                        FeedbackManager.triggerFeedback(context)
+                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
                                         itemWithOptions = item 
                                     }
                                 ),
@@ -105,7 +105,7 @@ fun ClipboardPanel(
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable { 
-                        FeedbackManager.triggerFeedback(context)
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
                         itemWithOptions = null 
                     },
                 contentAlignment = Alignment.Center
@@ -141,7 +141,7 @@ fun ClipboardPanel(
                         ) {
                             Button(
                                 onClick = { 
-                                    FeedbackManager.triggerFeedback(context)
+                                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
                                     onTogglePin(item)
                                     itemWithOptions = null 
                                 },
@@ -162,7 +162,7 @@ fun ClipboardPanel(
                             }
                             Button(
                                 onClick = { 
-                                    FeedbackManager.triggerFeedback(context)
+                                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
                                     onDelete(item)
                                     itemWithOptions = null 
                                 },

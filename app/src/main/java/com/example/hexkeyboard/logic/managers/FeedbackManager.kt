@@ -13,6 +13,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 object FeedbackManager {
+    enum class HapticType {
+        KEY_CLICK,
+        LONG_PRESS,
+        DELETE,
+        TICK
+    }
+
     private var vibrator: Vibrator? = null
     private var audioManager: AudioManager? = null
     
@@ -26,18 +33,19 @@ object FeedbackManager {
 
     fun initialize(context: Context) {
         if (isInitialized) return
+        val appContext = context.applicationContext
         
         vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            val vibratorManager = appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
             vibratorManager?.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            appContext.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
-        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         
         managerScope.launch {
-            ThemeUtils.getDataStore(context).data.collectLatest { prefs ->
+            ThemeUtils.getDataStore(appContext).data.collectLatest { prefs ->
                 vibrationEnabled = prefs[ThemeUtils.KEYBOARD_VIBRATION] ?: true
                 vibrationIntensity = prefs[ThemeUtils.KEYBOARD_VIBRATION_INTENSITY] ?: 30
                 
@@ -50,24 +58,87 @@ object FeedbackManager {
         isInitialized = true
     }
 
-    fun triggerFeedback(context: Context) {
+    fun triggerFeedback(context: Context, type: HapticType = HapticType.KEY_CLICK) {
         if (!isInitialized) initialize(context)
-        triggerVibration(context)
+        triggerVibration(context, type)
         triggerSound(context)
     }
 
-    fun triggerVibration(context: Context) {
+    fun triggerVibration(context: Context, type: HapticType = HapticType.KEY_CLICK) {
         if (!isInitialized) initialize(context)
-        if (!vibrationEnabled) return
         
-        vibrator?.let { v ->
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                v.vibrate(VibrationEffect.createOneShot(vibrationIntensity.toLong(), (vibrationIntensity * 2.55).toInt().coerceIn(1, 255)))
-            } else {
-                @Suppress("DEPRECATION")
-                v.vibrate(vibrationIntensity.toLong())
+        if ((!vibrationEnabled) || (vibrationIntensity <= 0)) return
+        
+        val v = vibrator ?: return
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val effect = createModernEffect(v, type)
+            v.vibrate(effect)
+        } else {
+            executeLegacyVibration(v, type)
+        }
+    }
+
+    private fun executeLegacyVibration(v: Vibrator, type: HapticType) {
+        val duration = when(type) {
+            HapticType.KEY_CLICK -> vibrationIntensity.toLong()
+            HapticType.LONG_PRESS -> (vibrationIntensity * 1.5).toLong()
+            HapticType.DELETE -> (vibrationIntensity * 0.8).toLong().coerceAtLeast(1)
+            HapticType.TICK -> (vibrationIntensity * 0.5).toLong().coerceAtLeast(1)
+        }
+        val amplitude = (vibrationIntensity * 2.55).toInt().coerceIn(1, 255)
+        v.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+    }
+
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.S)
+    private fun createModernEffect(v: Vibrator, type: HapticType): VibrationEffect {
+        // Mapeo de intensidad: Asegurar un mínimo perceptible (0.3) y escalar hasta 1.0
+        val baseIntensity = (vibrationIntensity / 100f)
+        val adjustedIntensity = (0.3f + baseIntensity * 0.7f).coerceIn(0.1f, 1f)
+        
+        val primitive = when (type) {
+            HapticType.KEY_CLICK -> VibrationEffect.Composition.PRIMITIVE_CLICK
+            HapticType.LONG_PRESS -> VibrationEffect.Composition.PRIMITIVE_CLICK
+            HapticType.DELETE -> VibrationEffect.Composition.PRIMITIVE_TICK
+            HapticType.TICK -> VibrationEffect.Composition.PRIMITIVE_LOW_TICK
+        }
+
+        val supported = v.arePrimitivesSupported(primitive)
+        if (supported.isEmpty() || !supported[0]) {
+            return createFallbackEffect(type)
+        }
+
+        val composition = VibrationEffect.startComposition()
+        when (type) {
+            HapticType.KEY_CLICK -> {
+                composition.addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, adjustedIntensity)
+            }
+            HapticType.LONG_PRESS -> {
+                composition.addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, (adjustedIntensity * 1.2f).coerceAtMost(1f))
+                val tickSupported = v.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK)
+                if (tickSupported.isNotEmpty() && tickSupported[0]) {
+                    composition.addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, adjustedIntensity, 20)
+                }
+            }
+            HapticType.DELETE -> {
+                composition.addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, adjustedIntensity)
+            }
+            HapticType.TICK -> {
+                composition.addPrimitive(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, adjustedIntensity)
             }
         }
+        return composition.compose()
+    }
+
+    private fun createFallbackEffect(type: HapticType): VibrationEffect {
+        val duration = when(type) {
+            HapticType.KEY_CLICK -> vibrationIntensity.toLong()
+            HapticType.LONG_PRESS -> (vibrationIntensity * 1.5).toLong()
+            HapticType.DELETE -> (vibrationIntensity * 0.8).toLong().coerceAtLeast(1)
+            HapticType.TICK -> (vibrationIntensity * 0.5).toLong().coerceAtLeast(1)
+        }
+        val amplitude = (vibrationIntensity * 2.55).toInt().coerceIn(1, 255)
+        return VibrationEffect.createOneShot(duration, amplitude)
     }
 
     fun triggerSound(context: Context) {
