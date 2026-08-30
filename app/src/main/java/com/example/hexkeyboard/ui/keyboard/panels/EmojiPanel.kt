@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -79,44 +80,14 @@ fun EmojiPanel(
     val searchQuery by (viewModel?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
     val skinTone by (viewModel?.selectedSkinTone ?: MutableStateFlow("")).collectAsState()
     val genderIndex by (viewModel?.selectedGenderIndex ?: MutableStateFlow(0)).collectAsState()
-
-    var recentEmojis by remember { mutableStateOf<List<String>>(emptyList()) }
+    val emojiList by (viewModel?.filteredEmojiList ?: MutableStateFlow(emptyList())).collectAsState()
     
     LaunchedEffect(Unit) {
         ThemeUtils.getDataStore(context).data.map { it[ThemeUtils.RECENT_EMOJIS] ?: "" }
             .collect { json ->
-                recentEmojis = json.split(",").filter { it.isNotEmpty() }
+                val list = json.split(",").filter { it.isNotEmpty() }
+                viewModel?.updateRecentEmojis(list)
             }
-    }
-
-    // ELIMINADA la dependencia de skinTone y genderIndex. La lista base es estática y súper ligera.
-    val emojiList = remember(searchQuery, recentEmojis) {
-        val list = mutableListOf<EmojiProvider.EmojiGridItem>()
-        if (searchQuery.isEmpty()) {
-            // Añadir Recientes al principio
-            if (recentEmojis.isNotEmpty()) {
-                list.add(EmojiProvider.EmojiGridItem.Header("Recientes", 0))
-                recentEmojis.forEach { 
-                    val canonical = EmojiProvider.getCanonicalEmoji(it)
-                    val family = EmojiProvider.getEmojiFamily(canonical)
-                    list.add(EmojiProvider.EmojiGridItem.Emoji(it, "Recientes", 0, canonical, family))
-                }
-            }
-            // Añadir el resto de categorías pre-calculadas (empezando con offset si hay recientes)
-            list.addAll(EmojiProvider.flatGridItems)
-        } else {
-            val filtered = EmojiProvider.searchEmojis(searchQuery)
-            val collapsed = filtered.map { EmojiProvider.getEmojiFamily(it).neutral ?: it }.distinct()
-
-            if (collapsed.isNotEmpty()) {
-                list.add(EmojiProvider.EmojiGridItem.Header("Resultados", 0))
-                collapsed.forEach { 
-                    val family = EmojiProvider.getEmojiFamily(it)
-                    list.add(EmojiProvider.EmojiGridItem.Emoji(it, "Search", 0, it, family))
-                }
-            }
-        }
-        list
     }
 
     val gridState = rememberLazyGridState()
@@ -158,9 +129,28 @@ fun EmojiPanel(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        if (searchQuery.isNotEmpty() && emojiList.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.SearchOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = Color(theme.keyTextColor).copy(alpha = 0.3f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "No se encontraron emojis",
+                        color = Color(theme.keyTextColor).copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Fixed(8),
+            columns = GridCells.Adaptive(minSize = 44.dp),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 60.dp)
         ) {
@@ -188,16 +178,7 @@ fun EmojiPanel(
                             onGenderSelected = { viewModel?.setGenderIndex(it) },
                             onEmojiSelected = { finalEmoji ->
                                 FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                                val newList = (listOf(finalEmoji) + recentEmojis.filter { it != finalEmoji }).take(30)
-                                scope.launch {
-                                    ThemeUtils.getDataStore(context).edit { prefs ->
-                                        prefs[ThemeUtils.RECENT_EMOJIS] = newList.joinToString(",")
-                                    }
-                                }
-
-                                if (item.category != "Recientes" || !recentEmojis.contains(finalEmoji)) {
-                                    recentEmojis = newList
-                                }
+                                viewModel?.saveRecentEmoji(context, finalEmoji)
                                 onEmojiSelected(finalEmoji)
                             },
                             theme = theme
@@ -341,7 +322,6 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -365,27 +345,25 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
         }
     }
 
-    CompositionLocalProvider(LocalRippleConfiguration provides null) {
-        Surface(
-            onClick = { onDelete() },
-            interactionSource = interactionSource,
-            modifier = Modifier.size(45.dp).graphicsLayer { scaleX = scale; scaleY = scale },
-            shape = CircleShape,
-            color = Color(theme.keyBackgroundColor),
-            shadowElevation = 2.dp
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPressed) Icons.AutoMirrored.Filled.Backspace else Icons.AutoMirrored.Outlined.Backspace,
-                    contentDescription = "Borrar",
-                    tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint).copy(alpha = 0.7f),
-                    modifier = Modifier.size(24.dp).offset(x = (-1).dp)
-                )
-            }
-        }
+    Box(
+        modifier = Modifier
+            .size(45.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .shadow(2.dp, CircleShape)
+            .background(Color(theme.keyBackgroundColor), CircleShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onDelete
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isPressed) Icons.AutoMirrored.Filled.Backspace else Icons.AutoMirrored.Outlined.Backspace,
+            contentDescription = "Borrar",
+            tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint).copy(alpha = 0.7f),
+            modifier = Modifier.size(24.dp).offset(x = (-1).dp)
+        )
     }
 }
 
@@ -486,16 +464,16 @@ fun EmojiItem(
             ) {
                 var popupVisible by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) { popupVisible = true }
-                
+
                 val popupScale by animateFloatAsState(targetValue = if (popupVisible) 1f else 0.8f, label = "popup_scale")
                 val popupAlpha by animateFloatAsState(targetValue = if (popupVisible) 1f else 0f, label = "popup_alpha")
 
                 Surface(
                     color = Color(theme.backgroundColor), shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 10.dp, tonalElevation = 8.dp, 
+                    shadowElevation = 10.dp, tonalElevation = 8.dp,
                     border = BorderStroke(1.dp, Color(theme.keyTextColor).copy(alpha = 0.1f)),
-                    modifier = Modifier.graphicsLayer { 
-                        scaleX = popupScale; scaleY = popupScale; alpha = popupAlpha 
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = popupScale; scaleY = popupScale; alpha = popupAlpha
                     }
                 ) {
                     Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -1,11 +1,15 @@
 package com.example.hexkeyboard.viewmodel
 
+import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +47,12 @@ class KeyboardViewModel : ViewModel() {
 
     private val _isEmojiSearchActive = MutableStateFlow(false)
     val isEmojiSearchActive: StateFlow<Boolean> = _isEmojiSearchActive.asStateFlow()
+
+    private val _recentEmojis = MutableStateFlow<List<String>>(emptyList())
+    val recentEmojis: StateFlow<List<String>> = _recentEmojis.asStateFlow()
+
+    private val _filteredEmojiList = MutableStateFlow<List<EmojiProvider.EmojiGridItem>>(emptyList())
+    val filteredEmojiList: StateFlow<List<EmojiProvider.EmojiGridItem>> = _filteredEmojiList.asStateFlow()
 
     // --- Callbacks para comunicación con el Service ---
     var onActionRequested: ((Action) -> Unit)? = null
@@ -107,7 +117,7 @@ class KeyboardViewModel : ViewModel() {
 
     fun onCharTyped(text: String) {
         if (_isEmojiSearchActive.value) {
-            _emojiSearchQuery.value += text
+            updateEmojiSearchQuery(_emojiSearchQuery.value + text)
         } else {
             onActionRequested?.invoke(Action.InsertText(text))
         }
@@ -117,7 +127,7 @@ class KeyboardViewModel : ViewModel() {
         if (_isEmojiSearchActive.value) {
             val current = _emojiSearchQuery.value
             if (current.isNotEmpty()) {
-                _emojiSearchQuery.value = current.dropLast(1)
+                updateEmojiSearchQuery(current.dropLast(1))
             } else {
                 setEmojiSearchActive(false)
             }
@@ -149,6 +159,58 @@ class KeyboardViewModel : ViewModel() {
 
     fun setGenderIndex(index: Int) {
         _selectedGenderIndex.value = index
+    }
+
+    fun updateRecentEmojis(emojis: List<String>) {
+        _recentEmojis.value = emojis
+        updateFilteredEmojiList()
+    }
+
+    fun saveRecentEmoji(context: Context, emoji: String) {
+        val current = _recentEmojis.value
+        val newList = (listOf(emoji) + current.filter { it != emoji }).take(30)
+        _recentEmojis.value = newList
+        viewModelScope.launch(Dispatchers.IO) {
+            ThemeUtils.getDataStore(context).edit { prefs ->
+                prefs[ThemeUtils.RECENT_EMOJIS] = newList.joinToString(",")
+            }
+        }
+        updateFilteredEmojiList()
+    }
+
+    fun updateEmojiSearchQuery(query: String) {
+        _emojiSearchQuery.value = query
+        updateFilteredEmojiList()
+    }
+
+    private fun updateFilteredEmojiList() {
+        val query = _emojiSearchQuery.value
+        val recents = _recentEmojis.value
+        
+        val list = mutableListOf<EmojiProvider.EmojiGridItem>()
+        if (query.isEmpty()) {
+            if (recents.isNotEmpty()) {
+                list.add(EmojiProvider.EmojiGridItem.Header("Recientes", 0))
+                recents.forEach { 
+                    val canonical = EmojiProvider.getCanonicalEmoji(it)
+                    val family = EmojiProvider.getEmojiFamily(canonical)
+                    list.add(EmojiProvider.EmojiGridItem.Emoji(it, "Recientes", 0, canonical, family))
+                }
+            }
+            list.addAll(EmojiProvider.flatGridItems)
+        } else {
+            val filtered = EmojiProvider.searchEmojis(query)
+            val collapsed = filtered.map { EmojiProvider.getEmojiFamily(it).neutral ?: it }.distinct()
+
+            if (collapsed.isNotEmpty()) {
+                list.add(EmojiProvider.EmojiGridItem.Header("Resultados", 0))
+                collapsed.forEach { 
+                    val family = EmojiProvider.getEmojiFamily(it)
+                    list.add(EmojiProvider.EmojiGridItem.Emoji(it, "Search", 0, it, family))
+                }
+            }
+        }
+        _filteredEmojiList.value = list
     }
 
     fun onSettingsClick() {

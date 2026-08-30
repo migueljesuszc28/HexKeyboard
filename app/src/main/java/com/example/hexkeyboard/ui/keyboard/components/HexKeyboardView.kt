@@ -74,7 +74,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         set(value) {
             if (field != value) {
                 field = value
-                if (layoutMode == LayoutMode.FONTS && width > 0) buildLayout(width.toFloat())
+                if (width > 0) buildLayout(width.toFloat())
                 invalidate()
             }
         }
@@ -276,7 +276,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
     }
 
-    
+
     fun resetState() {
         layoutMode = LayoutMode.ALPHA
         // shifted y capsLock serán gestionados por HexKeyboardService

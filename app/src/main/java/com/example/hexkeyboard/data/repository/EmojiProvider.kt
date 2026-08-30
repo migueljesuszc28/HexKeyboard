@@ -1,6 +1,7 @@
 package com.example.hexkeyboard.data.repository
 
 import android.content.Context
+import android.util.Log
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -248,7 +249,7 @@ object EmojiProvider {
             allEmojis = emptyList() // Liberar memoria
             
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("EmojiProvider", "Error cargando emojis: ${e.message}", e)
             categories = listOf(EmojiCategory("Recientes", "🕒", emptyList()))
         } finally {
             synchronized(this) {
