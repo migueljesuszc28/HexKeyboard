@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
+import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,7 +34,7 @@ import kotlinx.coroutines.withContext
 fun KeyboardPreview(
     theme: KeyboardTheme,
     modifier: Modifier = Modifier,
-    onKeyClick: ((HexKeyboardView.Key) -> Unit)? = null
+    onKeyClick: ((HexLayoutEngine.Key) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var backgroundImage by remember(theme.backgroundImageUri) { mutableStateOf<Bitmap?>(null) }
@@ -136,7 +137,7 @@ fun KeyboardPreview(
                             override fun onEnter() {}
                             override fun onLongPressSelect(char: String) {}
                             override fun onSymbolPageChange(page: String) {}
-                            override fun onKeyClick(key: HexKeyboardView.Key) {
+                            override fun onKeyClick(key: HexLayoutEngine.Key) {
                                 onKeyClick?.invoke(key)
                             }
                         }

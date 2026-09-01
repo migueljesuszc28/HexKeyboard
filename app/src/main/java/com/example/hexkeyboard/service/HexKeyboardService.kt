@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.PointF
 import android.inputmethodservice.InputMethodService
 import android.os.Build
@@ -47,6 +48,8 @@ import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
+import com.example.hexkeyboard.ui.keyboard.components.LayoutRegistry
+import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.ui.keyboard.KeyboardScreen
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
@@ -151,90 +154,9 @@ class HexKeyboardService : InputMethodService(),
         imm.showInputMethodPicker()
     }
 
-    val longPressAlternatives = mapOf(
-        'a' to listOf("á", "à", "â", "ä", "ã", "å", "æ", "@"),
-        'e' to listOf("é", "è", "ê", "ë", "ē", "ę", "€"),
-        'i' to listOf("í", "ì", "î", "ï", "ī", "į"),
-        'o' to listOf("ó", "ò", "ô", "ö", "õ", "ø", "œ", "°"),
-        'u' to listOf("ú", "ù", "û", "ü", "ū", "ų"),
-        'n' to listOf("ñ", "ń", "ň", "ņ"),
-        'c' to listOf("ç", "ć", "č", "©", "¢"),
-        'l' to listOf("ł", "ļ", "ľ", "£"),
-        's' to listOf("ś", "š", "ş", "§", "$"),
-        'z' to listOf("ź", "ż", "ž"),
-        'y' to listOf("ý", "ÿ", "¥"),
-        '?' to listOf("¿", "!", "¡"),
-        '(' to listOf("{", "[", "<"),
-        ')' to listOf("}", "]", ">"),
-        '.' to listOf("·", "…"),
-        ',' to listOf(";", ":"),
-        '-' to listOf("—", "_", "¯", "•", "·"),
-        '+' to listOf("±"),
-        '*' to listOf("★", "✝", "‡"),
-        '=' to listOf("∞", "≠", "≈"),
-        '%' to listOf("‰"),
-        'π' to listOf("∏", "μ"),
-        '"' to listOf("„", "“", "”", "‟", "«", "»"),
-        '\'' to listOf("‘", "’", "‹", "›"),
-        '<' to listOf("‹", "〈"),
-        '>' to listOf("›", "〉"),
-        '/' to listOf("\\"),
-        '#' to listOf("№"),
-        '$' to listOf("¢","€", "£", "₱", "¥", "₹"),
-        '§' to listOf("¶"),
-        '^' to listOf("↑", "↓", "←", "→"),
-        '°' to listOf("′", "″"),
-        '1' to listOf("¹", "₁", "½", "⅓", "¼", "⅕", "⅙", "⅐", "⅛", "⅑", "⅒"),
-        '2' to listOf("²", "₂", "⅔", "⅖"),
-        '3' to listOf("³", "₃", "¾", "⅗", "⅜"),
-        '4' to listOf("⁴", "₄", "⅘"),
-        '5' to listOf("⁵", "₅", "⅚", "⅝"),
-        '6' to listOf("⁶", "₆"),
-        '7' to listOf("⁷", "₇", "⅞"),
-        '8' to listOf("⁸", "₈"),
-        '9' to listOf("⁹", "₉"),
-        '0' to listOf("⁰", "₀", "∅"),
-    )
-
-    val symbolPages = mapOf(
-        "basic" to listOf(
-            "~", "`", "|", "•", "√", "π",
-            "÷", "×", "§", "∆", "£", "€", "₡",
-            "₲", "^", "°", "{", "}", "\\", "©", "%",
-            "®", "™", "✓", "[", "]", "<", ">",
-        ),
-        "math_currency" to listOf(
-            "±", "×", "÷", "√", "∞", "≈",
-            "≠", "≤", "≥", "°", "¹", "²", "³",
-            "€", "£", "¥", "¢", "₩", "₹", "₪", "₱", "฿",
-            "₫", "₮", "₼", "₿", "§", "¶",
-        ),
-        "special" to listOf(
-            "⬢", "⧫", "☤", "⚧", "★", "☆",
-            "✓", "✗", "✘", "♡", "♢", "♤", "♧",
-            "ツ", "«", "»", "‹", "›", "〈", "〉", "☂", "⌘",
-            "⌥", "⌃", "←", "↑", "↓", "→",
-        ),
-        "extra" to listOf(
-            "♫", "ⓘ", "☠︎︎", "☀︎", "㋡", "⚠︎", "✰",
-            "♛", "♥︎", "❦", "✴︎", "✶", "☭", "⚛",
-            "♱", "✪", "𓋹", "𓂀", "𓁈", "☯︎", "✯",
-            "☾", "☽", "☥", "☧", "☨", "☩", "☫"
-        )
-    )
-
-    val fontPages = listOf(
-        listOf("𝔸","𝔹","ℂ","𝔻","𝔼","𝔽","𝔾","ℍ","𝕀","𝕁","𝕂","𝕃","𝕄","ℕ","𝕆","ℙ","ℚ","ℝ","𝕊","𝕋","𝕌","𝕍","𝕎","𝕏","𝕐","ℤ","𝕒","𝕓","𝕔","𝕕","𝕖","𝕗","𝕘","𝕙","𝕚","𝕛","𝕜","𝕝","𝕞","𝕟","𝕠","𝕡","𝕢","𝕣","𝕤","𝕥","𝕦","𝕧","𝕨","𝕩","𝕪","𝕫"),
-        listOf("𝓐","𝓑","𝓒","𝓓","𝓔","𝓕","𝓖","𝓗","𝓘","𝓙","𝓚","𝓛","𝓜","𝓝","𝓞","𝓟","𝓠","𝓡","𝓢","𝓣","𝓤","𝓥","𝓦","𝓧","𝓨","𝓩","𝓪","𝓫","𝓬","𝓭","𝓮","𝓯","𝓰","𝓱","𝓲","𝓳","𝓴","𝓵","𝓶","𝓷","𝓸","𝓹","𝓺","𝓻","𝓼","𝓽","𝓾","𝓿","𝔀","𝔁","𝔂","𝔃"),
-        listOf("𝕬","𝕭","𝕮","𝕯","𝕰","𝕱","𝕲","𝕳","𝕴","𝕵","𝕶","𝕷","𝕸","𝕹","𝕺","𝕻","𝕼","𝕽","𝕾","𝕿","𝖀","𝖁","𝖂","𝖃","𝖄","𝖅","𝖆","𝖇","𝖈","𝖉","𝖊","𝖋","𝖌","𝖍","𝖎","𝖏","𝖐","𝖑","𝖒","𝖓","𝖔","𝖕","𝖖","𝖗","𝖘","𝖙","𝖚","𝖛","𝖜","𝖝","𝖞","𝖟"),
-        listOf("𝗔","𝗕","𝗖","𝗗","𝗘","𝗙","𝗚","𝗛","𝗜","𝗝","𝗞","𝗟","𝗠","𝗡","𝗢","𝗣","𝗤","𝗥","𝗦","𝗧","𝗨","𝗩","𝗪","𝗫","𝗬","𝗭","𝗮","𝗯","𝗰","𝗱","𝗲","𝗳","𝗴","𝗵","𝗶","𝗷","𝗸","𝗹","𝗺","𝗻","𝗼","𝗽","𝗾","𝗿","𝘀","𝘁","𝘂","𝘃","𝘄","𝘅","𝘆","𝘇"),
-        listOf("𝘈","𝘉","𝘊","𝘋","𝘌","𝘍","𝘎","𝘏","𝘐","𝘑","𝘒","𝘓","𝘔","𝘕","𝘖","𝘗","𝘘","𝘙","𝘚","𝘛","𝘜","𝘝","𝘞","𝘟","𝘠","𝘡","𝘢","𝘣","𝘤","𝘥","𝘦","𝘧","𝘨","𝘩","𝘪","ජ","ක","ල","ම","න","ඔ","ප","ක්‍","ර","ස","ත","උ","ව","ව","ක්‍","ය","ස"),
-        listOf("𝙰","𝙱","𝙲","𝙳","𝙴","𝙵","𝙶","𝙷","𝙸","𝙹","𝙺","𝙻","𝙼","𝙽","𝙾","𝙿","𝚀","𝚁","𝚂","𝚃","𝚄","𝚅","𝚆","𝚇","𝚈","𝚉","𝚊","𝚋","𝚌","𝚍","𝚎","𝚏","𝚐","𝚑","𝚒","𝚓","𝚔","𝚕","𝚖","𝚗","𝚘","𝚙","𝚚","𝚛","𝚜","𝚝","𝚞","𝚟","𝚠","𝚡","𝚢","𝚣"),
-        listOf("Ⓐ","Ⓑ","Ⓒ","Ⓓ","Ⓔ","Ⓕ","Ⓖ","Ⓗ","Ⓘ","Ⓙ","Ⓚ","Ⓛ","Ⓜ","Ⓝ","Ⓞ","Ⓟ","Ⓠ","Ⓡ","Ⓢ","Ⓣ","Ⓤ","Ⓥ","Ⓦ","Ⓧ","Ⓨ","Ⓩ","ⓐ","ⓑ","ⓒ","ⓓ","ⓔ","ⓕ","ⓖ","ⓗ","ⓘ","ⓙ","ⓚ","ⓛ","ⓜ","ⓝ","ⓞ","ⓟ","ⓠ","ⓡ","ⓢ","ⓣ","ⓤ","ⓥ","ⓦ","ⓧ","ⓨ","ⓩ"),
-        listOf("🄰","🄱","🄲","🄳","🄴","🄵","🄶","🄷","🄸","🄹","🄺","🄻","🄼","🄽","🄾","🄿","🅀","🅁","🅂","🅃","🅄","🅅","🅆","🅇","🅈","🅉","🄰","🄱","🄲","🄳","🄴","🄵","🄶","🄷","🄸","🄹","🄺","🄻","🄼","🄽","🄾","🄿","🅀","🅁","🅂","🅃","🅄","🅅","🅆","🅇","🅈","🅉"),
-        listOf("𝐀","𝐁","𝐂","𝐃","𝐄","𝐅","𝐆","𝐇","𝐈","𝐉","𝐊","𝐋","𝐌","𝐍","𝐎","𝐏","𝐐","𝐑","𝐒","𝐓","𝐔","𝐕","𝐖","𝐗","𝐘","𝐙","𝐚","𝐛","𝐜","𝐝","𝐞","𝐟","𝐠","𝐡","𝐢","𝐣","𝐤","𝐥","𝐦","𝐧","𝐨","𝐩","𝐪","𝐫","𝐬","𝐭","𝐮","𝐯","𝐰","𝐱","𝐲","𝐳"),
-        listOf("𝑨","𝑩","𝑪","𝑫","𝑬","𝑭","𝑮","𝑯","𝑰","𝑱","𝑲","𝑳","𝑴","𝑵","𝑶","𝑷","𝑸","𝑹","𝑺","𝑻","𝑼","𝑽","𝑾","𝑿","𝒀","𝒁","𝒂","𝒃","𝒄","𝒅","𝒆","𝒇","𝒈","𝒉","𝒊","𝒋","𝒌","𝒍","𝒎","𝒏","𝒐","𝒑","𝒒","𝒓","𝒔","𝒕","𝒖","𝒗","𝒘","𝒙","𝒚","𝒛")
-    )
+    val longPressAlternatives = LayoutRegistry.longPressAlternatives
+    val symbolPages = LayoutRegistry.symbolPages
+    val fontPages = LayoutRegistry.fontPages
 
     fun setEmojiSearchActive(active: Boolean) {
         viewModel.setEmojiSearchActive(active)
@@ -405,7 +327,7 @@ class HexKeyboardService : InputMethodService(),
         
         val composeView = ComposeView(this).apply {
             mComposeView = this
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setBackgroundColor(Color.TRANSPARENT)
 
             setViewTreeLifecycleOwner(this@HexKeyboardService)
             setViewTreeViewModelStoreOwner(this@HexKeyboardService)
@@ -459,14 +381,14 @@ class HexKeyboardService : InputMethodService(),
         updateShiftState()
         updateSuggestions()
 
-        mComposeView?.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        mComposeView?.setBackgroundColor(Color.TRANSPARENT)
 
         window?.window?.let { win ->
             WindowCompat.setDecorFitsSystemWindows(win, false)
             win.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             
             @Suppress("DEPRECATION")
-            win.navigationBarColor = if (theme.id == "glass") android.graphics.Color.TRANSPARENT else theme.backgroundColor
+            win.navigationBarColor = if (theme.id == "glass") Color.TRANSPARENT else theme.backgroundColor
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 win.setBackgroundBlurRadius(if (theme.id == "glass") 60 else 0)
@@ -545,9 +467,9 @@ class HexKeyboardService : InputMethodService(),
 
                 if ((classMask == InputType.TYPE_CLASS_NUMBER) ||
                     (classMask == InputType.TYPE_CLASS_PHONE)) {
-                    mHexKeyboardView?.layoutMode = HexKeyboardView.LayoutMode.PURE_NUMERIC
+                    mHexKeyboardView?.layoutMode = HexLayoutEngine.LayoutMode.PURE_NUMERIC
                 } else {
-                    mHexKeyboardView?.layoutMode = HexKeyboardView.LayoutMode.ALPHA
+                    mHexKeyboardView?.layoutMode = HexLayoutEngine.LayoutMode.ALPHA
                 }
                 
                 updateShiftState()
@@ -616,10 +538,10 @@ class HexKeyboardService : InputMethodService(),
         // pero por seguridad, si llegamos aquí, insertamos.
         
         mHexKeyboardView?.let { view ->
-            if (view.layoutMode == HexKeyboardView.LayoutMode.NUMERIC || view.layoutMode == HexKeyboardView.LayoutMode.SYMBOLS) {
+            if (view.layoutMode == HexLayoutEngine.LayoutMode.NUMERIC || view.layoutMode == HexLayoutEngine.LayoutMode.SYMBOLS) {
                 if (text == " ") {
                     if (symbolsTypedCount > 0) {
-                        view.layoutMode = HexKeyboardView.LayoutMode.ALPHA
+                        view.layoutMode = HexLayoutEngine.LayoutMode.ALPHA
                         symbolsTypedCount = 0
                     }
                 } else {
@@ -783,11 +705,11 @@ class HexKeyboardService : InputMethodService(),
         updateSuggestions()
     }
 
-    fun handleGesture(points: List<PointF>, keys: List<HexKeyboardView.Key>) {
+    fun handleGesture(points: List<PointF>, keys: List<HexLayoutEngine.Key>) {
         if (points.size < 2) return
         
         serviceScope.launch(Dispatchers.IO) {
-            val charPoints = keys.filter { it.type == HexKeyboardView.KeyType.CHAR && it.value.length == 1 }
+            val charPoints = keys.filter { it.type == HexLayoutEngine.KeyType.CHAR && it.value.length == 1 }
                 .map { PredictionEngine.CharPoint(it.value[0], it.cx, it.cy) }
             
             val suggestions = predictionEngine.getGestureSuggestions(points, charPoints)
@@ -847,7 +769,7 @@ class HexKeyboardService : InputMethodService(),
         if (!autoCapitalize) return
 
         val view = mHexKeyboardView ?: return
-        if (view.layoutMode != HexKeyboardView.LayoutMode.ALPHA) return
+        if (view.layoutMode != HexLayoutEngine.LayoutMode.ALPHA) return
 
         var reqModes = 0
         val inputType = ei.inputType

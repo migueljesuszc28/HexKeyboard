@@ -21,6 +21,7 @@ import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.ui.keyboard.panels.ClipboardPanel
 import com.example.hexkeyboard.ui.keyboard.panels.EmojiPanel
 import com.example.hexkeyboard.ui.keyboard.panels.FunctionsPanel
+import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import com.example.hexkeyboard.data.repository.ThemeUtils
@@ -90,12 +91,12 @@ fun KeyboardMainSection(
                     override fun onGesture(points: List<PointF>) {
                         service?.handleGesture(points, allKeys)
                     }
-                    override fun onKeyClick(key: HexKeyboardView.Key) {
+                    override fun onKeyClick(key: HexLayoutEngine.Key) {
                         when(key.type) {
-                            HexKeyboardView.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
-                            HexKeyboardView.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
-                            HexKeyboardView.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
-                            HexKeyboardView.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
+                            HexLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
+                            HexLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
+                            HexLayoutEngine.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
+                            HexLayoutEngine.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
                             else -> {}
                         }
                     }
@@ -131,12 +132,12 @@ fun KeyboardMainSection(
                 override fun onGesture(points: List<PointF>) {
                     service?.handleGesture(points, view.allKeys)
                 }
-                override fun onKeyClick(key: HexKeyboardView.Key) {
+                override fun onKeyClick(key: HexLayoutEngine.Key) {
                     when(key.type) {
-                        HexKeyboardView.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
-                        HexKeyboardView.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
-                        HexKeyboardView.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
-                        HexKeyboardView.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
+                        HexLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
+                        HexLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
+                        HexLayoutEngine.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
+                        HexLayoutEngine.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
                         else -> {}
                     }
                 }
