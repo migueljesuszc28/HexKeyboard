@@ -500,7 +500,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 renderer.pPopupText.color = renderer.colorPopupText
                 canvas.drawText(label, px, ty, renderer.pPopupText)
             } else {
-                val firstLabel = if (k.type != HexLayoutEngine.KeyType.CHAR && k.display.isNotEmpty()) k.display else k.value
+                val firstLabel = if (k.type == HexLayoutEngine.KeyType.FONT_PAGE) k.display else k.value
                 val alts = listOf(firstLabel) + k.alternatives
                 //marca############################################3
                 val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
@@ -554,7 +554,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             w = (prx * 2.5f).toInt()
             h = (pry * 2.5f).toInt()
         } else {
-            val firstLabel = if (key.type != HexLayoutEngine.KeyType.CHAR && key.display.isNotEmpty()) key.display else key.value
+            val firstLabel = if (key.type == HexLayoutEngine.KeyType.FONT_PAGE) key.display else key.value
             val alts = listOf(firstLabel) + key.alternatives
             //###################################
             val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
@@ -745,7 +745,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private fun handlePopupSelection(x: Float, y: Float) {
         val k = popupVisibleKey ?: return
         val prx = k.rx * keyScale * 1.1f * popupScale; val pry = k.ry * keyScale * 1.1f * popupScale
-        val firstLabel = if (k.type != HexLayoutEngine.KeyType.CHAR && k.display.isNotEmpty()) k.display else k.value
+        val firstLabel = if (k.type == HexLayoutEngine.KeyType.FONT_PAGE) k.display else k.value
         val alts = listOf(firstLabel) + k.alternatives; val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
         val w = popupWindow?.width?.toFloat() ?: width.toFloat(); val h = popupWindow?.height?.toFloat() ?: 0f
         var cols = when { alts.size <= 5 -> alts.size; alts.size <= 10 -> 5; else -> 6 }.coerceAtMost(alts.size)

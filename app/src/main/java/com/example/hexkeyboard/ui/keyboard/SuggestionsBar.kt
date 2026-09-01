@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -57,12 +59,17 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 val isListening by isListeningFlow.collectAsState()
                 val partialVoiceResult by partialVoiceResultFlow.collectAsState()
 
-                IconButton(
-                    onClick = {
-                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                        viewModel.setCurrentView("functions")
-                    },
-                    modifier = Modifier.size(48.dp)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                            viewModel.setCurrentView("functions")
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Extension,
@@ -82,7 +89,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                         item {
                             Text(
                                 text = partialVoiceResult.ifEmpty { "Escuchando..." },
-                                color = Color(theme.keyboardIconTint).copy(alpha = 0.6f),
+                                color = Color(theme.keyboardIconTint),
                                 fontSize = 14.sp
                             )
                         }
@@ -96,36 +103,41 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                     }
                 }
 
-                IconButton(
-                    onClick = {
-                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                        if (isListening) {
-                            service?.voiceRecognitionHelper?.stopListening()
-                        } else {
-                            val permission = Manifest.permission.RECORD_AUDIO
-                            val granted = ContextCompat.checkSelfPermission(
-                                context, permission
-                            ) == PackageManager.PERMISSION_GRANTED
-
-                            if (granted) {
-                                service?.voiceRecognitionHelper?.startListening(
-                                    object : VoiceRecognitionHelper.VoiceResultListener {
-                                        override fun onVoiceResult(text: String) {
-                                            viewModel.onCharTyped("$text ")
-                                        }
-                                        override fun onVoiceError(error: Int) {}
-                                    }
-                                )
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                            if (isListening) {
+                                service?.voiceRecognitionHelper?.stopListening()
                             } else {
-                                val intent = Intent(context, PermissionActivity::class.java).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    putExtra("request_permission", permission)
+                                val permission = Manifest.permission.RECORD_AUDIO
+                                val granted = ContextCompat.checkSelfPermission(
+                                    context, permission
+                                ) == PackageManager.PERMISSION_GRANTED
+
+                                if (granted) {
+                                    service?.voiceRecognitionHelper?.startListening(
+                                        object : VoiceRecognitionHelper.VoiceResultListener {
+                                            override fun onVoiceResult(text: String) {
+                                                viewModel.onCharTyped("$text ")
+                                            }
+                                            override fun onVoiceError(error: Int) {}
+                                        }
+                                    )
+                                } else {
+                                    val intent = Intent(context, PermissionActivity::class.java).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        putExtra("request_permission", permission)
+                                    }
+                                    context.startActivity(intent)
                                 }
-                                context.startActivity(intent)
                             }
-                        }
-                    },
-                    modifier = Modifier.size(46.dp)
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isListening) Icons.Default.Done else Icons.Default.Mic,
@@ -161,7 +173,11 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
 @Composable
 fun SuggestionChip(suggestion: String, theme: KeyboardTheme, onClick: () -> Unit) {
     Surface(
-        onClick = onClick,
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick
+        ),
         color = Color(theme.keyBackgroundColor).copy(alpha = 0.5f),
         shape = CircleShape
     ) {
@@ -169,8 +185,8 @@ fun SuggestionChip(suggestion: String, theme: KeyboardTheme, onClick: () -> Unit
             text = suggestion,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             color = Color(theme.keyTextColor),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium
+            fontSize = 15.sp
+            //fontWeight = FontWeight.Medium
         )
     }
 }

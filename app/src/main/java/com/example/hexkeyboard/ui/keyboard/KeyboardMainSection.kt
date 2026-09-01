@@ -25,6 +25,7 @@ import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import com.example.hexkeyboard.data.repository.ThemeUtils
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -148,7 +149,7 @@ fun KeyboardMainSection(
 }
 
 @Composable
-fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
+fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, hazeState: HazeState) {
     val currentView by viewModel.currentView.collectAsState()
     val clipboardHistory by viewModel.clipboardHistory.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
@@ -160,7 +161,7 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
         val panelModifier = if (isEmojiSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
         Box(modifier = panelModifier) {
             when (currentView) {
-                "emoji" -> EmojiPanel(onEmojiSelected = { char -> viewModel.onEmojiSelected(char) }, onBack = { viewModel.setCurrentView("keyboard") }, theme = theme, viewModel = viewModel)
+                "emoji" -> EmojiPanel(onEmojiSelected = { char -> viewModel.onEmojiSelected(char) }, onBack = { viewModel.setCurrentView("keyboard") }, theme = theme, viewModel = viewModel, hazeState = hazeState)
                 "clipboard" -> ClipboardPanel(
                     history = clipboardHistory,
                     onItemSelected = { item -> viewModel.onClipboardItemClick(item) },

@@ -335,7 +335,7 @@ class HexRenderer(private val context: Context) {
                     }
                 }
             }
-            dr.mutate().setTint(tint); dr.alpha = if (pressed) 128 else 255; dr.draw(canvas)
+            dr.mutate().setTint(tint); dr.alpha = 255; dr.draw(canvas)
         } else if (key.type == HexLayoutEngine.KeyType.SYMBOL_PAGE) {
             val drawColor = if (isKeyTextColorCustom) colorIcon else {
                 val isLightBg = ColorUtils.calculateLuminance(activeBgColor) > 0.5
@@ -352,7 +352,7 @@ class HexRenderer(private val context: Context) {
                     pText.color = if (isLightBg == isLightText) (if (isLightBg) Color.BLACK else Color.WHITE) else colorText
                 }
             }
-            pText.alpha = if (floating && pressed) 128 else 255
+            pText.alpha = 255
             var drawLabel = customLabel ?: label
             if (customLabel == null && themeObj.id == "default" && (key.type == HexLayoutEngine.KeyType.ENTER && layoutMode != HexLayoutEngine.LayoutMode.PURE_NUMERIC)) {
                 drawLabel = ""

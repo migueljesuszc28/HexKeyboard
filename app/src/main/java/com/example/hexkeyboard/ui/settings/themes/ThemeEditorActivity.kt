@@ -93,10 +93,20 @@ fun ThemeEditorScreen(
         if (result.resultCode == Activity.RESULT_OK) {
             val uriString = result.data?.getStringExtra("cropped_uri")
             if (uriString != null) {
-                currentTheme = currentTheme.copy(
-                    backgroundImageUri = uriString,
-                    backgroundColor = Color.TRANSPARENT
-                )
+                scope.launch {
+                    val bitmap = ThemeUtils.loadBitmapFromUri(context, uriString)
+                    if (bitmap != null) {
+                        currentTheme = ThemeUtils.extractDynamicTheme(bitmap, currentTheme).copy(
+                            backgroundImageUri = uriString,
+                            backgroundColor = Color.TRANSPARENT
+                        )
+                    } else {
+                        currentTheme = currentTheme.copy(
+                            backgroundImageUri = uriString,
+                            backgroundColor = Color.TRANSPARENT
+                        )
+                    }
+                }
             }
         }
     }

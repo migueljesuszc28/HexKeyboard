@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -84,18 +86,6 @@ fun FunctionItem(
     val bgColor = Color(theme.keyBackgroundColor)
     val iconColor = Color(theme.keyboardIconTint)
     val textColor = Color(theme.keyTextColor)
-    
-    // Calcular si el contraste es suficiente, si no, usar el color de texto o blanco/negro
-    val bgLuminance = bgColor.luminance()
-    val iconLuminance = iconColor.luminance()
-    val contrast = abs(bgLuminance - iconLuminance)
-    
-    val adaptiveTint = if (contrast < 0.25f) {
-        val textContrast = abs(bgLuminance - textColor.luminance())
-        if (textContrast > 0.4f) textColor else (if (bgLuminance > 0.5f) Color.Black else Color.White)
-    } else {
-        iconColor
-    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -103,7 +93,9 @@ fun FunctionItem(
             .width(80.dp)
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = onLongClick,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
             )
     ) {
         Surface(
@@ -113,22 +105,13 @@ fun FunctionItem(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 when (icon) {
-                    is ImageVector -> Icon(icon, contentDescription = null, tint = adaptiveTint)
-                    is Painter -> Icon(icon, contentDescription = null, tint = adaptiveTint, modifier = Modifier.size(24.dp))
+                    is ImageVector -> Icon(icon, contentDescription = null, tint = iconColor)
+                    is Painter -> Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
         
-        // Texto adaptable al fondo general si hay imagen
-        val baseBgColor = Color(theme.backgroundColor)
-        val textContrast = abs(baseBgColor.luminance() - textColor.luminance())
-        val adaptiveTextColor = if (theme.backgroundImageUri != null && textContrast < 0.4f) {
-            if (baseBgColor.luminance() > 0.5f) Color.Black else Color.White
-        } else {
-            textColor
-        }
-        
-        Text(label, style = MaterialTheme.typography.labelMedium, color = adaptiveTextColor)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = textColor)
     }
 }

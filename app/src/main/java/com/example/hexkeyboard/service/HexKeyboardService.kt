@@ -61,9 +61,13 @@ import com.example.hexkeyboard.ui.settings.PermissionActivity
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import androidx.core.content.edit
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -78,17 +82,23 @@ import kotlinx.coroutines.withContext
 import java.text.BreakIterator
 import java.util.Locale
 
+@AndroidEntryPoint
 class HexKeyboardService : InputMethodService(),
     LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+
+    @Inject lateinit var dataStore: DataStore<Preferences>
+    @Inject lateinit var predictionEngine: PredictionEngine
+    @Inject lateinit var feedbackManager: FeedbackManager
+    @Inject lateinit var emojiProvider: EmojiProvider
+    @Inject lateinit var parallaxSensorManager: ParallaxSensorManager
+    @Inject lateinit var spellCheckerManager: SpellCheckerManager
+    @Inject lateinit var voiceRecognitionHelper: VoiceRecognitionHelper
 
     private val mViewModelStore = ViewModelStore()
     private val mSavedStateRegistryController = SavedStateRegistryController.create(this)
     private val mLifecycleRegistry = LifecycleRegistry(this)
 
     private lateinit var clipboardManager: ClipboardManager
-    private lateinit var spellCheckerManager: SpellCheckerManager
-    private lateinit var predictionEngine: PredictionEngine
-    lateinit var voiceRecognitionHelper: VoiceRecognitionHelper
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
         val clip = clipboardManager.primaryClip
         if ((clip != null) && (clip.itemCount > 0)) {
@@ -107,7 +117,6 @@ class HexKeyboardService : InputMethodService(),
     private var mComposeView: ComposeView? = null
 
     private lateinit var viewModel: KeyboardViewModel
-    private lateinit var parallaxSensorManager: ParallaxSensorManager
 
     private var lastUsedClipboardText: String? = null
     private var lastAutoCorrection: LastCorrection? = null
@@ -225,14 +234,11 @@ class HexKeyboardService : InputMethodService(),
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         registerReceiver(wallpaperReceiver, filter)
 
-        parallaxSensorManager = ParallaxSensorManager(this)
         serviceScope.launch {
             parallaxSensorManager.parallaxOffset.collect {
                 viewModel.updateParallaxOffset(it)
             }
         }
-
-        val dataStore = ThemeUtils.getDataStore(this)
         
         serviceScope.launch {
             dataStore.data.collectLatest { prefs ->
@@ -266,10 +272,6 @@ class HexKeyboardService : InputMethodService(),
 
         clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         clipboardManager.addPrimaryClipChangedListener(clipboardListener)
-
-        predictionEngine = PredictionEngine(this)
-        spellCheckerManager = SpellCheckerManager(predictionEngine)
-        voiceRecognitionHelper = VoiceRecognitionHelper(this)
 
         serviceScope.launch {
             ThemeUtils.getKeyboardThemeFlow(this@HexKeyboardService).collect { theme ->

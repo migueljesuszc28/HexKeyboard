@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Build
+import androidx.core.graphics.ColorUtils
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.core.graphics.scale
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import androidx.palette.graphics.Palette
 import java.io.IOException
 import kotlin.math.abs
 
@@ -212,6 +214,8 @@ object ThemeUtils {
                 val accentColor = "#2196F3".toColorInt()
                 // Accent con transparencia (78 en hex es aprox 120 en decimal)
                 val glassAccent = "#902196F3".toColorInt()
+                val redglassAccent = "#90FF0000".toColorInt()
+
 
                 if (isDark) {
                     KeyboardTheme(
@@ -224,34 +228,41 @@ object ThemeUtils {
                         keyStrokeColor = Color.TRANSPARENT,
                         keyTextColor = Color.WHITE,
                         keyboardIconTint = Color.WHITE,
-                        keyShiftActiveColor = accentColor,
+                        keyShiftActiveColor = "#90FFFFFF".toColorInt(),
                         keyShiftInactiveColor = "#905C5C5C".toColorInt(),
                         popupBackgroundColor = "#EB5C5C5C".toColorInt(),
                         popupTextColor = Color.WHITE,
                         popupSelectedBackgroundColor = Color.BLACK,
                         popupSelectedTextColor = Color.WHITE,
-                        individualKeyColors = mapOf("ENTER" to glassAccent),
-                        deletePressedIconColor = Color.RED
+                        deletePressedIconColor = Color.RED,
+                        individualKeyColors = mapOf(
+                            "ENTER" to glassAccent,
+                            "DELETE" to redglassAccent
+                        )
+
                     )
                 } else {
                     KeyboardTheme(
                         id = "glass",
                         name = "Glass",
-                        backgroundColor = "#70C7C7C7".toColorInt(),        // Fondo claro semitransparente
+                        backgroundColor = "#60D9D9D9".toColorInt(),        // Fondo claro semitransparente
                         keyBackgroundColor = "#90FFFFFF".toColorInt(),    // Teclas blancas traslúcidas
                         keyBackgroundPressedColor = "#90FFFFFF".toColorInt(),
                         keyBackgroundSpecialColor = "#90FFFFFF".toColorInt(),
                         keyStrokeColor = Color.TRANSPARENT,
                         keyTextColor = Color.BLACK,
                         keyboardIconTint = Color.BLACK,
-                        keyShiftActiveColor = accentColor,
+                        keyShiftActiveColor = "#90000000".toColorInt(),
                         keyShiftInactiveColor = "#90FFFFFF".toColorInt(),
                         popupBackgroundColor = "#EBFFFFFF".toColorInt(),
                         popupTextColor = Color.BLACK,
                         popupSelectedBackgroundColor = Color.BLACK,
                         popupSelectedTextColor = Color.WHITE,
-                        individualKeyColors = mapOf("ENTER" to glassAccent),
-                        deletePressedIconColor = Color.RED
+                        deletePressedIconColor = Color.RED,
+                        individualKeyColors = mapOf(
+                            "ENTER" to glassAccent,
+                            "DELETE" to redglassAccent
+                        )
                     )
                 }
             }
@@ -725,5 +736,57 @@ object ThemeUtils {
         val totalHeight = keysHeight + suggestionsHeightUnits + bottomMarginUnits
 
         1000f / totalHeight
+    }
+
+    /**
+     * Genera colores dinámicos basados en un Bitmap usando Palette.
+     */
+    fun extractDynamicTheme(bitmap: Bitmap, baseTheme: KeyboardTheme): KeyboardTheme {
+        val palette = Palette.from(bitmap).generate()
+        
+        val isDarkImage = ColorUtils.calculateLuminance(palette.getDominantColor(Color.GRAY)) < 0.5
+        
+        // Colores de Palette (vibrant, muted, etc.)
+        val dominant = palette.getDominantColor(if (isDarkImage) Color.BLACK else Color.WHITE)
+        val vibrant = palette.getVibrantColor(dominant)
+        val lightVibrant = palette.getLightVibrantColor(vibrant)
+        val darkVibrant = palette.getDarkVibrantColor(vibrant)
+        val muted = palette.getMutedColor(dominant)
+        
+        // Decidir colores según la luminancia de la imagen
+        val keyBgColor = if (isDarkImage) {
+            ColorUtils.blendARGB(dominant, Color.BLACK, 0.4f)
+        } else {
+            ColorUtils.blendARGB(dominant, Color.WHITE, 0.6f)
+        }
+        
+        val textColor = if (isDarkImage) Color.WHITE else Color.BLACK
+        val iconTint = if (isDarkImage) lightVibrant else darkVibrant
+        
+        // Color para el Shift activo (usamos un tono vibrante)
+        val shiftActive = if (isDarkImage) lightVibrant else vibrant
+        
+        // Color para el ENTER (usamos un tono contrastado)
+        val enterColor = if (isDarkImage) vibrant else darkVibrant
+
+        return baseTheme.copy(
+            backgroundColor = Color.TRANSPARENT,
+            keyBackgroundColor = ColorUtils.setAlphaComponent(keyBgColor, 180),
+            keyBackgroundPressedColor = ColorUtils.setAlphaComponent(keyBgColor, 230),
+            keyBackgroundSpecialColor = ColorUtils.setAlphaComponent(keyBgColor, 200),
+            keyTextColor = textColor,
+            keyboardIconTint = iconTint,
+            keyShiftActiveColor = shiftActive,
+            keyShiftInactiveColor = ColorUtils.setAlphaComponent(keyBgColor, 200),
+            popupBackgroundColor = ColorUtils.blendARGB(keyBgColor, if (isDarkImage) Color.BLACK else Color.WHITE, 0.2f),
+            popupTextColor = textColor,
+            popupSelectedBackgroundColor = shiftActive,
+            popupSelectedTextColor = if (ColorUtils.calculateLuminance(shiftActive) > 0.5) Color.BLACK else Color.WHITE,
+            individualKeyColors = mapOf(
+                "ENTER" to enterColor,
+                "DELETE" to Color.parseColor("#E31212")
+            ),
+            isKeyTextColorCustom = true
+        )
     }
 }

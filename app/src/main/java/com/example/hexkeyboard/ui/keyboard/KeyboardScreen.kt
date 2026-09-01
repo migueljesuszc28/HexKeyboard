@@ -137,7 +137,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                 contentAlignment = Alignment.TopCenter
             ) {
                 KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
-                PanelsSection(viewModel, keyboardTheme)
+                PanelsSection(viewModel, keyboardTheme, hazeState)
             }
 
             if (bottomOffset > 0) {

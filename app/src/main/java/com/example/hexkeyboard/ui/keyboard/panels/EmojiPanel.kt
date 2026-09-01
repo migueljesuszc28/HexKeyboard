@@ -61,6 +61,9 @@ import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.logic.managers.FeedbackManager
+import dev.chrisbanes.haze.HazeDefaults
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,7 +77,8 @@ fun EmojiPanel(
     onEmojiSelected: (String) -> Unit,
     onBack: () -> Unit,
     theme: KeyboardTheme,
-    viewModel: KeyboardViewModel? = null
+    viewModel: KeyboardViewModel? = null,
+    hazeState: HazeState? = null
 ) {
     val context = LocalContext.current
     val searchQuery by (viewModel?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
@@ -136,12 +140,12 @@ fun EmojiPanel(
                         imageVector = Icons.Default.SearchOff,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
-                        tint = Color(theme.keyTextColor).copy(alpha = 0.3f)
+                        tint = Color(theme.keyTextColor)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "No se encontraron emojis",
-                        color = Color(theme.keyTextColor).copy(alpha = 0.5f),
+                        color = Color(theme.keyTextColor),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -226,7 +230,8 @@ fun EmojiPanel(
                                 } 
                             }
                         },
-                        theme = theme
+                        theme = theme,
+                        hazeState = hazeState
                     )
                 }
 
@@ -239,7 +244,8 @@ fun EmojiPanel(
                         val service = context as? HexKeyboardService
                         service?.handleDelete()
                     },
-                    theme = theme
+                    theme = theme,
+                    hazeState = hazeState
                 )
             }
         }
@@ -248,26 +254,19 @@ fun EmojiPanel(
 
 @Composable
 fun EmojiHeader(name: String, theme: KeyboardTheme) {
-    val baseTextColor = Color(theme.keyTextColor)
-    val baseBgColor = Color(theme.backgroundColor)
-    val textContrast = abs(baseBgColor.luminance() - baseTextColor.luminance())
-    val adaptiveHeaderColor = if (theme.backgroundImageUri != null && textContrast < 0.4f) {
-        if (baseBgColor.luminance() > 0.5f) Color.Black else Color.White
-    } else {
-        baseTextColor
-    }
+    val textColor = Color(theme.keyTextColor)
 
     Text(
-        text = name.uppercase(),
+        text = name,
         style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        color = adaptiveHeaderColor.copy(alpha = 0.6f),
+        fontWeight = FontWeight.Medium,
+        color = textColor,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
     )
 }
 
 @Composable
-fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, theme: KeyboardTheme, modifier: Modifier = Modifier) {
+fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, theme: KeyboardTheme, modifier: Modifier = Modifier, hazeState: HazeState? = null) {
     val context = LocalContext.current
     val categoryIcons = remember {
         mapOf(
@@ -279,9 +278,17 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
         )
     }
 
+    val backgroundColor = Color(theme.keyBackgroundColor)
+    
     Surface(
-        modifier = modifier.height(38.dp),
-        color = Color(theme.keyBackgroundColor),
+        modifier = modifier
+            .height(38.dp)
+            .then(
+                if (hazeState != null) {
+                    Modifier.hazeEffect(state = hazeState, style = HazeDefaults.style(backgroundColor = backgroundColor, blurRadius = 25.dp))
+                } else Modifier
+            ),
+        color = backgroundColor.copy(alpha = if (hazeState != null) 0.95f else 1f),
         shape = RoundedCornerShape(20.dp),
         shadowElevation = 2.dp
     ) {
@@ -304,11 +311,11 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
                             FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                             onCategoryClick(category.name)
                         },
-                        unselectedContentColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f),
+                        unselectedContentColor = Color(theme.keyboardIconTint),
                         selectedContentColor = Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint),
                         icon = {
                             val iconData = categoryIcons[category.name]
-                            val tint = if (isSelected) Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint) else Color(theme.keyboardIconTint).copy(alpha = 0.5f)
+                            val tint = if (isSelected) Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint) else Color(theme.keyboardIconTint)
                             when (iconData) {
                                 is ImageVector -> Icon(imageVector = iconData, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
                                 is Int -> Icon(painter = painterResource(iconData), contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
@@ -323,7 +330,7 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
 }
 
 @Composable
-fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
+fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme, hazeState: HazeState? = null) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(targetValue = if (isPressed) 0.85f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh), label = "delete_bounce")
@@ -345,12 +352,20 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
         }
     }
 
+    val backgroundColor = Color(theme.keyBackgroundColor)
+
     Box(
         modifier = Modifier
             .size(45.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .shadow(2.dp, CircleShape)
-            .background(Color(theme.keyBackgroundColor), CircleShape)
+            .clip(CircleShape)
+            .then(
+                if (hazeState != null) {
+                    Modifier.hazeEffect(state = hazeState, style = HazeDefaults.style(backgroundColor = backgroundColor, blurRadius = 25.dp))
+                } else Modifier
+            )
+            .background(backgroundColor.copy(alpha = if (hazeState != null) 0.95f else 1f))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -361,7 +376,7 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme) {
         Icon(
             imageVector = if (isPressed) Icons.AutoMirrored.Filled.Backspace else Icons.AutoMirrored.Outlined.Backspace,
             contentDescription = "Borrar",
-            tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint).copy(alpha = 0.7f),
+            tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint),
             modifier = Modifier.size(24.dp).offset(x = (-1).dp)
         )
     }

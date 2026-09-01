@@ -2,6 +2,7 @@ package com.example.hexkeyboard.ui.keyboard.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,15 +25,7 @@ import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 @Composable
 fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: String) {
     val iconColor = Color(theme.keyboardIconTint)
-    val baseBgColor = Color(theme.backgroundColor)
-    val useAdaptiveColor = theme.backgroundImageUri != null
-    val isLightBg = baseBgColor.red * 0.299 + baseBgColor.green * 0.587 + baseBgColor.blue * 0.114 > 0.5
-    
-    val finalIconColor = if (useAdaptiveColor) {
-        if (isLightBg) Color.Black else Color.White
-    } else {
-        iconColor
-    }
+    val textColor = Color(theme.keyTextColor)
 
     Row(
         modifier = Modifier
@@ -39,14 +33,19 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = { viewModel.setCurrentView("keyboard") },
-            modifier = Modifier.size(36.dp)
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { viewModel.setCurrentView("keyboard") },
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.Keyboard,
                 contentDescription = "Cerrar",
-                tint = finalIconColor
+                tint = iconColor
             )
         }
 
@@ -57,7 +56,10 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Color(theme.keyBackgroundColor).copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .clickable { viewModel.setEmojiSearchActive(true) }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { viewModel.setEmojiSearchActive(true) }
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -65,13 +67,13 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = null,
-                    tint = Color(theme.keyboardIconTint).copy(alpha = 0.6f),
+                    tint = iconColor,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (query.isEmpty()) "Buscar emoji..." else query,
-                    color = Color(theme.keyTextColor).copy(alpha = if (query.isEmpty()) 0.5f else 1f),
+                    color = textColor,
                     fontSize = 14.sp
                 )
             }
@@ -83,23 +85,6 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
 fun PanelHeader(title: String, theme: KeyboardTheme, onBack: () -> Unit) {
     val textColor = Color(theme.keyTextColor)
     val iconColor = Color(theme.keyboardIconTint)
-    val baseBgColor = Color(theme.backgroundColor)
-    
-    // Lógica de color adaptable al fondo
-    val useAdaptiveColor = theme.backgroundImageUri != null
-    val isLightBg = baseBgColor.red * 0.299 + baseBgColor.green * 0.587 + baseBgColor.blue * 0.114 > 0.5
-    
-    val finalTextColor = if (useAdaptiveColor) {
-        if (isLightBg) Color.Black else Color.White
-    } else {
-        textColor
-    }
-
-    val finalIconColor = if (useAdaptiveColor) {
-        if (isLightBg) Color.Black else Color.White
-    } else {
-        iconColor
-    }
 
     Row(
         modifier = Modifier
@@ -107,18 +92,26 @@ fun PanelHeader(title: String, theme: KeyboardTheme, onBack: () -> Unit) {
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onBack() },
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = Icons.Default.Keyboard,
                 contentDescription = "Volver",
-                tint = finalIconColor
+                tint = iconColor
             )
         }
         Text(
-            text = title.uppercase(),
-            color = finalTextColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            text = title,
+            color = textColor,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(start = 8.dp)
         )
     }

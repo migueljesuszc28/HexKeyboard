@@ -9,13 +9,16 @@ import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class KeyboardViewModel : ViewModel() {
+@HiltViewModel
+class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     // --- Estado de la UI ---
     private val _parallaxOffset = MutableStateFlow(ParallaxSensorManager.Offset(0f, 0f))

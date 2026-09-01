@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -49,7 +50,7 @@ fun ClipboardPanel(
         ) {
             if (history.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("El portapapeles está vacío", color = Color(theme.keyTextColor).copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
+                    Text("El portapapeles está vacío", color = Color(theme.keyTextColor), style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
                 LazyVerticalGrid(
@@ -71,7 +72,9 @@ fun ClipboardPanel(
                                     onLongClick = { 
                                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
                                         itemWithOptions = item 
-                                    }
+                                    },
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
                                 ),
                             color = Color(theme.keyBackgroundColor),
                             shape = RoundedCornerShape(12.dp),
@@ -89,7 +92,7 @@ fun ClipboardPanel(
                                     Icon(
                                         Icons.Default.PushPin,
                                         contentDescription = null,
-                                        tint = Color(theme.keyboardIconTint).copy(alpha = 0.6f),
+                                        tint = Color(theme.keyboardIconTint),
                                         modifier = Modifier.size(14.dp).align(Alignment.TopEnd)
                                     )
                                 }
@@ -104,7 +107,10 @@ fun ClipboardPanel(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable { 
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { 
                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
                         itemWithOptions = null 
                     },
@@ -125,13 +131,13 @@ fun ClipboardPanel(
                             text = "Opciones de nota",
                             style = MaterialTheme.typography.titleMedium,
                             color = Color(theme.keyTextColor),
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Medium
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = item.text,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(theme.keyTextColor).copy(alpha = 0.7f),
+                            color = Color(theme.keyTextColor),
                             maxLines = 2
                         )
                         Spacer(Modifier.height(20.dp))
@@ -139,43 +145,59 @@ fun ClipboardPanel(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Button(
-                                onClick = { 
-                                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
-                                    onTogglePin(item)
-                                    itemWithOptions = null 
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(theme.keyBackgroundColor),
-                                    contentColor = Color(theme.keyTextColor)
-                                ),
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
+                                        onTogglePin(item)
+                                        itemWithOptions = null
+                                    },
+                                color = Color(theme.keyBackgroundColor),
+                                contentColor = Color(theme.keyTextColor),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(
-                                    if (item.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (item.isPinned) "Desfijar" else "Fijar", fontSize = 13.sp)
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if (item.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(if (item.isPinned) "Desfijar" else "Fijar", fontSize = 13.sp)
+                                }
                             }
-                            Button(
-                                onClick = { 
-                                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
-                                    onDelete(item)
-                                    itemWithOptions = null 
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                ),
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
+                                        onDelete(item)
+                                        itemWithOptions = null
+                                    },
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Borrar", fontSize = 13.sp)
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Borrar", fontSize = 13.sp)
+                                }
                             }
                         }
                     }
