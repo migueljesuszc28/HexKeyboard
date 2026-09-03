@@ -491,6 +491,25 @@ class HexLayoutEngine {
     }
 
     fun findKeyAt(x: Float, y: Float, keys: List<Key>): Key? {
-        return keys.find { it.contains(x, y) }
+        val exactMatch = keys.find { it.contains(x, y) }
+        if (exactMatch != null) return exactMatch
+
+        if (keys.isEmpty()) return null
+
+        var closestKey: Key? = null
+        var minDistanceSq = Float.MAX_VALUE
+        val sampleRx = keys.firstOrNull()?.rx ?: 50f
+        val maxThresholdSq = (sampleRx * 2.8f) * (sampleRx * 2.8f)
+
+        for (key in keys) {
+            val dx = x - key.cx
+            val dy = y - key.cy
+            val distSq = dx * dx + dy * dy
+            if (distSq < minDistanceSq && distSq <= maxThresholdSq) {
+                minDistanceSq = distSq
+                closestKey = key
+            }
+        }
+        return closestKey
     }
 }

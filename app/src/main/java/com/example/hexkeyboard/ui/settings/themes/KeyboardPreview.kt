@@ -4,8 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import com.example.hexkeyboard.data.repository.ThemeUtils
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -152,8 +150,10 @@ fun KeyboardPreview(
             )
             
             // Bottom Margin
-            val bottomOffset = runBlocking {
-                ThemeUtils.getDataStore(context).data.first()[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
+            val bottomOffset by produceState(initialValue = 0, context) {
+                ThemeUtils.getDataStore(context).data.collect { prefs ->
+                    value = prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
+                }
             }
             
             if (bottomOffset > 0) {

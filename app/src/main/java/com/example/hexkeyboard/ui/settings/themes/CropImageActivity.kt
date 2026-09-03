@@ -83,9 +83,11 @@ fun CropImageScreen(
     
     // Alturas en DP para dibujar la silueta
     val suggestionsHeightDp = 46f
-    val bottomOffsetDp = runBlocking {
-        ThemeUtils.getDataStore(context).data.first()[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
-    }.toFloat()
+    val bottomOffsetDp by produceState(initialValue = 0f, context) {
+        ThemeUtils.getDataStore(context).data.collect { prefs ->
+            value = (prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0).toFloat()
+        }
+    }
 
     // GBoard-like Crop: Image moves, fixed frame in center
     Surface(
