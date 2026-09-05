@@ -62,6 +62,7 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     sealed class Action {
         data class InsertText(val text: String) : Action()
+        data class UseClipboardItem(val item: ClipboardItem) : Action()
         object DeleteBackward : Action()
         object InsertNewLine : Action()
         data class ReplaceLastWord(val newWord: String) : Action()
@@ -151,8 +152,8 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
         onActionRequested?.invoke(Action.ReplaceLastWord("$suggestion "))
     }
 
-    fun onClipboardItemClick(text: String) {
-        onActionRequested?.invoke(Action.InsertText(text))
+    fun onClipboardItemClick(item: ClipboardItem) {
+        onActionRequested?.invoke(Action.UseClipboardItem(item))
         setCurrentView("keyboard")
     }
 

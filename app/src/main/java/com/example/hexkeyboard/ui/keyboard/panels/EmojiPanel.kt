@@ -278,6 +278,21 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
         )
     }
 
+    val activeColor = remember(theme) {
+        val shiftColor = theme.keyShiftActiveColor
+        if (shiftColor != null && shiftColor != theme.keyboardIconTint) {
+            Color(shiftColor)
+        } else if (theme.keyTextColor != theme.keyboardIconTint) {
+            Color(theme.keyTextColor)
+        } else if (theme.id.contains("dark") || theme.id == "terminal") {
+            Color(0xFF4285F4)
+        } else {
+            Color(0xFF1A73E8)
+        }
+    }
+    val selectedColor = activeColor
+    val unselectedColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f)
+
     val backgroundColor = Color(theme.keyBackgroundColor)
     
     Surface(
@@ -297,7 +312,7 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
             ScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.Transparent,
-                contentColor = Color(theme.keyboardIconTint),
+                contentColor = selectedColor,
                 edgePadding = 4.dp,
                 modifier = Modifier.fillMaxWidth(),
                 divider = {},
@@ -305,21 +320,32 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
             ) {
                 EmojiProvider.categories.forEachIndexed { index, category ->
                     val isSelected = index == selectedTabIndex
+                    val tint = if (isSelected) selectedColor else unselectedColor
                     Tab(
                         selected = isSelected,
                         onClick = {
                             FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                             onCategoryClick(category.name)
                         },
-                        unselectedContentColor = Color(theme.keyboardIconTint),
-                        selectedContentColor = Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint),
+                        unselectedContentColor = unselectedColor,
+                        selectedContentColor = selectedColor,
                         icon = {
-                            val iconData = categoryIcons[category.name]
-                            val tint = if (isSelected) Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint) else Color(theme.keyboardIconTint)
-                            when (iconData) {
-                                is ImageVector -> Icon(imageVector = iconData, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
-                                is Int -> Icon(painter = painterResource(iconData), contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
-                                else -> Text(category.icon, fontSize = 18.sp, color = tint)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .then(
+                                        if (isSelected) Modifier.background(selectedColor.copy(alpha = 0.18f))
+                                        else Modifier
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val iconData = categoryIcons[category.name]
+                                when (iconData) {
+                                    is ImageVector -> Icon(imageVector = iconData, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
+                                    is Int -> Icon(painter = painterResource(iconData), contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
+                                    else -> Text(category.icon, fontSize = 18.sp, color = tint)
+                                }
                             }
                         }
                     )

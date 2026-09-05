@@ -17,17 +17,27 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -458,52 +468,233 @@ fun ColorPickerDialog(
     onConfirm: (Int) -> Unit
 ) {
     val controller = rememberColorPickerController()
-    var selectedColor by remember { mutableStateOf(androidx.compose.ui.graphics.Color(initialColor)) }
+    val initialComposeColor = remember(initialColor) { androidx.compose.ui.graphics.Color(initialColor) }
+    var selectedColor by remember { mutableStateOf(initialComposeColor) }
+
+    fun formatColorHex(color: androidx.compose.ui.graphics.Color): String {
+        return String.format("#%08X", color.toArgb())
+    }
+
+    fun parseColorHex(input: String): androidx.compose.ui.graphics.Color? {
+        val clean = input.trim().removePrefix("#")
+        return try {
+            val argb = when (clean.length) {
+                6 -> (0xFF000000 or clean.toLong(16)).toInt()
+                8 -> clean.toLong(16).toInt()
+                else -> return null
+            }
+            androidx.compose.ui.graphics.Color(argb)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    var hexInputText by remember { mutableStateOf(formatColorHex(initialComposeColor)) }
+    var isHexValid by remember { mutableStateOf(true) }
+
+    val presetColors = remember {
+        listOf(
+            androidx.compose.ui.graphics.Color.Transparent,
+            androidx.compose.ui.graphics.Color.White,
+            androidx.compose.ui.graphics.Color(0xFFE0E0E0),
+            androidx.compose.ui.graphics.Color(0xFF757575),
+            androidx.compose.ui.graphics.Color(0xFF212121),
+            androidx.compose.ui.graphics.Color.Black,
+            androidx.compose.ui.graphics.Color(0xFFF44336),
+            androidx.compose.ui.graphics.Color(0xFFE91E63),
+            androidx.compose.ui.graphics.Color(0xFF9C27B0),
+            androidx.compose.ui.graphics.Color(0xFF2196F3),
+            androidx.compose.ui.graphics.Color(0xFF00BCD4),
+            androidx.compose.ui.graphics.Color(0xFF009688),
+            androidx.compose.ui.graphics.Color(0xFF4CAF50),
+            androidx.compose.ui.graphics.Color(0xFFFFEB3B),
+            androidx.compose.ui.graphics.Color(0xFFFF9800)
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Selecciona un color") },
+        title = {
+            Text(
+                text = "Seleccionar color",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(350.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Live Color Preview Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Original", style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(initialComposeColor)
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Nuevo", style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(selectedColor)
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
+                        )
+                    }
+                }
+
+                // HSV Color Wheel Picker
                 HsvColorPicker(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(250.dp)
-                        .padding(10.dp),
+                        .height(200.dp),
                     controller = controller,
                     onColorChanged = { envelope ->
-                        selectedColor = envelope.color
+                        if (envelope.fromUser) {
+                            selectedColor = envelope.color
+                            hexInputText = formatColorHex(envelope.color)
+                            isHexValid = true
+                        }
                     },
-                    initialColor = androidx.compose.ui.graphics.Color(initialColor)
+                    initialColor = initialComposeColor
                 )
-                
-                BrightnessSlider(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp)
-                        .height(35.dp),
-                    controller = controller
+
+                // Brightness Slider
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Brillo", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(2.dp))
+                    BrightnessSlider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(30.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        controller = controller
+                    )
+                }
+
+                // Alpha / Opacity Slider
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Opacidad", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(2.dp))
+                    AlphaSlider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(30.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        controller = controller
+                    )
+                }
+
+                // Hexadecimal Code Input
+                OutlinedTextField(
+                    value = hexInputText,
+                    onValueChange = { input ->
+                        hexInputText = input.uppercase()
+                        val parsed = parseColorHex(input)
+                        if (parsed != null) {
+                            isHexValid = true
+                            selectedColor = parsed
+                            controller.selectByColor(parsed, false)
+                        } else {
+                            isHexValid = false
+                        }
+                    },
+                    label = { Text("Código Hexadecimal") },
+                    singleLine = true,
+                    isError = !isHexValid,
+                    supportingText = if (!isHexValid) {
+                        { Text("Ej: #FF4285F4 o #4285F4") }
+                    } else null,
+                    trailingIcon = {
+                        if (isHexValid) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Válido",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "Inválido",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                
-                AlphaSlider(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp)
-                        .height(35.dp),
-                    controller = controller
-                )
+
+                // Preset Swatches Row
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Paleta rápida", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(6.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(presetColors) { color ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (color == selectedColor) 2.dp else 1.dp,
+                                        color = if (color == selectedColor) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        selectedColor = color
+                                        hexInputText = formatColorHex(color)
+                                        isHexValid = true
+                                        controller.selectByColor(color, false)
+                                    }
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedColor.toArgb()) }) { Text("Confirmar") }
+            Button(
+                onClick = { onConfirm(selectedColor.toArgb()) },
+                enabled = isHexValid
+            ) {
+                Text("Confirmar")
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
         }
     )
 }

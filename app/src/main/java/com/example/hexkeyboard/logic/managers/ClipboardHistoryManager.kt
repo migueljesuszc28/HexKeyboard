@@ -1,6 +1,8 @@
 package com.example.hexkeyboard.logic.managers
 
 import android.content.Context
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.datastore.preferences.core.edit
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import kotlinx.coroutines.flow.Flow
@@ -10,14 +12,20 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.util.concurrent.TimeUnit
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
 
 @Serializable
 data class ClipboardItem(
-    val text: String,
+    val text: String = "",
+    val imageUri: String? = null,
+    val mimeType: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val isPinned: Boolean = false,
-)
+) {
+    val isImage: Boolean get() = !imageUri.isNullOrEmpty()
+}
 
 object ClipboardHistoryManager {
     private val json = Json {
@@ -47,14 +55,45 @@ object ClipboardHistoryManager {
         }
     }
 
+    fun saveImageToCache(context: Context, sourceUri: Uri, mimeType: String): Uri? {
+        return try {
+            val imagesDir = File(context.filesDir, "clipboard_images")
+            if (!imagesDir.exists()) imagesDir.mkdirs()
+
+            val ext = when (mimeType) {
+                "image/png" -> "png"
+                "image/webp" -> "webp"
+                "image/gif" -> "gif"
+                else -> "jpg"
+            }
+            val fileName = "clip_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.$ext"
+            val destFile = File(imagesDir, fileName)
+
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                FileOutputStream(destFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                destFile
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     suspend fun addItem(context: Context, text: String) {
         if (text.isBlank()) return
         val currentHistory = getHistory(context).toMutableList()
         
         // Remove existing to move to top
-        currentHistory.removeAll { it.text == text }
+        currentHistory.removeAll { !it.isImage && it.text == text }
         
-        currentHistory.add(0, ClipboardItem(text))
+        currentHistory.add(0, ClipboardItem(text = text))
         
         // Limit history size (e.g., 50 items)
         val limitedHistory = currentHistory.take(50)
@@ -64,15 +103,46 @@ object ClipboardHistoryManager {
         cleanUpExpiredItems(context)
     }
 
+    suspend fun addImageItem(context: Context, imageUri: Uri, mimeType: String, caption: String = "") {
+        val currentHistory = getHistory(context).toMutableList()
+        val uriString = imageUri.toString()
+        
+        if (currentHistory.firstOrNull()?.imageUri == uriString) return
+        
+        currentHistory.removeAll { it.imageUri == uriString }
+        
+        val newItem = ClipboardItem(
+            text = caption,
+            imageUri = uriString,
+            mimeType = mimeType
+        )
+        currentHistory.add(0, newItem)
+        
+        val limitedHistory = currentHistory.take(50)
+        saveHistory(context, limitedHistory)
+        cleanUpExpiredItems(context)
+    }
+
     suspend fun deleteItem(context: Context, item: ClipboardItem) {
         val currentHistory = getHistory(context).toMutableList()
-        currentHistory.removeAll { (it.text == item.text) && (it.timestamp == item.timestamp) }
+        currentHistory.removeAll { 
+            (it.text == item.text) && (it.timestamp == item.timestamp) && (it.imageUri == item.imageUri) 
+        }
         saveHistory(context, currentHistory)
+
+        if (!item.imageUri.isNullOrEmpty()) {
+            try {
+                val uri = Uri.parse(item.imageUri)
+                if (uri.scheme == "content") {
+                    context.contentResolver.delete(uri, null, null)
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     suspend fun togglePin(context: Context, item: ClipboardItem) {
         val currentHistory = getHistory(context).map {
-            if ((it.text == item.text) && (it.timestamp == item.timestamp)) {
+            if ((it.text == item.text) && (it.timestamp == item.timestamp) && (it.imageUri == item.imageUri)) {
                 it.copy(isPinned = !it.isPinned)
             } else it
         }
@@ -91,12 +161,25 @@ object ClipboardHistoryManager {
         
         val now = System.currentTimeMillis()
         val currentHistory = getHistory(context)
+        val expiredItems = currentHistory.filter { 
+            !it.isPinned && (now - it.timestamp) >= expiryMillis
+        }
         val newHistory = currentHistory.filter { 
             it.isPinned || (now - it.timestamp) < expiryMillis
         }
         
         if (newHistory.size != currentHistory.size) {
             saveHistory(context, newHistory)
+            expiredItems.forEach { item ->
+                if (!item.imageUri.isNullOrEmpty()) {
+                    try {
+                        val uri = Uri.parse(item.imageUri)
+                        if (uri.scheme == "content") {
+                            context.contentResolver.delete(uri, null, null)
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
         }
     }
 }

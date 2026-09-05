@@ -115,12 +115,16 @@ fun KeyboardMainSection(
             view.fontPages = service?.fontPages ?: emptyList()
 
             service?.currentInputEditorInfo?.let { info ->
+                val effectiveAction = service.getEffectiveImeAction(info)
                 val inputType = info.inputType
                 val classMask = inputType and InputType.TYPE_MASK_CLASS
-                view.isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
-                        (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
-                val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
-                view.setImeAction(action)
+                
+                val isTextClass = classMask == InputType.TYPE_CLASS_TEXT
+                val hasMultiLineFlag = (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+                val isMultiLine = isTextClass && hasMultiLineFlag && (effectiveAction == EditorInfo.IME_ACTION_NONE || effectiveAction == EditorInfo.IME_ACTION_UNSPECIFIED)
+                
+                view.setImeAction(effectiveAction)
+                view.isMultiLine = isMultiLine
             }
 
             view.listener = object : HexKeyboardView.Listener {

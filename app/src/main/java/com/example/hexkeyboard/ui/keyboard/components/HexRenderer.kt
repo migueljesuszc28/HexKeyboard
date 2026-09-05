@@ -254,18 +254,14 @@ class HexRenderer(private val context: Context) {
             }
             HexLayoutEngine.KeyType.ENTER -> {
                 if (isEnterWithText) {
-                    customLabel = if (isMultiLine) {
-                        "INTRO"
-                    } else {
-                        when (currentImeAction) {
-                            EditorInfo.IME_ACTION_GO -> "IR"
-                            EditorInfo.IME_ACTION_SEARCH -> "BUSCAR"
-                            EditorInfo.IME_ACTION_SEND -> "ENVIAR"
-                            EditorInfo.IME_ACTION_NEXT -> "SIG."
-                            EditorInfo.IME_ACTION_DONE -> "HECHO"
-                            EditorInfo.IME_ACTION_PREVIOUS -> "ANT."
-                            else -> "INTRO"
-                        }
+                    customLabel = when (currentImeAction) {
+                        EditorInfo.IME_ACTION_GO -> "IR"
+                        EditorInfo.IME_ACTION_SEARCH -> "BUSCAR"
+                        EditorInfo.IME_ACTION_SEND -> "ENVIAR"
+                        EditorInfo.IME_ACTION_NEXT -> "SIG."
+                        EditorInfo.IME_ACTION_DONE -> "HECHO"
+                        EditorInfo.IME_ACTION_PREVIOUS -> "ANT."
+                        else -> "INTRO"
                     }
                 }
             }
@@ -293,16 +289,12 @@ class HexRenderer(private val context: Context) {
         } else {
             when (key.type) {
                 HexLayoutEngine.KeyType.ENTER -> {
-                    if (isMultiLine) {
-                        iconEnter
-                    } else {
-                        when (currentImeAction) {
-                            EditorInfo.IME_ACTION_SEND -> iconSend
-                            EditorInfo.IME_ACTION_SEARCH -> iconSearch
-                            EditorInfo.IME_ACTION_DONE -> iconDone
-                            EditorInfo.IME_ACTION_GO -> iconGo
-                            else -> iconEnter
-                        }
+                    when (currentImeAction) {
+                        EditorInfo.IME_ACTION_SEND -> iconSend
+                        EditorInfo.IME_ACTION_SEARCH -> iconSearch
+                        EditorInfo.IME_ACTION_DONE -> iconDone
+                        EditorInfo.IME_ACTION_GO -> iconGo
+                        else -> iconEnter
                     }
                 }
                 HexLayoutEngine.KeyType.SYMBOL_PAGE -> iconSymbols

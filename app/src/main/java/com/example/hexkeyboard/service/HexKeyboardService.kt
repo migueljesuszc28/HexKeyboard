@@ -2,6 +2,8 @@ package com.example.hexkeyboard.service
 
 import android.Manifest
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -11,6 +13,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PointF
 import android.inputmethodservice.InputMethodService
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.text.InputType
@@ -22,6 +25,10 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
+import android.widget.Toast
+import androidx.core.view.inputmethod.EditorInfoCompat
+import androidx.core.view.inputmethod.InputConnectionCompat
+import androidx.core.view.inputmethod.InputContentInfoCompat
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
@@ -99,15 +106,43 @@ class HexKeyboardService : InputMethodService(),
     private val mLifecycleRegistry = LifecycleRegistry(this)
 
     private lateinit var clipboardManager: ClipboardManager
+    private var isSettingInternalClip = false
+
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
+        if (isSettingInternalClip) {
+            isSettingInternalClip = false
+            return@OnPrimaryClipChangedListener
+        }
         val clip = clipboardManager.primaryClip
         if ((clip != null) && (clip.itemCount > 0)) {
-            val text = clip.getItemAt(0).text?.toString() ?: ""
-            if (text.isNotEmpty()) {
-                serviceScope.launch {
+            val item = clip.getItemAt(0)
+            val uri = item.uri
+            val text = item.text?.toString() ?: ""
+            val desc = clip.description
+            val mimeType = desc?.let { d ->
+                (0 until d.mimeTypeCount)
+                    .map { d.getMimeType(it) }
+                    .find { it.startsWith("image/") }
+            }
+
+            if (uri != null && mimeType != null) {
+                serviceScope.launch(Dispatchers.IO) {
+                    val cachedUri = ClipboardHistoryManager.saveImageToCache(this@HexKeyboardService, uri, mimeType)
+                    if (cachedUri != null) {
+                        ClipboardHistoryManager.addImageItem(this@HexKeyboardService, cachedUri, mimeType, text)
+                        lastUsedClipboardText = null
+                        withContext(Dispatchers.Main) {
+                            refreshClipboardHistory(triggerSuggestionsUpdate = true)
+                        }
+                    }
+                }
+            } else if (text.isNotBlank()) {
+                serviceScope.launch(Dispatchers.IO) {
                     ClipboardHistoryManager.addItem(this@HexKeyboardService, text)
                     lastUsedClipboardText = null
-                    refreshClipboardHistory(triggerSuggestionsUpdate = true)
+                    withContext(Dispatchers.Main) {
+                        refreshClipboardHistory(triggerSuggestionsUpdate = true)
+                    }
                 }
             }
         }
@@ -303,6 +338,7 @@ class HexKeyboardService : InputMethodService(),
         viewModel.onActionRequested = { action ->
             when (action) {
                 is KeyboardViewModel.Action.InsertText -> handleChar(action.text)
+                is KeyboardViewModel.Action.UseClipboardItem -> useClipboardItem(action.item)
                 is KeyboardViewModel.Action.DeleteBackward -> handleDelete()
                 is KeyboardViewModel.Action.InsertNewLine -> handleEnter()
                 is KeyboardViewModel.Action.ReplaceLastWord -> replaceLastWord(action.newWord)
@@ -439,10 +475,36 @@ class HexKeyboardService : InputMethodService(),
         }
     }
 
+    override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(attribute, restarting)
+        if (attribute == null) return
+        val effectiveAction = getEffectiveImeAction(attribute)
+        mHexKeyboardView?.setImeAction(effectiveAction)
+    }
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         if (info == null) return
         
+        val effectiveAction = getEffectiveImeAction(info)
+        val inputType = info.inputType
+        val classMask = inputType and InputType.TYPE_MASK_CLASS
+        val isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
+                (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0) &&
+                (effectiveAction == EditorInfo.IME_ACTION_NONE || effectiveAction == EditorInfo.IME_ACTION_UNSPECIFIED)
+
+        mHexKeyboardView?.setImeAction(effectiveAction)
+        mHexKeyboardView?.isMultiLine = isMultiLine
+
+        if ((classMask == InputType.TYPE_CLASS_NUMBER) ||
+            (classMask == InputType.TYPE_CLASS_PHONE)) {
+            mHexKeyboardView?.layoutMode = HexLayoutEngine.LayoutMode.PURE_NUMERIC
+        } else {
+            mHexKeyboardView?.layoutMode = HexLayoutEngine.LayoutMode.ALPHA
+        }
+        
+        updateShiftState()
+
         serviceScope.launch {
             val lang = ThemeUtils.getDataStore(this@HexKeyboardService).data.first()[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es"
             
@@ -456,25 +518,6 @@ class HexKeyboardService : InputMethodService(),
                 spellCheckerManager.closeSession()
                 spellCheckerManager.clearSuggestions()
                 spellCheckerManager.initSession()
-                val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
-                mHexKeyboardView?.setImeAction(action)
-                
-                val inputType = info.inputType
-                val classMask = inputType and InputType.TYPE_MASK_CLASS
-                
-                // Prioridad: Si es multilinea, la acción por defecto es ENTER
-                val isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
-                        (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
-                mHexKeyboardView?.isMultiLine = isMultiLine
-
-                if ((classMask == InputType.TYPE_CLASS_NUMBER) ||
-                    (classMask == InputType.TYPE_CLASS_PHONE)) {
-                    mHexKeyboardView?.layoutMode = HexLayoutEngine.LayoutMode.PURE_NUMERIC
-                } else {
-                    mHexKeyboardView?.layoutMode = HexLayoutEngine.LayoutMode.ALPHA
-                }
-                
-                updateShiftState()
             }
         }
     }
@@ -685,21 +728,51 @@ class HexKeyboardService : InputMethodService(),
         return last - previous
     }
 
+    fun getEffectiveImeAction(info: EditorInfo?): Int {
+        if (info == null) return EditorInfo.IME_ACTION_NONE
+
+        val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
+
+        // 1. Acciones explícitas de alta prioridad NUNCA deben ser sobrescritas por banderas multilinea.
+        // Las barras de búsqueda y navegadores inyectan IME_ACTION_SEARCH, GO o SEND
+        if (action == EditorInfo.IME_ACTION_SEARCH || 
+            action == EditorInfo.IME_ACTION_GO || 
+            action == EditorInfo.IME_ACTION_SEND) {
+            return action
+        }
+
+        // 2. Si la app establece IME_FLAG_NO_ENTER_ACTION, pide explícitamente un Enter normal.
+        if ((info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) {
+            return EditorInfo.IME_ACTION_NONE
+        }
+
+        // 3. En campos multilínea estándar (WhatsApp, Telegram) se prioriza el salto de línea
+        // siempre y cuando la acción no haya sido una explícita procesada en el paso 1.
+        val isTextClass = (info.inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
+        val isMultiLine = isTextClass && (info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        
+        if (isMultiLine) {
+            return EditorInfo.IME_ACTION_NONE
+        }
+
+        // 4. Si la app Android inyecta IME_ACTION_DONE (el default genérico de un EditText de línea única), 
+        // lo convertimos a NONE si es un campo de texto, ya que la gente espera "Enter" para bajar la línea.
+        if (action == EditorInfo.IME_ACTION_DONE && isTextClass) {
+            return EditorInfo.IME_ACTION_NONE
+        }
+
+        // 5. Para todo lo demás (NEXT, PREVIOUS, DONE en formularios no textuales), respetamos la acción.
+        return action
+    }
+
     fun handleEnter() {
         val ic = currentInputConnection ?: return
         val ei = currentInputEditorInfo ?: return
         
-        val inputType = ei.inputType
-        val classMask = inputType and InputType.TYPE_MASK_CLASS
-        val isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
-                (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
-
-        val action = ei.imeOptions and EditorInfo.IME_MASK_ACTION
+        val effectiveAction = getEffectiveImeAction(ei)
         
-        if (isMultiLine) {
-            ic.commitText("\n", 1)
-        } else if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
-            ic.performEditorAction(action)
+        if (effectiveAction != EditorInfo.IME_ACTION_NONE && effectiveAction != EditorInfo.IME_ACTION_UNSPECIFIED) {
+            ic.performEditorAction(effectiveAction)
         } else {
             ic.commitText("\n", 1)
         }
@@ -757,12 +830,61 @@ class HexKeyboardService : InputMethodService(),
         }
     }
 
-    fun useClipboardItem(text: String) {
-        val latestClip = viewModel.clipboardHistory.value.firstOrNull()?.text ?: ""
-        if (text.trim() == latestClip.trim()) {
-            lastUsedClipboardText = latestClip
+    fun useClipboardItem(item: ClipboardItem) {
+        if (item.isImage) {
+            commitImageContent(item)
+        } else {
+            val latestClip = viewModel.clipboardHistory.value.firstOrNull()?.text ?: ""
+            if (item.text.trim() == latestClip.trim()) {
+                lastUsedClipboardText = latestClip
+            }
+            handleChar(item.text)
         }
-        handleChar(text)
+    }
+
+    fun commitImageContent(item: ClipboardItem) {
+        val ic = currentInputConnection ?: return
+        val info = currentInputEditorInfo ?: return
+        val imageUriString = item.imageUri ?: return
+        val mimeType = item.mimeType ?: "image/png"
+
+        try {
+            val imageUri = Uri.parse(imageUriString)
+            val editorMimeTypes = EditorInfoCompat.getContentMimeTypes(info)
+            val isSupported = editorMimeTypes.any { editorMime ->
+                ClipDescription.compareMimeTypes(editorMime, mimeType) || editorMime == "*/*"
+            }
+
+            if (isSupported) {
+                val inputContentInfo = InputContentInfoCompat(
+                    imageUri,
+                    ClipDescription("Clipboard Image", arrayOf(mimeType)),
+                    null
+                )
+                
+                var flags = 0
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
+                }
+                
+                val committed = InputConnectionCompat.commitContent(ic, info, inputContentInfo, flags, null)
+                if (committed) {
+                    val latestClip = viewModel.clipboardHistory.value.firstOrNull()?.imageUri ?: ""
+                    if (item.imageUri == latestClip) {
+                        lastUsedClipboardText = latestClip
+                    }
+                    return
+                }
+            }
+
+            val clipData = ClipData.newUri(contentResolver, "Clipboard Image", imageUri)
+            isSettingInternalClip = true
+            clipboardManager.setPrimaryClip(clipData)
+            Toast.makeText(this, "Imagen copiada al portapapeles. Usa Pegar.", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "No se pudo insertar la imagen en esta aplicación", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun updateShiftState() {
