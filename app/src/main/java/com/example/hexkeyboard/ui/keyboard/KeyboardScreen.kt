@@ -3,6 +3,8 @@ package com.example.hexkeyboard.ui.keyboard
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -10,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -124,24 +127,122 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             Box(modifier = Modifier.matchParentSize().background(Color(keyboardTheme.backgroundColor).copy(alpha = 1f - keyboardTheme.backgroundOpacity)))
         }
 
+        val currentView by viewModel.currentView.collectAsState()
+        val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
+        val isEmojiPanel = currentView == "emoji"
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (isGlassTheme) Modifier.hazeSource(hazeState) else Modifier)
+                .then(if (isGlassTheme || isEmojiPanel) Modifier.hazeSource(hazeState) else Modifier)
                 .navigationBarsPadding()
         ) {
-            SuggestionsBarSection(viewModel, keyboardTheme)
-
             Box(
-                modifier = Modifier.fillMaxWidth().wrapContentHeight(),
-                contentAlignment = Alignment.TopCenter
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
             ) {
-                KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
-                PanelsSection(viewModel, keyboardTheme, hazeState)
-            }
+                // Capa 1: Columna Ancla que determina la altura total exacta (46dp + Teclado + BottomOffset)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (isEmojiPanel && !isEmojiSearchActive) Modifier.alpha(0f) else Modifier)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
+                        SuggestionsBarSection(viewModel, keyboardTheme)
+                    }
 
-            if (bottomOffset > 0) {
-                Spacer(modifier = Modifier.height(bottomOffset.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
+                        if (!isEmojiPanel || isEmojiSearchActive) {
+                            PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset)
+                        }
+                    }
+
+                    if (bottomOffset > 0) {
+                        Spacer(modifier = Modifier.fillMaxWidth().height(bottomOffset.dp))
+                    }
+                }
+
+                // Capa 2: Panel de Emojis a pantalla completa con Haze Effect y Desvanecido Gradient
+                if (isEmojiPanel && !isEmojiSearchActive) {
+                    val topFadeBrush = remember(keyboardTheme.backgroundColor) {
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.98f),
+                                0.70f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.85f),
+                                1.0f to Color.Transparent
+                            )
+                        )
+                    }
+
+                    val bottomFadeBrush = remember(keyboardTheme.backgroundColor) {
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.40f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.85f),
+                                1.0f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.98f)
+                            )
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    ) {
+                        // 1. El Panel de Emojis ocupa la altura total de la capa base
+                        PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset)
+
+                        // 2. Barra de Sugerencias Flotante Superior con Haze y Curvatura Recortada (28.dp)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .height(58.dp)
+                                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                                .hazeEffect(
+                                    state = hazeState,
+                                    style = HazeDefaults.style(
+                                        backgroundColor = Color(keyboardTheme.backgroundColor).copy(alpha = 0.92f),
+                                        blurRadius = 25.dp
+                                    )
+                                )
+                                .background(topFadeBrush)
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
+                                SuggestionsBarSection(viewModel, keyboardTheme)
+                            }
+                        }
+
+                        // 3. Margen Inferior Flotante con Haze y Desvanecido Gradient (Bloquea toques hacia los emojis)
+                        if (bottomOffset > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height((bottomOffset + 16).dp)
+                                    .hazeEffect(
+                                        state = hazeState,
+                                        style = HazeDefaults.style(
+                                            backgroundColor = Color(keyboardTheme.backgroundColor).copy(alpha = 0.92f),
+                                            blurRadius = 25.dp
+                                        )
+                                    )
+                                    .background(bottomFadeBrush)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { /* Absorbe toques para evitar seleccionar emojis detrás del margen */ }
+                            )
+                        }
+                    }
+                }
             }
         }
     }

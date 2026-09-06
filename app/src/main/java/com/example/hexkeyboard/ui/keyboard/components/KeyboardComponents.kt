@@ -51,11 +51,12 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
 
         Spacer(modifier = Modifier.width(8.dp))
 
+        val pillBg = if (theme.keyBackgroundColor != 0 && theme.keyBackgroundColor != android.graphics.Color.TRANSPARENT) Color(theme.keyBackgroundColor) else Color(theme.backgroundColor)
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(Color(theme.keyBackgroundColor).copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .background(pillBg.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null

@@ -384,7 +384,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     fun buildLayoutExternally() {
-        if (width > 0) buildLayout(width.toFloat()); invalidate()
+        if (width > 0) buildLayout(width.toFloat())
+        requestLayout()
+        invalidate()
     }
 
     private var keysBitmap: Bitmap? = null

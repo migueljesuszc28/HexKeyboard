@@ -78,7 +78,8 @@ fun EmojiPanel(
     onBack: () -> Unit,
     theme: KeyboardTheme,
     viewModel: KeyboardViewModel? = null,
-    hazeState: HazeState? = null
+    hazeState: HazeState? = null,
+    bottomOffset: Int = 0
 ) {
     val context = LocalContext.current
     val searchQuery by (viewModel?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
@@ -156,7 +157,7 @@ fun EmojiPanel(
             state = gridState,
             columns = GridCells.Adaptive(minSize = 44.dp),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 60.dp)
+            contentPadding = PaddingValues(top = 46.dp, bottom = (70 + bottomOffset).dp)
         ) {
             items(
                 items = emojiList,
@@ -197,7 +198,7 @@ fun EmojiPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                    .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + 8).dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End
             ) {

@@ -153,7 +153,7 @@ fun KeyboardMainSection(
 }
 
 @Composable
-fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, hazeState: HazeState) {
+fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, hazeState: HazeState, bottomOffset: Int = 0) {
     val currentView by viewModel.currentView.collectAsState()
     val clipboardHistory by viewModel.clipboardHistory.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
@@ -162,10 +162,19 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, h
 
     if (currentView != "keyboard") {
         val scope = rememberCoroutineScope()
+        // Cuando estamos en el panel de emoji, ocupamos todo el Box padre (matchParentSize), 
+        // pero la altura final la decidirá el Teclado principal renderizado invisible debajo
         val panelModifier = if (isEmojiSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
         Box(modifier = panelModifier) {
             when (currentView) {
-                "emoji" -> EmojiPanel(onEmojiSelected = { char -> viewModel.onEmojiSelected(char) }, onBack = { viewModel.setCurrentView("keyboard") }, theme = theme, viewModel = viewModel, hazeState = hazeState)
+                "emoji" -> EmojiPanel(
+                    onEmojiSelected = { char -> viewModel.onEmojiSelected(char) }, 
+                    onBack = { viewModel.setCurrentView("keyboard") }, 
+                    theme = theme, 
+                    viewModel = viewModel, 
+                    hazeState = hazeState,
+                    bottomOffset = bottomOffset
+                )
                 "clipboard" -> ClipboardPanel(
                     history = clipboardHistory,
                     onItemSelected = { item -> viewModel.onClipboardItemClick(item) },
