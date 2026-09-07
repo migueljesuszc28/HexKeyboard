@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.hexkeyboard.data.model.CredentialItem
+import com.example.hexkeyboard.data.repository.CredentialsManager
 import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
@@ -29,6 +31,22 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     private val _clipboardHistory = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val clipboardHistory: StateFlow<List<ClipboardItem>> = _clipboardHistory.asStateFlow()
+
+    private val _clipboardItemWithOptions = MutableStateFlow<ClipboardItem?>(null)
+    val clipboardItemWithOptions: StateFlow<ClipboardItem?> = _clipboardItemWithOptions.asStateFlow()
+
+    fun setClipboardItemWithOptions(item: ClipboardItem?) {
+        _clipboardItemWithOptions.value = item
+    }
+
+    private val _credentials = MutableStateFlow<List<CredentialItem>>(emptyList())
+    val credentials: StateFlow<List<CredentialItem>> = _credentials.asStateFlow()
+
+    fun loadCredentials(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _credentials.value = CredentialsManager.getAllCredentials(context)
+        }
+    }
 
     private val _keyboardTheme = MutableStateFlow<KeyboardTheme?>(null)
     val keyboardTheme: StateFlow<KeyboardTheme?> = _keyboardTheme.asStateFlow()
@@ -97,10 +115,13 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
         _currentLocale.value = locale
     }
 
-    fun setCurrentView(view: String) {
+    fun setCurrentView(view: String, context: Context? = null) {
         _currentView.value = view
         if (view == "clipboard") {
             onActionRequested?.invoke(Action.RefreshClipboard)
+        }
+        if (view == "credentials" && context != null) {
+            loadCredentials(context)
         }
         if (view != "emoji") {
             _emojiSearchQuery.value = ""

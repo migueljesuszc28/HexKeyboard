@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
@@ -17,15 +18,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
-import kotlin.math.abs
 
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 
@@ -38,13 +37,18 @@ fun FunctionsPanel(
 ) {
     val context = LocalContext.current
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 16.dp),
+        contentAlignment = Alignment.TopCenter
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             FunctionItem(
                 icon = Icons.Default.Settings,
                 label = "Ajustes",
@@ -70,6 +74,14 @@ fun FunctionsPanel(
                 },
                 theme = theme
             )
+            FunctionItem(
+                icon = Icons.Default.Key,
+                label = "Contraseñas",
+                onClick = {
+                    viewModel?.setCurrentView("credentials", context)
+                },
+                theme = theme
+            )
         }
     }
 }
@@ -90,7 +102,7 @@ fun FunctionItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(80.dp)
+            .width(76.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -112,6 +124,12 @@ fun FunctionItem(
         }
         Spacer(Modifier.height(8.dp))
         
-        Text(label, style = MaterialTheme.typography.labelMedium, color = textColor)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = textColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

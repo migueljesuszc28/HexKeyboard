@@ -1,0 +1,8 @@
+- `[x]` Implementar lógica de datos y seguridad para CredentialsManager (`EncryptedSharedPreferences`).
+- `[x]` Implementar modelo de datos `CredentialItem`.
+- `[x]` Integrar CredentialsManager en `KeyboardViewModel`.
+- `[x]` Crear Interfaz de Ajustes (`CredentialsSettingsActivity`).
+- `[x]` Añadir acceso en `SettingsActivity` a la nueva interfaz de credenciales.
+- `[x]` Crear Panel del Teclado (`CredentialsPanel`).
+- `[/]` Agregar estado de navegación de `"credentials"` en `KeyboardMainSection` y atajo en `FunctionsPanel` / `SuggestionsBar`.
+- `[x]` Añadir dependencias de cifrado de seguridad a `build.gradle.kts`.

@@ -33,11 +33,32 @@ object ClipboardHistoryManager {
         encodeDefaults = true
     }
 
+    suspend fun getHistoryRaw(context: Context): List<ClipboardItem> {
+        val prefs = ThemeUtils.getDataStore(context).data.first()
+        val jsonString = prefs[ThemeUtils.CLIPBOARD_HISTORY] ?: return emptyList()
+        return try {
+            json.decodeFromString<List<ClipboardItem>>(jsonString)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     fun getHistoryFlow(context: Context): Flow<List<ClipboardItem>> {
         return ThemeUtils.getDataStore(context).data.map { prefs ->
             val jsonString = prefs[ThemeUtils.CLIPBOARD_HISTORY] ?: return@map emptyList()
             try {
-                json.decodeFromString<List<ClipboardItem>>(jsonString)
+                val fullList = json.decodeFromString<List<ClipboardItem>>(jsonString)
+                val autoDelete = prefs[ThemeUtils.CLIPBOARD_AUTO_DELETE] ?: true
+                if (!autoDelete) {
+                    fullList
+                } else {
+                    val expiryHoursStr = prefs[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] ?: "1"
+                    val expiryHours = expiryHoursStr.replace(',', '.').toDoubleOrNull() ?: 1.0
+                    val expiryMillis = (expiryHours * 3600000).toLong()
+                    val now = System.currentTimeMillis()
+                    
+                    fullList.filter { it.isPinned || (now - it.timestamp) < expiryMillis }
+                }
             } catch (_: Exception) {
                 emptyList()
             }
@@ -141,12 +162,23 @@ object ClipboardHistoryManager {
     }
 
     suspend fun togglePin(context: Context, item: ClipboardItem) {
-        val currentHistory = getHistory(context).map {
+        val currentHistory = getHistoryRaw(context).map {
             if ((it.text == item.text) && (it.timestamp == item.timestamp) && (it.imageUri == item.imageUri)) {
                 it.copy(isPinned = !it.isPinned)
             } else it
         }
         saveHistory(context, currentHistory)
+    }
+
+    suspend fun updateItem(context: Context, oldItem: ClipboardItem, newText: String) {
+        val currentHistory = getHistoryRaw(context).toMutableList()
+        val index = currentHistory.indexOfFirst { 
+            (it.text == oldItem.text) && (it.timestamp == oldItem.timestamp) && (it.imageUri == oldItem.imageUri) 
+        }
+        if (index != -1) {
+            currentHistory[index] = currentHistory[index].copy(text = newText)
+            saveHistory(context, currentHistory)
+        }
     }
 
     suspend fun cleanUpExpiredItems(context: Context) {
@@ -160,7 +192,7 @@ object ClipboardHistoryManager {
         val expiryMillis = (expiryHours * 3600000).toLong()
         
         val now = System.currentTimeMillis()
-        val currentHistory = getHistory(context)
+        val currentHistory = getHistoryRaw(context)
         val expiredItems = currentHistory.filter { 
             !it.isPinned && (now - it.timestamp) >= expiryMillis
         }

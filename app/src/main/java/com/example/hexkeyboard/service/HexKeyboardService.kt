@@ -442,6 +442,10 @@ class HexKeyboardService : InputMethodService(),
         updateShiftState()
         updateSuggestions()
 
+        serviceScope.launch(Dispatchers.IO) {
+            ClipboardHistoryManager.cleanUpExpiredItems(this@HexKeyboardService)
+        }
+
         mComposeView?.setBackgroundColor(Color.TRANSPARENT)
 
         window?.window?.let { win ->
@@ -680,7 +684,12 @@ class HexKeyboardService : InputMethodService(),
             if (words.isNotEmpty()) {
                 val currentWord = words.last()
                 val previousWord = if (words.size > 1) words[words.size - 2] else null
-                predictionEngine.learnFromInput(currentWord, previousWord)
+                val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+                if (emailRegex.matches(currentWord)) {
+                    predictionEngine.addUserWord(currentWord)
+                } else {
+                    predictionEngine.learnFromInput(currentWord, previousWord)
+                }
             }
         }
 
@@ -837,6 +846,19 @@ class HexKeyboardService : InputMethodService(),
         val ic = currentInputConnection ?: return
         val ei = currentInputEditorInfo ?: return
         
+        val before = ic.getTextBeforeCursor(40, 0) ?: ""
+        val words = before.split(" ", "\n", "\t").filter { it.isNotEmpty() }
+        if (words.isNotEmpty()) {
+            val currentWord = words.last()
+            val previousWord = if (words.size > 1) words[words.size - 2] else null
+            val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+            if (emailRegex.matches(currentWord)) {
+                predictionEngine.addUserWord(currentWord)
+            } else {
+                predictionEngine.learnFromInput(currentWord, previousWord)
+            }
+        }
+
         val effectiveAction = getEffectiveImeAction(ei)
         
         if (effectiveAction != EditorInfo.IME_ACTION_NONE && effectiveAction != EditorInfo.IME_ACTION_UNSPECIFIED) {

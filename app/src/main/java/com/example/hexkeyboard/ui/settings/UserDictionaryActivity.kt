@@ -21,7 +21,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +74,29 @@ fun UserDictionaryScreen(
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val isDark = surfaceColor.luminance() < 0.5f
+
+    val topBarMaskBrush = remember(isDark, surfaceColor) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to Color.Black.copy(alpha = 0.55f),
+                    0.6f to Color.Black.copy(alpha = 0.20f),
+                    1.0f to Color.Transparent
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to surfaceColor.copy(alpha = 0.92f),
+                    0.6f to surfaceColor.copy(alpha = 0.50f),
+                    1.0f to Color.Transparent
+                )
+            )
+        }
+    }
+
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var isSearchActive by remember { mutableStateOf(false) }
     var showDeleteAllConfirm by remember { mutableStateOf(false) }
@@ -79,72 +104,82 @@ fun UserDictionaryScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Diccionario Personal", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        FilledTonalIconButton(
-                            onClick = onBack,
-                            shape = CircleShape
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Atrás"
-                            )
-                        }
-                    },
-                    actions = {
-                        if (uiState.words.isNotEmpty()) {
-                            IconButton(onClick = { showDeleteAllConfirm = true }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(brush = topBarMaskBrush)
+            ) {
+                Column {
+                    TopAppBar(
+                        title = { Text("Diccionario Personal", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            FilledTonalIconButton(
+                                onClick = onBack,
+                                shape = CircleShape
+                            ) {
                                 Icon(
-                                    Icons.Default.DeleteForever,
-                                    contentDescription = "Borrar todo",
-                                    tint = MaterialTheme.colorScheme.error
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Atrás"
                                 )
                             }
-                        }
-                        IconButton(onClick = {
-                            isSearchActive = !isSearchActive
-                            if (!isSearchActive) viewModel.onSearchQueryChange("")
-                        }) {
-                            Icon(
-                                if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = "Buscar"
-                            )
-                        }
-                    },
-                    scrollBehavior = scrollBehavior
-                )
-
-                AnimatedVisibility(
-                    visible = isSearchActive,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    TextField(
-                        value = uiState.searchQuery,
-                        onValueChange = viewModel::onSearchQueryChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        placeholder = { Text("Buscar palabra en el diccionario...") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        trailingIcon = {
-                            if (uiState.searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Clear, null)
+                        },
+                        actions = {
+                            if (uiState.words.isNotEmpty()) {
+                                IconButton(onClick = { showDeleteAllConfirm = true }) {
+                                    Icon(
+                                        Icons.Default.DeleteForever,
+                                        contentDescription = "Borrar todo",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
                                 }
                             }
+                            IconButton(onClick = {
+                                isSearchActive = !isSearchActive
+                                if (!isSearchActive) viewModel.onSearchQueryChange("")
+                            }) {
+                                Icon(
+                                    if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                                    contentDescription = "Buscar"
+                                )
+                            }
                         },
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent
                         ),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true
+                        scrollBehavior = scrollBehavior
                     )
+
+                    AnimatedVisibility(
+                        visible = isSearchActive,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        TextField(
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::onSearchQueryChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            placeholder = { Text("Buscar palabra en el diccionario...") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                        Icon(Icons.Default.Clear, null)
+                                    }
+                                }
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            singleLine = true
+                        )
+                    }
                 }
             }
         },

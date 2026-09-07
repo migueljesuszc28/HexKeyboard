@@ -28,6 +28,8 @@ import androidx.preference.PreferenceManager
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
+import com.example.hexkeyboard.logic.managers.FeedbackManager
+import com.example.hexkeyboard.ui.keyboard.panels.CredentialsPanel
 import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.ui.keyboard.panels.ClipboardPanel
 import com.example.hexkeyboard.ui.keyboard.panels.EmojiPanel
@@ -227,6 +229,7 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, h
                         service?.refreshClipboardHistory(triggerSuggestionsUpdate = true) 
                     }
                 },
+                onLongPress = { item -> viewModel.setClipboardItemWithOptions(item) },
                 onBack = { viewModel.setCurrentView("keyboard") },
                 theme = theme
             )
@@ -236,6 +239,23 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, h
                 theme = theme,
                 viewModel = viewModel
             )
+            "credentials" -> {
+                val credentials by viewModel.credentials.collectAsState()
+                LaunchedEffect(Unit) {
+                    viewModel.loadCredentials(context)
+                }
+                CredentialsPanel(
+                    credentials = credentials,
+                    onInsertText = { text ->
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                        viewModel.onActionRequested?.invoke(KeyboardViewModel.Action.InsertText(text))
+                        viewModel.setCurrentView("keyboard")
+                    },
+                    theme = theme,
+                    bottomOffset = bottomOffset,
+                    navBarBottomDp = navBarBottomDp
+                )
+            }
             else -> Box(modifier = Modifier.fillMaxSize())
         }
     }

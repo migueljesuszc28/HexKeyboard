@@ -249,6 +249,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                             context.startActivity(Intent(context, UserDictionaryActivity::class.java))
                         }
                     )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Cuentas y Contraseñas", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text("Gestionar credenciales e importar CSV") },
+                        leadingContent = { Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable {
+                            context.startActivity(Intent(context, CredentialsSettingsActivity::class.java))
+                        }
+                    )
                 }
             }
 

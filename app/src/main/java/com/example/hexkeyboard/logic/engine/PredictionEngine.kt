@@ -873,7 +873,7 @@ class PredictionEngine(private val context: Context) {
     fun addUserWord(word: String) {
         val w = word.lowercase().trim()
         if (w.isEmpty()) return
-        insert(w, 200, isUser = true)
+        insert(w, 800, isUser = true)
         userDictionary.add(w)
         saveUserDictionary()
         predictionCache.evictAll()

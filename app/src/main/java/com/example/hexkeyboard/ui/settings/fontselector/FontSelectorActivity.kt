@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,8 +27,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontFamily
@@ -89,19 +93,56 @@ fun FontSelectorScreen(onBack: () -> Unit) {
         customFonts = FontManager.listCustomFonts(context)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Fuente del Teclado", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    FilledTonalIconButton(
-                        onClick = onBack,
-                        shape = CircleShape
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                }
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val isDark = surfaceColor.luminance() < 0.5f
+
+    val topBarMaskBrush = remember(isDark, surfaceColor) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to Color.Black.copy(alpha = 0.55f),
+                    0.6f to Color.Black.copy(alpha = 0.20f),
+                    1.0f to Color.Transparent
+                )
             )
+        } else {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to surfaceColor.copy(alpha = 0.92f),
+                    0.6f to surfaceColor.copy(alpha = 0.50f),
+                    1.0f to Color.Transparent
+                )
+            )
+        }
+    }
+
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(brush = topBarMaskBrush)
+            ) {
+                TopAppBar(
+                    title = { Text("Fuente del Teclado", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        FilledTonalIconButton(
+                            onClick = onBack,
+                            shape = CircleShape
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    ),
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(

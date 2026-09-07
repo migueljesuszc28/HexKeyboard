@@ -108,6 +108,7 @@ fun PreviewClipboardPanel() {
                 onItemSelected = {},
                 onDelete = {},
                 onTogglePin = {},
+                onLongPress = {},
                 onBack = {},
                 theme = theme
             )

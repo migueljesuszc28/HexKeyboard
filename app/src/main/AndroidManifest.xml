@@ -69,9 +69,23 @@
             android:theme="@style/Theme.HexKeyboard" />
 
         <activity
+            android:name="com.example.hexkeyboard.ui.settings.CredentialsSettingsActivity"
+            android:exported="false"
+            android:label="Cuentas y Contraseñas"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.SettingsActivity"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
             android:name="com.example.hexkeyboard.ui.settings.themes.CropImageActivity"
             android:exported="false"
             android:label="Recortar imagen"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
+            android:name="com.example.hexkeyboard.ui.settings.ClipboardEditActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:label="Editar nota"
             android:theme="@style/Theme.HexKeyboard" />
 
         <activity

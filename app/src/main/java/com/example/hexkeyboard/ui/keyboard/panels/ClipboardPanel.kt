@@ -13,14 +13,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,12 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import kotlinx.coroutines.Dispatchers
@@ -46,11 +44,17 @@ fun ClipboardPanel(
     onItemSelected: (ClipboardItem) -> Unit, 
     onDelete: (ClipboardItem) -> Unit,
     onTogglePin: (ClipboardItem) -> Unit,
+    onLongPress: (ClipboardItem) -> Unit,
     onBack: () -> Unit, 
     theme: KeyboardTheme
 ) {
     val context = LocalContext.current
-    var itemWithOptions by remember { mutableStateOf<ClipboardItem?>(null) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            ClipboardHistoryManager.cleanUpExpiredItems(context)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -83,7 +87,7 @@ fun ClipboardPanel(
                                     },
                                     onLongClick = { 
                                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
-                                        itemWithOptions = item 
+                                        onLongPress(item) 
                                     },
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
@@ -135,124 +139,40 @@ fun ClipboardPanel(
                 }
             }
         }
+    }
+}
 
-        itemWithOptions?.let { item ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { 
-                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
-                        itemWithOptions = null 
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .fillMaxWidth(0.92f)
-                        .clickable(enabled = false) {},
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(theme.backgroundColor).copy(alpha = if (theme.id == "glass") 0.9f else 1.0f),
-                    tonalElevation = if (theme.id == "glass") 0.dp else 8.dp,
-                    shadowElevation = 12.dp
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Text(
-                            text = if (item.isImage) "Opciones de imagen" else "Opciones de nota",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Color(theme.keyTextColor),
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(Modifier.height(6.dp))
-
-                        if (item.isImage && !item.imageUri.isNullOrEmpty()) {
-                            ClipboardImageThumbnail(
-                                imageUriString = item.imageUri,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(70.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                        } else {
-                            Text(
-                                text = item.text,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(theme.keyTextColor),
-                                maxLines = 2
-                            )
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) {
-                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
-                                        onTogglePin(item)
-                                        itemWithOptions = null
-                                    },
-                                color = Color(theme.keyBackgroundColor),
-                                contentColor = Color(theme.keyTextColor),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        if (item.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(if (item.isPinned) "Desfijar" else "Fijar", fontSize = 13.sp)
-                                }
-                            }
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) {
-                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
-                                        onDelete(item)
-                                        itemWithOptions = null
-                                    },
-                                color = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Borrar", fontSize = 13.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+@Composable
+fun ClipboardMenuRow(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(22.dp)
+        )
+        Text(
+            text = label,
+            color = tint,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

@@ -211,6 +211,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
             val title = when(currentView) {
                 "clipboard" -> "Portapapeles"
                 "functions" -> "Funciones"
+                "credentials" -> "Contraseñas"
                 else -> currentView
             }
             PanelHeader(title, theme) { viewModel.setCurrentView("keyboard") }
