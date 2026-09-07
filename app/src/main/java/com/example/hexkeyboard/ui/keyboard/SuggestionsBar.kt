@@ -178,7 +178,7 @@ fun SuggestionChip(suggestion: String, theme: KeyboardTheme, onClick: () -> Unit
             indication = null,
             onClick = onClick
         ),
-        color = Color(theme.keyBackgroundColor).copy(alpha = 0.5f),
+        color = Color(theme.keyBackgroundColor).copy(alpha = 0.9f),
         shape = CircleShape
     ) {
         Text(

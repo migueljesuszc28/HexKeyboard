@@ -71,6 +71,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     implementation(libs.androidx.dynamicanimation)
     implementation(libs.colorpicker.compose)
+    implementation(libs.cloudy)
     implementation(libs.haze)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

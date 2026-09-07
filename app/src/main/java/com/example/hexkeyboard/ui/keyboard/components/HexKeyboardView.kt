@@ -541,6 +541,14 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         popupVisibleKey = null
     }
 
+    private fun getPopupOffsetY(key: HexLayoutEngine.Key, isLongPress: Boolean, h: Int): Int {
+        return if (!isLongPress) {
+            (key.cy - key.ry * (1.1f + 1.2f * popupScale) - h / 2f).toInt()
+        } else {
+            (key.cy - key.ry * (1.1f + 0.2f * popupScale) - h).toInt()
+        }
+    }
+
     private fun showPopup(key: HexLayoutEngine.Key, isLongPress: Boolean = false) {
         if (!showKeyPopup || windowToken == null) return
         handler.removeCallbacks(hidePopupRunnable)
@@ -561,22 +569,20 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         } else {
             val firstLabel = if (key.type == HexLayoutEngine.KeyType.FONT_PAGE) key.display else key.value
             val alts = listOf(firstLabel) + key.alternatives
-            //###################################
             val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
-            //####################################
             val maxW = screenWidth - p * 2f
             var cols = when { alts.size <= 5 -> alts.size; alts.size <= 10 -> 5; else -> 6 }.coerceAtMost(alts.size)
             while (cols > 1 && (cols * sW + (cols - 1) * g) > maxW) cols--
             val rows = (alts.size + cols - 1) / cols
             val tw = if (rows > 1) cols * sW + (cols - 1) * g else alts.size * sW + (alts.size - 1) * g
             val th = rows * sH + (rows - 1) * g
-            w = (tw + p * 2.5f).toInt()
+            w = (tw + p * 2.5f).toInt().coerceAtMost(screenWidth)
             h = (th + p * 1.5f).toInt()
         }
         popupWindow?.width = w; popupWindow?.height = h; popupContentView?.invalidate()
         val location = IntArray(2); getLocationInWindow(location)
         val offsetX = (key.cx - w / 2f).toInt()
-        val offsetY = (key.cy - key.ry * (1.1f + 1.2f * popupScale) - h / 2f).toInt()
+        val offsetY = getPopupOffsetY(key, isLongPress, h)
         var x = location[0] + offsetX; var y = location[1] + offsetY
         if (x < 0) x = 0; if (x + w > screenWidth) x = screenWidth - w
         if (popupWindow?.isShowing == true) popupWindow?.update(x, y, w, h)
@@ -773,7 +779,8 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val screenWidth = context.resources.displayMetrics.widthPixels
         var finalPopupX = location[0] + (k.cx - w / 2f)
         if (finalPopupX < 0) finalPopupX = 0f; if (finalPopupX + w > screenWidth) finalPopupX = (screenWidth - w).toFloat()
-        val rx = x - finalPopupX; val ry = y - (location[1] + (k.cy - k.ry * (1.1f + 1.2f * popupScale) - h / 2f))
+        val offsetY = getPopupOffsetY(k, true, h.toInt())
+        val rx = x - finalPopupX; val ry = y - (location[1] + offsetY)
         var minDist = Float.MAX_VALUE; var newIndex = 0
         alts.forEachIndexed { i, _ ->
             val r = i / cols; val c = i % cols; val itemsInThisRow = if (r == rows - 1) alts.size - (r * cols) else cols

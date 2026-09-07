@@ -1,6 +1,16 @@
 package com.example.hexkeyboard.ui.keyboard
 
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,16 +92,21 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val bottomOffsetFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 35 } }
     val bottomOffset by bottomOffsetFlow.collectAsState(35)
 
+    val currentView by viewModel.currentView.collectAsState()
+    val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
+    val isEmojiPanel = currentView == "emoji"
+
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight()
-            .background(
-                color = Color(keyboardTheme.backgroundColor),
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-            )
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-    ) {
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .background(
+                    color = Color(keyboardTheme.backgroundColor),
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                )
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .then(if (isGlassTheme || isEmojiPanel) Modifier.hazeSource(hazeState) else Modifier)
+        ) {
         // Continuous Background Layer
         val img = blurredBitmap ?: backgroundBitmap
         img?.let {
@@ -127,15 +142,12 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             Box(modifier = Modifier.matchParentSize().background(Color(keyboardTheme.backgroundColor).copy(alpha = 1f - keyboardTheme.backgroundOpacity)))
         }
 
-        val currentView by viewModel.currentView.collectAsState()
-        val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
-        val isEmojiPanel = currentView == "emoji"
+        val navBarBottomDp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (isGlassTheme || isEmojiPanel) Modifier.hazeSource(hazeState) else Modifier)
-                .navigationBarsPadding()
+                .then(if (isEmojiPanel && !isEmojiSearchActive) Modifier else Modifier.navigationBarsPadding())
         ) {
             Box(
                 modifier = Modifier
@@ -160,22 +172,26 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                     ) {
                         KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
                         if (!isEmojiPanel || isEmojiSearchActive) {
-                            PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset)
+                            PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset, navBarBottomDp)
                         }
                     }
 
-                    if (bottomOffset > 0) {
-                        Spacer(modifier = Modifier.fillMaxWidth().height(bottomOffset.dp))
+                    val totalBottomSpacerHeight = if (isEmojiPanel && !isEmojiSearchActive) (bottomOffset + navBarBottomDp) else bottomOffset
+                    if (totalBottomSpacerHeight > 0) {
+                        Spacer(modifier = Modifier.fillMaxWidth().height(totalBottomSpacerHeight.dp))
                     }
                 }
 
-                // Capa 2: Panel de Emojis a pantalla completa con Haze Effect y Desvanecido Gradient
+                // Capa 2: Panel de Emojis a pantalla completa con Haze Effect
                 if (isEmojiPanel && !isEmojiSearchActive) {
+                    val baseThemeColor = Color(keyboardTheme.backgroundColor)
+                    val hazeBgColor = Color.Transparent //baseThemeColor.copy(alpha = 0.40f)
+
                     val topFadeBrush = remember(keyboardTheme.backgroundColor) {
                         Brush.verticalGradient(
                             colorStops = arrayOf(
-                                0.0f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.98f),
-                                0.70f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.85f),
+                                0.0f to baseThemeColor.copy(alpha = 0.45f),
+                                0.65f to baseThemeColor.copy(alpha = 0.20f),
                                 1.0f to Color.Transparent
                             )
                         )
@@ -185,8 +201,8 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color.Transparent,
-                                0.40f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.85f),
-                                1.0f to Color(keyboardTheme.backgroundColor).copy(alpha = 0.98f)
+                                0.35f to baseThemeColor.copy(alpha = 0.20f),
+                                1.0f to baseThemeColor.copy(alpha = 0.45f)
                             )
                         )
                     }
@@ -197,7 +213,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     ) {
                         // 1. El Panel de Emojis ocupa la altura total de la capa base
-                        PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset)
+                        PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset, navBarBottomDp)
 
                         // 2. Barra de Sugerencias Flotante Superior con Haze y Curvatura Recortada (28.dp)
                         Box(
@@ -209,7 +225,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                                 .hazeEffect(
                                     state = hazeState,
                                     style = HazeDefaults.style(
-                                        backgroundColor = Color(keyboardTheme.backgroundColor).copy(alpha = 0.92f),
+                                        backgroundColor = hazeBgColor,
                                         blurRadius = 25.dp
                                     )
                                 )
@@ -221,16 +237,17 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         }
 
                         // 3. Margen Inferior Flotante con Haze y Desvanecido Gradient (Bloquea toques hacia los emojis)
-                        if (bottomOffset > 0) {
+                        val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
+                        if (totalBottomHazeHeight > 0) {
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
-                                    .height((bottomOffset + 16).dp)
+                                    .height(totalBottomHazeHeight.dp)
                                     .hazeEffect(
                                         state = hazeState,
                                         style = HazeDefaults.style(
-                                            backgroundColor = Color(keyboardTheme.backgroundColor).copy(alpha = 0.92f),
+                                            backgroundColor = hazeBgColor,
                                             blurRadius = 25.dp
                                         )
                                     )

@@ -5,6 +5,17 @@ import android.graphics.Typeface
 import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -153,53 +164,76 @@ fun KeyboardMainSection(
 }
 
 @Composable
-fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, hazeState: HazeState, bottomOffset: Int = 0) {
+fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, hazeState: HazeState, bottomOffset: Int = 0, navBarBottomDp: Int = 0) {
     val currentView by viewModel.currentView.collectAsState()
     val clipboardHistory by viewModel.clipboardHistory.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
     val context = LocalContext.current
     val service = context as? HexKeyboardService
 
-    if (currentView != "keyboard") {
-        val scope = rememberCoroutineScope()
-        // Cuando estamos en el panel de emoji, ocupamos todo el Box padre (matchParentSize), 
-        // pero la altura final la decidirá el Teclado principal renderizado invisible debajo
-        val panelModifier = if (isEmojiSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
-        Box(modifier = panelModifier) {
-            when (currentView) {
-                "emoji" -> EmojiPanel(
-                    onEmojiSelected = { char -> viewModel.onEmojiSelected(char) }, 
-                    onBack = { viewModel.setCurrentView("keyboard") }, 
-                    theme = theme, 
-                    viewModel = viewModel, 
-                    hazeState = hazeState,
-                    bottomOffset = bottomOffset
+    val scope = rememberCoroutineScope()
+    val panelModifier = if (isEmojiSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
+
+    AnimatedContent(
+        targetState = currentView,
+        transitionSpec = {
+            if (targetState != "keyboard") {
+                (slideInVertically(
+                    initialOffsetY = { (it * 0.15f).toInt() },
+                    animationSpec = tween(220)
+                ) + fadeIn(animationSpec = tween(220))).togetherWith(
+                    fadeOut(animationSpec = tween(180)) + slideOutVertically(
+                        targetOffsetY = { (it * 0.15f).toInt() },
+                        animationSpec = tween(180)
+                    )
                 )
-                "clipboard" -> ClipboardPanel(
-                    history = clipboardHistory,
-                    onItemSelected = { item -> viewModel.onClipboardItemClick(item) },
-                    onDelete = { item -> 
-                        scope.launch {
-                            ClipboardHistoryManager.deleteItem(context, item)
-                            service?.refreshClipboardHistory() 
-                        }
-                    },
-                    onTogglePin = { item -> 
-                        scope.launch {
-                            ClipboardHistoryManager.togglePin(context, item)
-                            service?.refreshClipboardHistory() 
-                        }
-                    },
-                    onBack = { viewModel.setCurrentView("keyboard") },
-                    theme = theme
-                )
-                "functions" -> FunctionsPanel(
-                    onBack = { viewModel.setCurrentView("keyboard") },
-                    onSettings = { viewModel.onSettingsClick() },
-                    theme = theme,
-                    viewModel = viewModel
+            } else {
+                (fadeIn(animationSpec = tween(200))).togetherWith(
+                    slideOutVertically(
+                        targetOffsetY = { (it * 0.15f).toInt() },
+                        animationSpec = tween(180)
+                    ) + fadeOut(animationSpec = tween(180))
                 )
             }
+        },
+        label = "panel_animation",
+        modifier = panelModifier
+    ) { view ->
+        when (view) {
+            "emoji" -> EmojiPanel(
+                onEmojiSelected = { char -> viewModel.onEmojiSelected(char) }, 
+                onBack = { viewModel.setCurrentView("keyboard") }, 
+                theme = theme, 
+                viewModel = viewModel, 
+                hazeState = hazeState,
+                bottomOffset = bottomOffset,
+                navBarBottomDp = navBarBottomDp
+            )
+            "clipboard" -> ClipboardPanel(
+                history = clipboardHistory,
+                onItemSelected = { item -> viewModel.onClipboardItemClick(item) },
+                onDelete = { item -> 
+                    scope.launch {
+                        ClipboardHistoryManager.deleteItem(context, item)
+                        service?.refreshClipboardHistory() 
+                    }
+                },
+                onTogglePin = { item -> 
+                    scope.launch {
+                        ClipboardHistoryManager.togglePin(context, item)
+                        service?.refreshClipboardHistory() 
+                    }
+                },
+                onBack = { viewModel.setCurrentView("keyboard") },
+                theme = theme
+            )
+            "functions" -> FunctionsPanel(
+                onBack = { viewModel.setCurrentView("keyboard") },
+                onSettings = { viewModel.onSettingsClick() },
+                theme = theme,
+                viewModel = viewModel
+            )
+            else -> Box(modifier = Modifier.fillMaxSize())
         }
     }
 }

@@ -1,11 +1,22 @@
 package com.example.hexkeyboard.ui.keyboard.panels
 
+import android.content.Context
+import android.graphics.drawable.ColorDrawable
+import android.view.Gravity
+import android.view.View
+import android.widget.PopupWindow
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -34,8 +45,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,7 +93,8 @@ fun EmojiPanel(
     theme: KeyboardTheme,
     viewModel: KeyboardViewModel? = null,
     hazeState: HazeState? = null,
-    bottomOffset: Int = 0
+    bottomOffset: Int = 0,
+    navBarBottomDp: Int = 0
 ) {
     val context = LocalContext.current
     val searchQuery by (viewModel?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
@@ -108,10 +123,12 @@ fun EmojiPanel(
         snapshotFlow { Pair(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
             .collect { (currentIndex, currentOffset) ->
                 if (gridState.isScrollInProgress) {
-                    if (currentIndex > lastScrollIndex || (currentIndex == lastScrollIndex && currentOffset > lastScrollOffset)) {
-                        isCategoriesVisible = false
-                    } else if (currentIndex < lastScrollIndex || currentOffset < lastScrollOffset) {
-                        isCategoriesVisible = true
+                    val indexDiff = currentIndex - lastScrollIndex
+                    val offsetDiff = currentOffset - lastScrollOffset
+                    if (indexDiff > 0 || (indexDiff == 0 && offsetDiff > 40)) {
+                        if (isCategoriesVisible) isCategoriesVisible = false
+                    } else if (indexDiff < 0 || offsetDiff < -40) {
+                        if (!isCategoriesVisible) isCategoriesVisible = true
                     }
                 }
                 lastScrollIndex = currentIndex
@@ -157,7 +174,7 @@ fun EmojiPanel(
             state = gridState,
             columns = GridCells.Adaptive(minSize = 44.dp),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 46.dp, bottom = (70 + bottomOffset).dp)
+            contentPadding = PaddingValues(top = 46.dp, bottom = (70 + bottomOffset + navBarBottomDp).dp)
         ) {
             items(
                 items = emojiList,
@@ -198,7 +215,7 @@ fun EmojiPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + 8).dp),
+                    .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + navBarBottomDp + 8).dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End
             ) {
@@ -409,6 +426,7 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme, hazeState: Haz
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EmojiItem(
     emoji: String,
@@ -423,8 +441,7 @@ fun EmojiItem(
 ) {
     val context = LocalContext.current
     val service = context as? HexKeyboardService
-    var isPressed by remember { mutableStateOf(false) }
-    var showVariationSelector by remember { mutableStateOf(false) }
+    val parentView = LocalView.current
 
     // Sincronización Global Total (Estilo Gboard):
     // Los emojis reaccionan dinámicamente al tono y género global usando la familia pre-calculada
@@ -440,38 +457,45 @@ fun EmojiItem(
     val variationGrid = remember(canonical) { EmojiProvider.getEmojiVariationGrid(canonical) }
     val hasVariations = remember(canonical) { EmojiProvider.hasVariations(canonical) }
 
-    var itemX by remember { mutableFloatStateOf(0f) }
-    var itemWidth by remember { mutableFloatStateOf(0f) }
-    val configuration = LocalConfiguration.current
-    val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.toPx() }
-
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.85f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh), label = "emoji_bounce")
+    // Almacena las coordenadas reales de la celda sin desencadenar recomposiciones durante el scroll
+    val cellCoords = remember { floatArrayOf(0f, 0f, 0f, 0f) }
 
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(12.dp))
-            .onGloballyPositioned {
-                itemX = it.positionInWindow().x
-                itemWidth = it.size.width.toFloat()
+            .onGloballyPositioned { coordinates ->
+                val pos = coordinates.positionInWindow()
+                cellCoords[0] = pos.x
+                cellCoords[1] = pos.y
+                cellCoords[2] = coordinates.size.width.toFloat()
+                cellCoords[3] = coordinates.size.height.toFloat()
             }
-            .pointerInput(displayEmoji, hasVariations) {
-                detectTapGestures(
-                    onPress = {
-                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                        isPressed = true
-                        try { awaitRelease() } finally { isPressed = false }
-                    },
-                    onTap = { onEmojiSelected(displayEmoji) },
-                    onLongPress = {
-                        if (hasVariations) {
-                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
-                            showVariationSelector = true
-                        }
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(
+                onClick = {
+                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                    onEmojiSelected(displayEmoji)
+                },
+                onLongClick = {
+                    if (hasVariations) {
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
+                        showEmojiVariationPopupWindow(
+                            context = context,
+                            anchorView = parentView,
+                            cellX = cellCoords[0],
+                            cellY = cellCoords[1],
+                            cellWidth = cellCoords[2],
+                            cellHeight = cellCoords[3],
+                            variationGrid = variationGrid,
+                            displayEmoji = displayEmoji,
+                            canonical = canonical,
+                            theme = theme,
+                            onEmojiSelected = onEmojiSelected,
+                            service = service
+                        )
                     }
-                )
-            },
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(text = displayEmoji, fontSize = 35.sp, lineHeight = 42.sp)
@@ -486,54 +510,102 @@ fun EmojiItem(
                 }
             }
         }
+    }
+}
 
-        if (showVariationSelector) {
-            val popupWidthPx = with(LocalDensity.current) {
-                if (variationGrid.size > 1) (6 * 48 + 16).dp.toPx() else (variationGrid[0].size * 48 + 16).dp.toPx()
-            }
-            val centerX = itemX + itemWidth / 2f
-            val halfWidth = popupWidthPx / 2f
-            val adjustedX = when {
-                centerX - halfWidth < 0 -> (halfWidth - centerX).toInt()
-                centerX + halfWidth > screenWidthPx -> (screenWidthPx - (centerX + halfWidth)).toInt()
-                else -> 0
-            }
+fun showEmojiVariationPopupWindow(
+    context: Context,
+    anchorView: View,
+    cellX: Float,
+    cellY: Float,
+    cellWidth: Float,
+    cellHeight: Float,
+    variationGrid: List<List<String>>,
+    displayEmoji: String,
+    canonical: String,
+    theme: KeyboardTheme,
+    onEmojiSelected: (String) -> Unit,
+    service: HexKeyboardService?
+) {
+    val density = context.resources.displayMetrics.density
+    val screenWidth = context.resources.displayMetrics.widthPixels
+    val marginPx = (12 * density).toInt()
 
-            Popup(
-                alignment = Alignment.BottomCenter, offset = IntOffset(adjustedX, -120),
-                onDismissRequest = { showVariationSelector = false },
-                properties = PopupProperties(focusable = false, clippingEnabled = false, excludeFromSystemGesture = true)
+    val cols = variationGrid.firstOrNull()?.size ?: 1
+    val rows = variationGrid.size
+
+    val itemSizePx = (46 * density).toInt()
+    val popupWidthPx = (cols * itemSizePx + (16 * density)).toInt()
+    val popupHeightPx = (rows * itemSizePx + (16 * density)).toInt()
+
+    val globalCellX = cellX
+    val globalCellY = cellY
+
+    val cellCenterX = globalCellX + (cellWidth / 2f)
+    val idealLeftX = cellCenterX - (popupWidthPx / 2f)
+    val clampedLeftX = idealLeftX.coerceIn(marginPx.toFloat(), (screenWidth - marginPx - popupWidthPx).toFloat().coerceAtLeast(marginPx.toFloat()))
+
+    val topStatusBarMarginPx = (24 * density).toInt()
+    val locationOnScreen = IntArray(2)
+    anchorView.getLocationOnScreen(locationOnScreen)
+    val windowTopOnScreen = locationOnScreen[1]
+    val minAllowedYInWindow = if (windowTopOnScreen > 0) {
+        -windowTopOnScreen + topStatusBarMarginPx
+    } else {
+        -1000
+    }
+
+    val idealTopY = (globalCellY - popupHeightPx - (8 * density)).toInt()
+
+    val targetY = if (idealTopY >= minAllowedYInWindow) {
+        idealTopY
+    } else {
+        (globalCellY + cellHeight + (8 * density)).toInt()
+    }
+
+    var popupWindow: PopupWindow? = null
+
+    val composeView = ComposeView(context).apply {
+        if (service != null) {
+            setViewTreeLifecycleOwner(service)
+            setViewTreeViewModelStoreOwner(service)
+            setViewTreeSavedStateRegistryOwner(service)
+        }
+        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        setContent {
+            var popupVisible by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { popupVisible = true }
+
+            val popupScale by animateFloatAsState(targetValue = if (popupVisible) 1f else 0.8f, label = "popup_scale")
+            val popupAlpha by animateFloatAsState(targetValue = if (popupVisible) 1f else 0f, label = "popup_alpha")
+
+            Surface(
+                color = Color(theme.backgroundColor),
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 10.dp,
+                tonalElevation = 8.dp,
+                border = BorderStroke(1.dp, Color(theme.keyTextColor).copy(alpha = 0.12f)),
+                modifier = Modifier.graphicsLayer {
+                    scaleX = popupScale
+                    scaleY = popupScale
+                    alpha = popupAlpha
+                }
             ) {
-                var popupVisible by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { popupVisible = true }
-
-                val popupScale by animateFloatAsState(targetValue = if (popupVisible) 1f else 0.8f, label = "popup_scale")
-                val popupAlpha by animateFloatAsState(targetValue = if (popupVisible) 1f else 0f, label = "popup_alpha")
-
-                Surface(
-                    color = Color(theme.backgroundColor), shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 10.dp, tonalElevation = 8.dp,
-                    border = BorderStroke(1.dp, Color(theme.keyTextColor).copy(alpha = 0.1f)),
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = popupScale; scaleY = popupScale; alpha = popupAlpha
-                    }
-                ) {
-                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        variationGrid.forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                row.forEach { variant ->
-                                    VariationItem(
-                                        emoji = variant,
-                                        isSelected = (displayEmoji == variant),
-                                        theme = theme,
-                                        onClick = {
-                                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                                            service?.saveStickyVariant(canonical, variant)
-                                            onEmojiSelected(variant)
-                                            showVariationSelector = false
-                                        }
-                                    )
-                                }
+                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    variationGrid.forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            row.forEach { variant ->
+                                VariationItem(
+                                    emoji = variant,
+                                    isSelected = (displayEmoji == variant),
+                                    theme = theme,
+                                    onClick = {
+                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                        service?.saveStickyVariant(canonical, variant)
+                                        onEmojiSelected(variant)
+                                        try { if (popupWindow?.isShowing == true) popupWindow?.dismiss() } catch (_: Exception) {}
+                                    }
+                                )
                             }
                         }
                     }
@@ -541,15 +613,57 @@ fun EmojiItem(
             }
         }
     }
+
+    popupWindow = PopupWindow(composeView, popupWidthPx, popupHeightPx).apply {
+        elevation = 20f
+        isTouchable = true
+        isOutsideTouchable = true
+        setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+        inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+        isClippingEnabled = false // PERMITE FLOTAR LIBREMENTE FUERA Y POR ENCIMA DEL TECLADO IME
+        animationStyle = 0
+    }
+
+    if (service != null) {
+        composeView.setViewTreeLifecycleOwner(service)
+        composeView.setViewTreeViewModelStoreOwner(service)
+        composeView.setViewTreeSavedStateRegistryOwner(service)
+    }
+
+    popupWindow.showAtLocation(anchorView, Gravity.NO_GRAVITY, clampedLeftX.toInt(), targetY)
+
+    if (service != null) {
+        composeView.rootView?.let { root ->
+            root.setViewTreeLifecycleOwner(service)
+            root.setViewTreeViewModelStoreOwner(service)
+            root.setViewTreeSavedStateRegistryOwner(service)
+        }
+    }
 }
 
 @Composable
 fun VariationItem(emoji: String, isSelected: Boolean, theme: KeyboardTheme, onClick: () -> Unit) {
-    val highlightColor = if (theme.id.contains("dark") || theme.id == "terminal") Color(0xFF4285F4) else Color(theme.keyShiftActiveColor ?: theme.keyboardIconTint)
+    val highlightColor = remember(theme) {
+        val shiftColor = theme.keyShiftActiveColor
+        if (shiftColor != null && shiftColor != theme.keyboardIconTint) {
+            Color(shiftColor)
+        } else if (theme.id.contains("dark") || theme.id == "terminal") {
+            Color(0xFF4285F4)
+        } else {
+            Color(0xFF1A73E8)
+        }
+    }
+
     Box(
-        modifier = Modifier.size(46.dp).clip(HexagonShape()).background(if (isSelected) highlightColor else Color.Transparent).clickable { onClick() },
+        modifier = Modifier
+            .size(44.dp)
+            .clip(HexagonShape())
+            .background(if (isSelected) highlightColor else Color.Transparent)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
-    ) { Text(emoji, fontSize = 26.sp) }
+    ) {
+        Text(emoji, fontSize = 26.sp)
+    }
 }
 
 class HexagonShape : Shape {

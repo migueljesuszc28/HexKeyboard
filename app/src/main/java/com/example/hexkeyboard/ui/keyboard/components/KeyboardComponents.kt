@@ -56,7 +56,7 @@ fun EmojiSearchBar(viewModel: KeyboardViewModel, theme: KeyboardTheme, query: St
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(pillBg.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+                .background(pillBg.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
