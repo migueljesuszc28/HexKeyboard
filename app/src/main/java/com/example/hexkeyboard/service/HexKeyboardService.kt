@@ -26,6 +26,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.Toast
+import androidx.core.content.edit
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
@@ -113,7 +114,7 @@ class HexKeyboardService : InputMethodService(),
             isSettingInternalClip = false
             return@OnPrimaryClipChangedListener
         }
-        val clip = clipboardManager.primaryClip
+        val clip = try { if (::clipboardManager.isInitialized) clipboardManager.primaryClip else null } catch (_: Exception) { null }
         if ((clip != null) && (clip.itemCount > 0)) {
             val item = clip.getItemAt(0)
             val uri = item.uri
@@ -131,20 +132,22 @@ class HexKeyboardService : InputMethodService(),
                     if (cachedUri != null) {
                         ClipboardHistoryManager.addImageItem(this@HexKeyboardService, cachedUri, mimeType, text)
                         lastUsedClipboardText = null
-                        withContext(Dispatchers.Main) {
-                            refreshClipboardHistory(triggerSuggestionsUpdate = true)
-                        }
+                        refreshClipboardHistory(triggerSuggestionsUpdate = true)
                     }
                 }
             } else if (text.isNotBlank()) {
                 serviceScope.launch(Dispatchers.IO) {
                     ClipboardHistoryManager.addItem(this@HexKeyboardService, text)
                     lastUsedClipboardText = null
-                    withContext(Dispatchers.Main) {
-                        refreshClipboardHistory(triggerSuggestionsUpdate = true)
-                    }
+                    refreshClipboardHistory(triggerSuggestionsUpdate = true)
                 }
+            } else {
+                lastUsedClipboardText = null
+                refreshClipboardHistory(triggerSuggestionsUpdate = true)
             }
+        } else {
+            lastUsedClipboardText = null
+            refreshClipboardHistory(triggerSuggestionsUpdate = true)
         }
     }
 
@@ -153,7 +156,29 @@ class HexKeyboardService : InputMethodService(),
 
     private lateinit var viewModel: KeyboardViewModel
 
-    private var lastUsedClipboardText: String? = null
+    private var lastUsedClipboardText: String?
+        get() {
+            return try {
+                val prefs = getSharedPreferences("hex_keyboard_prefs", MODE_PRIVATE)
+                prefs.getString("last_used_clipboard_text", null)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        set(value) {
+            try {
+                val prefs = getSharedPreferences("hex_keyboard_prefs", MODE_PRIVATE)
+                prefs.edit {
+                    if (value == null) {
+                        remove("last_used_clipboard_text")
+                    } else {
+                        putString("last_used_clipboard_text", value)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     private var lastAutoCorrection: LastCorrection? = null
     private var lastUndoneCorrection: String? = null
     internal var symbolsTypedCount = 0
@@ -323,10 +348,8 @@ class HexKeyboardService : InputMethodService(),
         }
         
         serviceScope.launch {
-            spellCheckerManager.suggestionsState.collect { suggestions ->
-                if (suggestions.isNotEmpty()) {
-                    viewModel.updateSuggestions(suggestions)
-                }
+            spellCheckerManager.suggestionsState.collect {
+                updateSuggestions()
             }
         }
 
@@ -527,14 +550,22 @@ class HexKeyboardService : InputMethodService(),
         val textBefore = ic.getTextBeforeCursor(40, 0) ?: ""
         
         serviceScope.launch(Dispatchers.Default) {
-            val localSuggestions = mutableListOf<String>()
-            
             val history = viewModel.clipboardHistory.value
-            history.firstOrNull()?.text?.let { 
-                if ((it.isNotEmpty()) && (it != lastUsedClipboardText)) {
-                    localSuggestions.add(it)
-                }
-            }
+            val topHistoryText = history.firstOrNull()?.text?.trim()
+            
+            val currentSystemClipText = try {
+                if (::clipboardManager.isInitialized && clipboardManager.hasPrimaryClip()) {
+                    clipboardManager.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                } else null
+            } catch (_: Exception) { null }
+
+            val clipToSuggest = if (!topHistoryText.isNullOrEmpty() &&
+                !currentSystemClipText.isNullOrEmpty() &&
+                topHistoryText == currentSystemClipText &&
+                topHistoryText != lastUsedClipboardText?.trim()
+            ) {
+                topHistoryText
+            } else null
 
             val allWords = textBefore.toString().trim().split(" ", "\n", "\t").filter { it.isNotEmpty() }
             val lastWord = if (textBefore.isNotEmpty() && !textBefore.endsWith(" ")) {
@@ -542,18 +573,55 @@ class HexKeyboardService : InputMethodService(),
             } else ""
             val prevWord = if (lastWord.isEmpty()) allWords.lastOrNull() else allWords.getOrNull(allWords.size - 2)
 
-            val predictions = predictionEngine.getSuggestions(lastWord, prevWord)
-            predictions.forEach { localSuggestions.add(it.text) }
+            val localSuggestions = mutableListOf<String>()
 
             if (lastWord.isNotEmpty()) {
+                val rawPredictions = predictionEngine.getSuggestions(lastWord, prevWord, limit = 10)
+                var rawCandidates = rawPredictions.map { it.text }.distinct()
+
                 val capsMode = ic.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS)
-                if ((capsMode != 0) || (mHexKeyboardView?.shifted == true)) {
-                    localSuggestions.add(lastWord.replaceFirstChar { it.uppercase() })
+                val shouldCapitalize = (capsMode != 0) || (mHexKeyboardView?.shifted == true)
+                if (shouldCapitalize) {
+                    rawCandidates = rawCandidates.map { word ->
+                        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                    }.distinct()
                 }
+
+                if (rawCandidates.isNotEmpty()) {
+                    val primaryCandidate = rawCandidates.first()
+
+                    val fallbackCandidate = if (lastWord.lowercase() != primaryCandidate.lowercase()) {
+                        lastWord
+                    } else {
+                        rawCandidates.getOrNull(1) ?: lastWord
+                    }
+
+                    val alternativeCandidate = rawCandidates.find { 
+                        it.lowercase() != primaryCandidate.lowercase() && it.lowercase() != fallbackCandidate.lowercase()
+                    } ?: rawCandidates.getOrNull(2)
+
+                    localSuggestions.add(primaryCandidate) // Índice 0: Centro (Predeterminada / Autocorrección)
+                    if (fallbackCandidate.isNotEmpty()) {
+                        localSuggestions.add(fallbackCandidate) // Índice 1: Izquierda (Literal / Fallback)
+                    }
+                    if (alternativeCandidate != null && alternativeCandidate.isNotEmpty()) {
+                        localSuggestions.add(alternativeCandidate) // Índice 2: Derecha (Alternativa)
+                    }
+                } else {
+                    localSuggestions.add(lastWord)
+                }
+
                 spellCheckerManager.fetchSuggestions(lastWord)
+            } else {
+                if (clipToSuggest != null) {
+                    localSuggestions.add("CLIPBOARD:$clipToSuggest")
+                } else {
+                    val nextWordPredictions = predictionEngine.getSuggestions("", prevWord, limit = 3).map { it.text }.distinct()
+                    localSuggestions.addAll(nextWordPredictions.take(3))
+                }
             }
             
-            val finalSuggestions = localSuggestions.asSequence().distinct().take(6).toList()
+            val finalSuggestions = localSuggestions.distinct().take(3)
             withContext(Dispatchers.Main) {
                 viewModel.updateSuggestions(finalSuggestions)
             }
@@ -921,11 +989,46 @@ class HexKeyboardService : InputMethodService(),
         viewModel.setCurrentView(view)
     }
 
-    fun refreshClipboardHistory(triggerSuggestionsUpdate: Boolean = false) {
-        serviceScope.launch {
+    fun clearSystemClipboardIfMatches(item: ClipboardItem) {
+        try {
+            if (!::clipboardManager.isInitialized || !clipboardManager.hasPrimaryClip()) return
+            val clip = clipboardManager.primaryClip ?: return
+            if (clip.itemCount == 0) return
+            val clipItem = clip.getItemAt(0)
+            val clipText = clipItem.text?.toString()?.trim()
+            val clipUri = clipItem.uri?.toString()
+
+            val textMatches = item.text.isNotBlank() && clipText == item.text.trim()
+            val uriMatches = !item.imageUri.isNullOrEmpty() && (clipUri == item.imageUri || clipText == item.imageUri)
+
+            if (textMatches || uriMatches) {
+                isSettingInternalClip = true
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    clipboardManager.clearPrimaryClip()
+                } else {
+                    clipboardManager.setPrimaryClip(ClipData.newPlainText("", ""))
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun deleteClipboardItem(item: ClipboardItem) {
+        serviceScope.launch(Dispatchers.IO) {
+            clearSystemClipboardIfMatches(item)
+            ClipboardHistoryManager.deleteItem(this@HexKeyboardService, item)
+            refreshClipboardHistory(triggerSuggestionsUpdate = true)
+        }
+    }
+
+    fun refreshClipboardHistory(triggerSuggestionsUpdate: Boolean = true) {
+        serviceScope.launch(Dispatchers.IO) {
             ClipboardHistoryManager.cleanUpExpiredItems(this@HexKeyboardService)
             val history = ClipboardHistoryManager.getHistory(this@HexKeyboardService)
-            viewModel.updateClipboardHistory(history)
+            withContext(Dispatchers.Main) {
+                viewModel.updateClipboardHistory(history)
+            }
             if (triggerSuggestionsUpdate) {
                 updateSuggestions()
             }

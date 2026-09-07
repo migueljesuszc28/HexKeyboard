@@ -74,8 +74,10 @@ fun HexKeyboardTheme(
         else -> isSystemInDarkTheme()
     }
 
+    val useDynamicColor = dynamicColor || appTheme == "m3_dynamic" || appTheme == "dynamic"
+
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> DarkColorScheme

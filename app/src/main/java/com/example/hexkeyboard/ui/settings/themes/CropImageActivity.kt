@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import java.io.File
 import java.io.FileOutputStream
 
@@ -43,6 +44,7 @@ class CropImageActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableMaxRefreshRate()
         enableEdgeToEdge()
 
         val imageUriString = intent.getStringExtra("image_uri")

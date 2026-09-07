@@ -1,5 +1,6 @@
 package com.example.hexkeyboard.data.repository
 
+import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -103,6 +104,7 @@ object ThemeUtils {
     val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
     val UNDO_CORRECTION_ON_BACKSPACE = booleanPreferencesKey("undo_correction_on_backspace")
     val SHOW_KEY_POPUP = booleanPreferencesKey("show_key_popup")
+    val KEY_BOUNCE_ANIMATION = booleanPreferencesKey("key_bounce_animation")
     val SHOW_LONG_PRESS_INDICATORS = booleanPreferencesKey("show_long_press_indicators")
     val POPUP_SCALE = intPreferencesKey("popup_scale")
     val LONG_PRESS_DURATION = intPreferencesKey("long_press_duration")
@@ -110,6 +112,19 @@ object ThemeUtils {
     val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
 
     fun getDataStore(context: Context) = context.dataStore
+
+    fun Activity.enableMaxRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val maxMode = display?.supportedModes?.maxByOrNull { it.refreshRate }
+                if (maxMode != null) {
+                    window.attributes = window.attributes.apply {
+                        preferredDisplayModeId = maxMode.modeId
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     /**
      * Trigger manual para forzar la recomposición del tema cuando algo externo

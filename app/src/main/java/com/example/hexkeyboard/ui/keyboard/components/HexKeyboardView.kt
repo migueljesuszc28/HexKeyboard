@@ -218,9 +218,12 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         invalidate()
     }
 
+    private var keyBounceEnabled = true
+
     private fun applyPrefs(prefs: Preferences) {
         showKeyPopup = prefs[ThemeUtils.SHOW_KEY_POPUP] ?: true
         showLongPressIndicators = prefs[ThemeUtils.SHOW_LONG_PRESS_INDICATORS] ?: true
+        keyBounceEnabled = prefs[ThemeUtils.KEY_BOUNCE_ANIMATION] ?: true
         popupScale = (prefs[ThemeUtils.POPUP_SCALE] ?: 95) / 100f
         vibrationEnabled = prefs[ThemeUtils.KEYBOARD_VIBRATION] ?: true
         soundEnabled = prefs[ThemeUtils.KEYBOARD_SOUND] ?: true
@@ -286,7 +289,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
 
         fun animateToScale(target: Float) {
-            springAnim.animateToFinalPosition(target)
+            if (keyBounceEnabled) {
+                springAnim.animateToFinalPosition(target)
+            } else {
+                springAnim.cancel()
+                key.currentScale = 1.0f
+                this@HexKeyboardView.invalidate()
+            }
         }
     }
 

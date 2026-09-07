@@ -3,6 +3,7 @@ package com.example.hexkeyboard.ui.settings
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -23,11 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import com.example.hexkeyboard.logic.engine.PredictionEngine
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 import com.example.hexkeyboard.viewmodel.UserDictionaryViewModel
@@ -35,7 +38,11 @@ import com.example.hexkeyboard.viewmodel.UserDictionaryViewModel
 class UserDictionaryActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableMaxRefreshRate()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        )
 
         setContent {
             HexKeyboardTheme {
@@ -74,9 +81,8 @@ fun UserDictionaryScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Diccionario Personal") },
+                    title = { Text("Diccionario Personal", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
-                        // Usamos FilledTonalIconButton para un fondo suave circular
                         FilledTonalIconButton(
                             onClick = onBack,
                             shape = CircleShape
@@ -97,8 +103,8 @@ fun UserDictionaryScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { 
-                            isSearchActive = !isSearchActive 
+                        IconButton(onClick = {
+                            isSearchActive = !isSearchActive
                             if (!isSearchActive) viewModel.onSearchQueryChange("")
                         }) {
                             Icon(
@@ -109,7 +115,7 @@ fun UserDictionaryScreen(
                     },
                     scrollBehavior = scrollBehavior
                 )
-                
+
                 AnimatedVisibility(
                     visible = isSearchActive,
                     enter = expandVertically() + fadeIn(),
@@ -120,8 +126,8 @@ fun UserDictionaryScreen(
                         onValueChange = viewModel::onSearchQueryChange,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        placeholder = { Text("Buscar palabra...") },
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = { Text("Buscar palabra en el diccionario...") },
                         leadingIcon = { Icon(Icons.Default.Search, null) },
                         trailingIcon = {
                             if (uiState.searchQuery.isNotEmpty()) {
@@ -133,10 +139,10 @@ fun UserDictionaryScreen(
                         colors = TextFieldDefaults.colors(
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         singleLine = true
                     )
                 }
@@ -146,33 +152,121 @@ fun UserDictionaryScreen(
             FloatingActionButton(
                 onClick = { viewModel.toggleAddDialog(true) },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Añadir palabra")
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
             if (uiState.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(bottom = padding.calculateBottomPadding())
+                )
             } else if (uiState.filteredWords.isEmpty()) {
                 EmptyState(
                     isSearching = uiState.searchQuery.isNotEmpty(),
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(bottom = padding.calculateBottomPadding())
                 )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 88.dp)
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = padding.calculateTopPadding() + 8.dp,
+                        bottom = padding.calculateBottomPadding() + 8.dp
+                    )
                 ) {
-                    items(
-                        items = uiState.filteredWords,
-                        key = { it }
-                    ) { word ->
-                        SwipeableWordItem(
-                            word = word,
-                            onDelete = { viewModel.removeWord(word) }
-                        )
+                    // Header card with statistics
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tonalElevation = 1.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Book,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Palabras aprendidas",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "El teclado aprende tus palabras frecuentes para sugerírtelas",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Text(
+                                        text = "${uiState.words.size}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Word items in a card list
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tonalElevation = 1.dp
+                        ) {
+                            Column {
+                                uiState.filteredWords.forEachIndexed { index, word ->
+                                    SwipeableWordItem(
+                                        word = word,
+                                        onDelete = { viewModel.removeWord(word) }
+                                    )
+                                    if (index < uiState.filteredWords.size - 1) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(80.dp))
                     }
                 }
             }
@@ -191,7 +285,7 @@ fun UserDictionaryScreen(
         AlertDialog(
             onDismissRequest = { showDeleteAllConfirm = false },
             title = { Text("¿Borrar todo el diccionario?") },
-            text = { Text("Esta acción eliminará todas las palabras que el teclado ha aprendido. No se puede deshacer.") },
+            text = { Text("Esta acción eliminará todas las palabras aprendidas. No se puede deshacer.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -254,53 +348,76 @@ fun SwipeableWordItem(
             headlineContent = { 
                 Text(
                     word, 
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
                 ) 
             },
             leadingContent = {
-                Icon(
-                    Icons.Default.Book,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = word.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             },
             colors = ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            modifier = Modifier.clickable { /* Opcional: editar */ }
+                containerColor = Color.Transparent
+            )
         )
     }
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant
-    )
 }
 
 @Composable
 fun EmptyState(isSearching: Boolean, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Surface(
+        modifier = modifier
+            .padding(24.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
     ) {
-        Icon(
-            if (isSearching) Icons.Default.Search else Icons.Default.Close,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            if (isSearching) "No se encontraron resultados" else "Tu diccionario está vacío",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            if (isSearching) "Prueba con otra palabra" else "Las palabras que escribas se guardarán aquí",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        )
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (isSearching) Icons.Default.Search else Icons.Default.Book,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                if (isSearching) "No se encontraron resultados" else "Tu diccionario está vacío",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (isSearching) "Prueba con otra palabra" else "Las palabras que escribas o añadas se guardarán aquí para sugerírtelas de inmediato.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -314,22 +431,27 @@ fun AddWordDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva Palabra") },
+        title = { Text("Añadir palabra al diccionario", fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
                     label = { Text("Palabra") },
+                    placeholder = { Text("Ej: Hexagonal") },
                     isError = error != null,
                     supportingText = { if (error != null) Text(error) },
                     singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(text) }) {
+            Button(
+                onClick = { onConfirm(text) },
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Text("Guardar")
             }
         },

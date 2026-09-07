@@ -213,15 +213,18 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, h
                 history = clipboardHistory,
                 onItemSelected = { item -> viewModel.onClipboardItemClick(item) },
                 onDelete = { item -> 
-                    scope.launch {
-                        ClipboardHistoryManager.deleteItem(context, item)
-                        service?.refreshClipboardHistory() 
+                    if (service != null) {
+                        service.deleteClipboardItem(item)
+                    } else {
+                        scope.launch {
+                            ClipboardHistoryManager.deleteItem(context, item)
+                        }
                     }
                 },
                 onTogglePin = { item -> 
                     scope.launch {
                         ClipboardHistoryManager.togglePin(context, item)
-                        service?.refreshClipboardHistory() 
+                        service?.refreshClipboardHistory(triggerSuggestionsUpdate = true) 
                     }
                 },
                 onBack = { viewModel.setCurrentView("keyboard") },

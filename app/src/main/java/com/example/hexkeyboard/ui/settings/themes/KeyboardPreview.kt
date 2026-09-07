@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.datastore.preferences.core.emptyPreferences
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
@@ -39,7 +40,11 @@ fun KeyboardPreview(
     var backgroundBlurImage by remember(theme.backgroundImageUri, theme.backgroundBlur) { mutableStateOf<Bitmap?>(null) }
     
     val parallaxManager = remember { ParallaxSensorManager(context) }
-    val parallaxOffset by parallaxManager.parallaxOffset.collectAsState()
+    val parallaxOffset = if (theme.parallaxEffect) {
+        parallaxManager.parallaxOffset.collectAsState().value
+    } else {
+        ParallaxSensorManager.Offset(0f, 0f)
+    }
 
     DisposableEffect(theme.parallaxEffect) {
         if (theme.parallaxEffect) {
@@ -142,19 +147,20 @@ fun KeyboardPreview(
                     }
                 },
                 update = { view ->
-                    view.keyboardTheme = theme
-                    view.drawBackground = false
-                    view.setParallaxOffset(parallaxOffset.x, parallaxOffset.y)
+                    if (view.keyboardTheme != theme) {
+                        view.keyboardTheme = theme
+                        view.drawBackground = false
+                    }
+                    if (theme.parallaxEffect) {
+                        view.setParallaxOffset(parallaxOffset.x, parallaxOffset.y)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             )
             
             // Bottom Margin
-            val bottomOffset by produceState(initialValue = 0, context) {
-                ThemeUtils.getDataStore(context).data.collect { prefs ->
-                    value = prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
-                }
-            }
+            val prefs by ThemeUtils.getDataStore(context).data.collectAsState(initial = emptyPreferences())
+            val bottomOffset = prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
             
             if (bottomOffset > 0) {
                 Spacer(modifier = Modifier.height(bottomOffset.dp))

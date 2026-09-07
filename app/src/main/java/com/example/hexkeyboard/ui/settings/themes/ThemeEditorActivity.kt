@@ -8,18 +8,19 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -28,22 +29,28 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
+import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 import com.github.skydoves.colorpicker.compose.*
 import kotlinx.coroutines.launch
@@ -53,7 +60,11 @@ class ThemeEditorActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableMaxRefreshRate()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT)
+        )
 
         val themeId = intent.getStringExtra("theme_id")
 
@@ -134,9 +145,13 @@ fun ThemeEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (initialThemeId == null) "Crear Tema" else "Editar Tema") },
+                title = { 
+                    Text(
+                        if (initialThemeId == null) "Crear Tema" else "Editar Tema",
+                        fontWeight = FontWeight.Bold
+                    ) 
+                },
                 navigationIcon = {
-                    // Usamos FilledTonalIconButton para un fondo suave circular
                     FilledTonalIconButton(
                         onClick = onBack,
                         shape = CircleShape
@@ -146,9 +161,6 @@ fun ThemeEditorScreen(
                             contentDescription = "Atrás"
                         )
                     }
-                },
-                actions = {
-                    // El botón de guardar ahora es un FAB para un estilo más Material 3 Expressive
                 }
             )
         },
@@ -156,7 +168,7 @@ fun ThemeEditorScreen(
             ExtendedFloatingActionButton(
                 onClick = {
                     if (currentTheme.name.isBlank()) {
-                        Toast.makeText(context, "Por favor introduce un nombre", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Por favor introduce un nombre para el tema", Toast.LENGTH_SHORT).show()
                     } else {
                         scope.launch {
                             ThemeUtils.saveCustomTheme(context, currentTheme)
@@ -164,72 +176,117 @@ fun ThemeEditorScreen(
                         }
                     }
                 },
-                icon = { Icon(Icons.Default.Save, null) },
-                text = { Text("Guardar Tema") },
-                containerColor = androidx.compose.ui.graphics.Color(0xFF2196F3),
-                contentColor = androidx.compose.ui.graphics.Color.White,
-                shape = MaterialTheme.shapes.extraLarge
+                icon = { Icon(Icons.Default.Save, contentDescription = null) },
+                text = { Text("Guardar Tema", fontWeight = FontWeight.Bold) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape
             )
         }
     ) { padding ->
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
+                .padding(top = padding.calculateTopPadding())
         ) {
-            // Preview (Fijo arriba)
-            Box(
+            // Live Preview (Hero Section)
+            Surface(
                 modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = 2.dp
             ) {
-                KeyboardPreview(
-                    theme = currentTheme,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    onKeyClick = { key ->
-                        if (editIndividualKeys) {
-                            initialColorForPicker = currentTheme.individualKeyColors[key.value] ?: currentTheme.keyBackgroundColor
-                            showColorPickerFor = { color ->
-                                val newMap = currentTheme.individualKeyColors.toMutableMap()
-                                newMap[key.value] = color
-                                currentTheme = currentTheme.copy(individualKeyColors = newMap)
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Palette,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Vista previa en vivo",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                )
+                    KeyboardPreview(
+                        theme = currentTheme,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                        onKeyClick = { key ->
+                            if (editIndividualKeys) {
+                                initialColorForPicker = currentTheme.individualKeyColors[key.value] ?: currentTheme.keyBackgroundColor
+                                showColorPickerFor = { color ->
+                                    val newMap = currentTheme.individualKeyColors.toMutableMap()
+                                    newMap[key.value] = color
+                                    currentTheme = currentTheme.copy(individualKeyColors = newMap)
+                                }
+                            }
+                        }
+                    )
+                }
             }
 
-            // Controles (Scrollable)
+            // Scrollable Controls
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
+                    .padding(bottom = padding.calculateBottomPadding() + 88.dp)
             ) {
-                OutlinedTextField(
-                    value = currentTheme.name,
-                    onValueChange = { currentTheme = currentTheme.copy(name = it) },
-                    label = { Text("Nombre del tema") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
-
-                Spacer(Modifier.height(24.dp))
-
-                Text("Colores principales", style = MaterialTheme.typography.titleMedium)
-                Card(
+                // Section 1: Information
+                EditorSectionHeader("Información General", Icons.Default.Edit)
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 1.dp
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        OutlinedTextField(
+                            value = currentTheme.name,
+                            onValueChange = { currentTheme = currentTheme.copy(name = it) },
+                            label = { Text("Nombre del tema") },
+                            placeholder = { Text("Ej: Mi Tema Neón") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    }
+                }
+
+                // Section 2: Colors
+                EditorSectionHeader("Colores Principales", Icons.Default.Palette)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 1.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(8.dp),
+                        modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
@@ -271,7 +328,7 @@ fun ThemeEditorScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
-                                ColorButton("Presión", currentTheme.keyBackgroundPressedColor) { 
+                                ColorButton("Pulsación", currentTheme.keyBackgroundPressedColor) { 
                                     initialColorForPicker = currentTheme.keyBackgroundPressedColor
                                     showColorPickerFor = { currentTheme = currentTheme.copy(keyBackgroundPressedColor = it) } 
                                 }
@@ -296,7 +353,7 @@ fun ThemeEditorScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 ColorButton("Popup Texto", currentTheme.popupTextColor) { 
                                     initialColorForPicker = currentTheme.popupTextColor
-                                    showColorPickerFor = { currentTheme = currentTheme.copy(popupTextColor = it) }
+                                    showColorPickerFor = { currentTheme = currentTheme.copy(popupTextColor = it) } 
                                 }
                             }
                         }
@@ -320,24 +377,31 @@ fun ThemeEditorScreen(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
-                
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (editIndividualKeys) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
+                // Section 3: Individual Key Colors
+                EditorSectionHeader("Colores Individuales", Icons.Default.TouchApp)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 1.dp
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Colores individuales", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Personalizar por tecla", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text("Activa esta opción para cambiar el color tecla por tecla", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             Switch(checked = editIndividualKeys, onCheckedChange = { editIndividualKeys = it })
                         }
                         if (editIndividualKeys) {
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                "Toca una tecla en la previsualización superior para cambiar su color.",
+                                "Toca cualquier tecla en la previsualización en vivo arriba para elegir su color individual.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
                             )
                             if (currentTheme.individualKeyColors.isNotEmpty()) {
                                 TextButton(
@@ -351,48 +415,62 @@ fun ThemeEditorScreen(
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
-                Text("Personalización visual", style = MaterialTheme.typography.titleMedium)
-                
-                Card(
+                // Section 4: Image and Effects
+                EditorSectionHeader("Imagen de Fondo y Efectos", Icons.Default.Image)
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 1.dp
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Imagen de fondo", style = MaterialTheme.typography.titleSmall)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Imagen de fondo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            modifier = Modifier.padding(vertical = 12.dp)
                         ) {
-                            Button(onClick = { pickImageLauncher.launch("image/*") }) {
+                            Button(
+                                onClick = { pickImageLauncher.launch("image/*") },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
                                 Icon(Icons.Default.Image, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text(if (currentTheme.backgroundImageUri == null) "Seleccionar imagen" else "Cambiar imagen")
                             }
                             if (currentTheme.backgroundImageUri != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
                                 IconButton(onClick = { currentTheme = currentTheme.copy(backgroundImageUri = null) }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Eliminar imagen", tint = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
 
-                        SliderWithLabel("Opacidad fondo", currentTheme.backgroundOpacity, 0f..1f) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                        EditorSlider("Opacidad de fondo", currentTheme.backgroundOpacity, 0f..1f) {
                             currentTheme = currentTheme.copy(backgroundOpacity = it)
                         }
 
-                        SliderWithLabel("Desenfoque fondo", currentTheme.backgroundBlur, 0f..25f) {
+                        EditorSlider("Desenfoque de fondo", currentTheme.backgroundBlur, 0f..25f) {
                             currentTheme = currentTheme.copy(backgroundBlur = it)
                         }
 
-                        SliderWithLabel("Desenfoque teclas", currentTheme.keysBlur, 0f..25f) {
+                        EditorSlider("Desenfoque de teclas", currentTheme.keysBlur, 0f..25f) {
                             currentTheme = currentTheme.copy(keysBlur = it)
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Efecto paralaje")
-                            Spacer(Modifier.weight(1f))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Efecto paralaje", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text("La imagen de fondo reacciona al movimiento del giroscopio", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             Switch(
                                 checked = currentTheme.parallaxEffect,
                                 onCheckedChange = { currentTheme = currentTheme.copy(parallaxEffect = it) }
@@ -400,9 +478,6 @@ fun ThemeEditorScreen(
                         }
                     }
                 }
-
-                // Espacio extra al final para que el FAB no tape los controles
-                Spacer(Modifier.height(100.dp))
             }
         }
     }
@@ -420,14 +495,46 @@ fun ThemeEditorScreen(
 }
 
 @Composable
+fun EditorSectionHeader(title: String, icon: ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 10.dp)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
 fun ColorButton(label: String, color: Int, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick, 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp),
-        shape = MaterialTheme.shapes.medium
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -436,27 +543,41 @@ fun ColorButton(label: String, color: Int, onClick: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(16.dp)
+                    .size(18.dp)
                     .background(
                         androidx.compose.ui.graphics.Color(color),
-                        MaterialTheme.shapes.extraSmall
+                        CircleShape
                     )
                     .border(
                         1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                        MaterialTheme.shapes.extraSmall
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        CircleShape
                     )
             )
             Spacer(Modifier.width(8.dp))
-            Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+            Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
-fun SliderWithLabel(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onValueChange: (Float) -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text("$label: ${String.format("%.2f", value)}")
+fun EditorSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onValueChange: (Float) -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Text(
+                    text = String.format("%.2f", value),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        }
         Slider(value = value, onValueChange = onValueChange, valueRange = range)
     }
 }
