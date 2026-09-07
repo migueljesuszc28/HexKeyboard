@@ -312,7 +312,7 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
     val unselectedColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f)
 
     val backgroundColor = Color(theme.keyBackgroundColor)
-    
+
     Surface(
         modifier = modifier
             .height(38.dp)

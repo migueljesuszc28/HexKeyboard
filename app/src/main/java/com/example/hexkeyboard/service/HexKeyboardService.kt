@@ -447,7 +447,7 @@ class HexKeyboardService : InputMethodService(),
         window?.window?.let { win ->
             WindowCompat.setDecorFitsSystemWindows(win, false)
             win.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            
+
             @Suppress("DEPRECATION")
             win.navigationBarColor = if (theme.id == "glass") Color.TRANSPARENT else theme.backgroundColor
 

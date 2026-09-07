@@ -3,17 +3,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Contorno de la tecla centrado -->
+    <!-- Icono de borrado predeterminado de Google Material (Outlined Backspace) -->
     <path
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.5"
-        android:strokeLineJoin="round"
-        android:strokeLineCap="round"
-        android:pathData="M19,6 L8,6 L3,12 L8,18 L19,18 C20.1,18 21,17.1 21,16 L21,8 C21,6.9 20.1,6 19,6 Z"/>
-    <!-- X interior centrada -->
-    <path
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:pathData="M12.5,10 L16.5,14 M16.5,10 L12.5,14"/>
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M22,3H7c-0.69,0 -1.23,0.35 -1.59,0.88L0,12l5.41,8.11c0.36,0.53 0.9,0.89 1.59,0.89h15c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2zM22,19H7.07L2.4,12l4.67,-7H22v14zM16,14.17L14.59,15.58L12,12.99L9.41,15.58L8,14.17L10.59,11.58L8,9l1.41,-1.41L12,10.17l2.59,-2.58L16,9l-2.59,2.58z"/>
 </vector>

@@ -182,27 +182,26 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                     }
                 }
 
-                // Capa 2: Panel de Emojis a pantalla completa con Haze Effect
+                // Capa 2: Panel de Emojis a pantalla completa con Shadow Mask
                 if (isEmojiPanel && !isEmojiSearchActive) {
                     val baseThemeColor = Color(keyboardTheme.backgroundColor)
-                    val hazeBgColor = Color.Transparent //baseThemeColor.copy(alpha = 0.40f)
 
-                    val topFadeBrush = remember(keyboardTheme.backgroundColor) {
+                    val topShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
                         Brush.verticalGradient(
                             colorStops = arrayOf(
-                                0.0f to baseThemeColor.copy(alpha = 0.45f),
-                                0.65f to baseThemeColor.copy(alpha = 0.20f),
+                                0.0f to baseThemeColor.copy(alpha = 0.55f),
+                                0.6f to baseThemeColor.copy(alpha = 0.20f),
                                 1.0f to Color.Transparent
                             )
                         )
                     }
 
-                    val bottomFadeBrush = remember(keyboardTheme.backgroundColor) {
+                    val bottomShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
                         Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color.Transparent,
-                                0.35f to baseThemeColor.copy(alpha = 0.20f),
-                                1.0f to baseThemeColor.copy(alpha = 0.45f)
+                                0.4f to baseThemeColor.copy(alpha = 0.20f),
+                                1.0f to baseThemeColor.copy(alpha = 0.55f)
                             )
                         )
                     }
@@ -215,28 +214,21 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         // 1. El Panel de Emojis ocupa la altura total de la capa base
                         PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset, navBarBottomDp)
 
-                        // 2. Barra de Sugerencias Flotante Superior con Haze y Curvatura Recortada (28.dp)
+                        // 2. Barra de Sugerencias Flotante Superior con Máscara de Sombra
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .fillMaxWidth()
                                 .height(58.dp)
                                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                                .hazeEffect(
-                                    state = hazeState,
-                                    style = HazeDefaults.style(
-                                        backgroundColor = hazeBgColor,
-                                        blurRadius = 25.dp
-                                    )
-                                )
-                                .background(topFadeBrush)
+                                .background(topShadowMaskBrush)
                         ) {
                             Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
                                 SuggestionsBarSection(viewModel, keyboardTheme)
                             }
                         }
 
-                        // 3. Margen Inferior Flotante con Haze y Desvanecido Gradient (Bloquea toques hacia los emojis)
+                        // 3. Margen Inferior Flotante con Máscara de Sombra (Bloquea toques hacia los emojis)
                         val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
                         if (totalBottomHazeHeight > 0) {
                             Box(
@@ -244,14 +236,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
                                     .height(totalBottomHazeHeight.dp)
-                                    .hazeEffect(
-                                        state = hazeState,
-                                        style = HazeDefaults.style(
-                                            backgroundColor = hazeBgColor,
-                                            blurRadius = 25.dp
-                                        )
-                                    )
-                                    .background(bottomFadeBrush)
+                                    .background(bottomShadowMaskBrush)
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null

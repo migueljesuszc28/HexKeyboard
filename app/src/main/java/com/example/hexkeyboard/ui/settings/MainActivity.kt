@@ -51,7 +51,9 @@ class MainActivity : ComponentActivity() {
             HexKeyboardTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MainScreen(
-                        modifier = Modifier.padding(innerPadding),
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .imePadding(),
                         onEnableClick = {
                             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                         },
