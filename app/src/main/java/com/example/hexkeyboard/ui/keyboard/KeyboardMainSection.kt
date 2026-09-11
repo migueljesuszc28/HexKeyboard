@@ -38,7 +38,6 @@ import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import com.example.hexkeyboard.data.repository.ThemeUtils
-import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -52,8 +51,10 @@ fun KeyboardMainSection(
 ) {
     val currentView by viewModel.currentView.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
+    val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
+    val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
     val currentLocale by viewModel.currentLocale.collectAsState()
-    val keyboardVisible = currentView == "keyboard" || isEmojiSearchActive
+    val keyboardVisible = currentView == "keyboard" || isSearchActive
 
     val context = LocalContext.current
     val service = context as? HexKeyboardService
@@ -161,20 +162,22 @@ fun KeyboardMainSection(
                 }
             }
         },
-        modifier = Modifier.fillMaxWidth().then(if (isEmojiSearchActive) Modifier.padding(top = 180.dp) else Modifier)
+        modifier = Modifier.fillMaxWidth().then(if (isSearchActive) Modifier.padding(top = 180.dp) else Modifier)
     )
 }
 
 @Composable
-fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, hazeState: HazeState, bottomOffset: Int = 0, navBarBottomDp: Int = 0) {
+fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, bottomOffset: Int = 0, navBarBottomDp: Int = 0) {
     val currentView by viewModel.currentView.collectAsState()
     val clipboardHistory by viewModel.clipboardHistory.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
+    val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
+    val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
     val context = LocalContext.current
     val service = context as? HexKeyboardService
 
     val scope = rememberCoroutineScope()
-    val panelModifier = if (isEmojiSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
+    val panelModifier = if (isSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
 
     AnimatedContent(
         targetState = currentView,
@@ -207,7 +210,6 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, h
                 onBack = { viewModel.setCurrentView("keyboard") }, 
                 theme = theme, 
                 viewModel = viewModel, 
-                hazeState = hazeState,
                 bottomOffset = bottomOffset,
                 navBarBottomDp = navBarBottomDp
             )
@@ -251,7 +253,9 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, h
                         viewModel.onActionRequested?.invoke(KeyboardViewModel.Action.InsertText(text))
                         viewModel.setCurrentView("keyboard")
                     },
+                    onBack = { viewModel.setCurrentView("keyboard") },
                     theme = theme,
+                    viewModel = viewModel,
                     bottomOffset = bottomOffset,
                     navBarBottomDp = navBarBottomDp
                 )

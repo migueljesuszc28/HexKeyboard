@@ -238,7 +238,7 @@ fun MainScreen(
                     onValueChange = { textState = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.test_keyboard_hint)) },
-                    placeholder = { Text("Escribe algo aquí para probar...") },
+                    placeholder = { Text("Escribe aqui para probar...") },
                     shape = RoundedCornerShape(16.dp),
                     leadingIcon = {
                         Icon(

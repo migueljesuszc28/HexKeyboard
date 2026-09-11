@@ -18,7 +18,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
-import androidx.preference.PreferenceManager
+import com.example.hexkeyboard.ui.component.GlassEffectConfig
+import com.example.hexkeyboard.ui.component.GlassStyle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.catch
@@ -109,6 +112,17 @@ object ThemeUtils {
     val POPUP_SCALE = intPreferencesKey("popup_scale")
     val LONG_PRESS_DURATION = intPreferencesKey("long_press_duration")
     val NUMERIC_KEY_SIZE_SCALE = intPreferencesKey("numeric_key_size_scale")
+
+    // Liquid Glass Keys
+    val GLASS_GLOBAL_ENABLED = booleanPreferencesKey("glass_global_enabled")
+    val GLASS_STYLE = stringPreferencesKey("glass_style")
+    val GLASS_BLUR_RADIUS = floatPreferencesKey("glass_blur_radius")
+    val GLASS_VIBRANCY = floatPreferencesKey("glass_vibrancy")
+    val GLASS_LENS_HEIGHT = floatPreferencesKey("glass_lens_height")
+    val GLASS_LENS_AMOUNT = floatPreferencesKey("glass_lens_amount")
+    val GLASS_SURFACE_OPACITY = floatPreferencesKey("glass_surface_opacity")
+    val GLASS_DEPTH_EFFECT = booleanPreferencesKey("glass_depth_effect")
+    val GLASS_CHROMATIC_ABERRATION = booleanPreferencesKey("glass_chromatic_aberration")
     val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
 
     fun getDataStore(context: Context) = context.dataStore
@@ -226,26 +240,24 @@ object ThemeUtils {
             )
             "glass" -> {
                 val isDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-                val accentColor = "#2196F3".toColorInt()
-                // Accent con transparencia (78 en hex es aprox 120 en decimal)
-                val glassAccent = "#902196F3".toColorInt()
-                val redglassAccent = "#90FF0000".toColorInt()
+                val glassAccent = "#2196F3".toColorInt()
+                val redglassAccent = "#FF0000".toColorInt()
 
 
                 if (isDark) {
                     KeyboardTheme(
                         id = "glass",
                         name = "Glass",
-                        backgroundColor = "#70000000".toColorInt(),
-                        keyBackgroundColor = "#905C5C5C".toColorInt(),
-                        keyBackgroundPressedColor = "#905C5C5C".toColorInt(),
-                        keyBackgroundSpecialColor = "#905C5C5C".toColorInt(),
+                        backgroundColor = Color.TRANSPARENT,
+                        keyBackgroundColor = "#5C5C5C".toColorInt(),
+                        keyBackgroundPressedColor = "#5C5C5C".toColorInt(),
+                        keyBackgroundSpecialColor = "#5C5C5C".toColorInt(),
                         keyStrokeColor = Color.TRANSPARENT,
                         keyTextColor = Color.WHITE,
                         keyboardIconTint = Color.WHITE,
-                        keyShiftActiveColor = "#90FFFFFF".toColorInt(),
-                        keyShiftInactiveColor = "#905C5C5C".toColorInt(),
-                        popupBackgroundColor = "#EB5C5C5C".toColorInt(),
+                        keyShiftActiveColor = "#FFFFFF".toColorInt(),
+                        keyShiftInactiveColor = "#5C5C5C".toColorInt(),
+                        popupBackgroundColor = "#5C5C5C".toColorInt(),
                         popupTextColor = Color.WHITE,
                         popupSelectedBackgroundColor = Color.BLACK,
                         popupSelectedTextColor = Color.WHITE,
@@ -260,16 +272,16 @@ object ThemeUtils {
                     KeyboardTheme(
                         id = "glass",
                         name = "Glass",
-                        backgroundColor = "#60D9D9D9".toColorInt(),        // Fondo claro semitransparente
-                        keyBackgroundColor = "#90FFFFFF".toColorInt(),    // Teclas blancas traslúcidas
-                        keyBackgroundPressedColor = "#90FFFFFF".toColorInt(),
-                        keyBackgroundSpecialColor = "#90FFFFFF".toColorInt(),
+                        backgroundColor = Color.TRANSPARENT,        // Fondo claro semitransparente
+                        keyBackgroundColor = "#FFFFFF".toColorInt(),    // Teclas blancas traslúcidas
+                        keyBackgroundPressedColor = "#FFFFFF".toColorInt(),
+                        keyBackgroundSpecialColor = "#FFFFFF".toColorInt(),
                         keyStrokeColor = Color.TRANSPARENT,
                         keyTextColor = Color.BLACK,
                         keyboardIconTint = Color.BLACK,
-                        keyShiftActiveColor = "#90000000".toColorInt(),
-                        keyShiftInactiveColor = "#90FFFFFF".toColorInt(),
-                        popupBackgroundColor = "#EBFFFFFF".toColorInt(),
+                        keyShiftActiveColor = "#000000".toColorInt(),
+                        keyShiftInactiveColor = "#FFFFFF".toColorInt(),
+                        popupBackgroundColor = "#FFFFFF".toColorInt(),
                         popupTextColor = Color.BLACK,
                         popupSelectedBackgroundColor = Color.BLACK,
                         popupSelectedTextColor = Color.WHITE,
@@ -437,7 +449,7 @@ object ThemeUtils {
             themes
         }
 
-    fun getAllThemes(context: Context): List<KeyboardTheme> = runBlocking {
+    suspend fun getAllThemes(context: Context): List<KeyboardTheme> = withContext(Dispatchers.IO) {
         val prefs = context.dataStore.data.first()
         val themes = mutableListOf<KeyboardTheme>()
         themes.add(getDefaultTheme(context))
@@ -724,12 +736,7 @@ object ThemeUtils {
         bitmap.setPixels(pix, 0, w, 0, 0, w, h)
     }
 
-    fun getKeyboardAspectRatio(context: Context): Float = runBlocking {
-        val prefs = context.dataStore.data.first()
-        val hPref = prefs[KEYBOARD_HEIGHT] ?: 50
-        val ksPref = prefs[KEYBOARD_KEY_SIZE] ?: 90
-        val boPref = prefs[KEYBOARD_BOTTOM_OFFSET] ?: 0
-
+    fun computeKeyboardAspectRatio(context: Context, hPref: Int = 50, ksPref: Int = 90, boPref: Int = 0): Float {
         val f = 0.7f + (hPref / 100f) * 0.6f
         val keyScale = ksPref / 100f
 
@@ -750,7 +757,15 @@ object ThemeUtils {
 
         val totalHeight = keysHeight + suggestionsHeightUnits + bottomMarginUnits
 
-        1000f / totalHeight
+        return 1000f / totalHeight
+    }
+
+    suspend fun getKeyboardAspectRatio(context: Context): Float = withContext(Dispatchers.IO) {
+        val prefs = context.dataStore.data.first()
+        val hPref = prefs[KEYBOARD_HEIGHT] ?: 50
+        val ksPref = prefs[KEYBOARD_KEY_SIZE] ?: 90
+        val boPref = prefs[KEYBOARD_BOTTOM_OFFSET] ?: 0
+        computeKeyboardAspectRatio(context, hPref, ksPref, boPref)
     }
 
     /**
@@ -766,7 +781,6 @@ object ThemeUtils {
         val vibrant = palette.getVibrantColor(dominant)
         val lightVibrant = palette.getLightVibrantColor(vibrant)
         val darkVibrant = palette.getDarkVibrantColor(vibrant)
-        val muted = palette.getMutedColor(dominant)
         
         // Decidir colores según la luminancia de la imagen
         val keyBgColor = if (isDarkImage) {
@@ -803,5 +817,58 @@ object ThemeUtils {
             ),
             isKeyTextColorCustom = true
         )
+    }
+
+    fun getGlassEffectConfigFlow(context: Context): Flow<GlassEffectConfig> = context.dataStore.data.map { prefs ->
+        val enabled = prefs[GLASS_GLOBAL_ENABLED] ?: true
+        val styleStr = prefs[GLASS_STYLE] ?: "LIQUID"
+        val style = try { GlassStyle.valueOf(styleStr) } catch (_: Exception) { GlassStyle.LIQUID }
+        val blurRadius = prefs[GLASS_BLUR_RADIUS] ?: 2f
+        val vibrancy = prefs[GLASS_VIBRANCY] ?: 1.2f
+        val lensHeight = prefs[GLASS_LENS_HEIGHT] ?: 0.4f
+        val lensAmount = prefs[GLASS_LENS_AMOUNT] ?: 0.6f
+        val surfaceOpacity = prefs[GLASS_SURFACE_OPACITY] ?: 0.5f
+        val depthEffect = prefs[GLASS_DEPTH_EFFECT] ?: false
+        val chromaticAberration = prefs[GLASS_CHROMATIC_ABERRATION] ?: false
+
+        GlassEffectConfig(
+            globalEnabled = enabled,
+            style = style,
+            blurRadius = blurRadius,
+            vibrancy = vibrancy,
+            lensHeight = lensHeight,
+            lensAmount = lensAmount,
+            surfaceOpacity = surfaceOpacity,
+            depthEffect = depthEffect,
+            chromaticAberration = chromaticAberration
+        )
+    }
+
+    suspend fun saveGlassEffectConfig(context: Context, config: GlassEffectConfig) {
+        context.dataStore.edit { prefs ->
+            prefs[GLASS_GLOBAL_ENABLED] = config.globalEnabled
+            prefs[GLASS_STYLE] = config.style.name
+            prefs[GLASS_BLUR_RADIUS] = config.blurRadius
+            prefs[GLASS_VIBRANCY] = config.vibrancy
+            prefs[GLASS_LENS_HEIGHT] = config.lensHeight
+            prefs[GLASS_LENS_AMOUNT] = config.lensAmount
+            prefs[GLASS_SURFACE_OPACITY] = config.surfaceOpacity
+            prefs[GLASS_DEPTH_EFFECT] = config.depthEffect
+            prefs[GLASS_CHROMATIC_ABERRATION] = config.chromaticAberration
+        }
+    }
+
+    suspend fun resetGlassEffectConfig(context: Context) {
+        context.dataStore.edit { prefs ->
+            prefs.remove(GLASS_GLOBAL_ENABLED)
+            prefs.remove(GLASS_STYLE)
+            prefs.remove(GLASS_BLUR_RADIUS)
+            prefs.remove(GLASS_VIBRANCY)
+            prefs.remove(GLASS_LENS_HEIGHT)
+            prefs.remove(GLASS_LENS_AMOUNT)
+            prefs.remove(GLASS_SURFACE_OPACITY)
+            prefs.remove(GLASS_DEPTH_EFFECT)
+            prefs.remove(GLASS_CHROMATIC_ABERRATION)
+        }
     }
 }

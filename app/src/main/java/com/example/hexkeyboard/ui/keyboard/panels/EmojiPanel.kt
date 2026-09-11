@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -75,9 +76,14 @@ import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import dev.chrisbanes.haze.HazeDefaults
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
+import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.example.hexkeyboard.ui.component.LocalAppBackdrop
+import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
+import com.example.hexkeyboard.ui.component.GlassEffectConfig
+import com.example.hexkeyboard.ui.component.liquidGlass
+import com.example.hexkeyboard.ui.component.glassContentColorFor
+import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,16 +98,37 @@ fun EmojiPanel(
     onBack: () -> Unit,
     theme: KeyboardTheme,
     viewModel: KeyboardViewModel? = null,
-    hazeState: HazeState? = null,
     bottomOffset: Int = 0,
     navBarBottomDp: Int = 0
 ) {
     val context = LocalContext.current
     val searchQuery by (viewModel?.emojiSearchQuery ?: MutableStateFlow("")).collectAsState()
+    val isEmojiSearchActive by (viewModel?.isEmojiSearchActive ?: MutableStateFlow(false)).collectAsState()
     val skinTone by (viewModel?.selectedSkinTone ?: MutableStateFlow("")).collectAsState()
     val genderIndex by (viewModel?.selectedGenderIndex ?: MutableStateFlow(0)).collectAsState()
     val emojiList by (viewModel?.filteredEmojiList ?: MutableStateFlow(emptyList())).collectAsState()
-    
+
+    val backdrop = rememberLayerBackdrop()
+    val savedGlassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
+    val savedGlassConfig by savedGlassConfigFlow.collectAsState(initial = GlassEffectConfig())
+    val glassConfig = remember(theme, savedGlassConfig) {
+        savedGlassConfig.copy(
+            surfaceTintColor = Color(theme.keyBackgroundColor),
+            textColor = Color(theme.keyboardIconTint)
+        )
+    }
+
+    val baseThemeColor = Color(theme.backgroundColor)
+    val topShadowMaskBrush = remember(theme.backgroundColor) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to baseThemeColor.copy(alpha = 0.40f),
+                0.6f to baseThemeColor.copy(alpha = 0.15f),
+                1.0f to Color.Transparent
+            )
+        )
+    }
+
     LaunchedEffect(Unit) {
         ThemeUtils.getDataStore(context).data.map { it[ThemeUtils.RECENT_EMOJIS] ?: "" }
             .collect { json ->
@@ -150,121 +177,156 @@ fun EmojiPanel(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (searchQuery.isNotEmpty() && emojiList.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.SearchOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = Color(theme.keyTextColor)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "No se encontraron emojis",
-                        color = Color(theme.keyTextColor),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
-
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Adaptive(minSize = 44.dp),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 46.dp, bottom = (70 + bottomOffset + navBarBottomDp).dp)
-        ) {
-            items(
-                items = emojiList,
-                key = { item ->
-                    when(item) {
-                        is EmojiProvider.EmojiGridItem.Header -> "header_${item.name}"
-                        is EmojiProvider.EmojiGridItem.Emoji -> "${item.category}_${item.code}"
-                    }
-                },
-                span = { item -> GridItemSpan(if (item is EmojiProvider.EmojiGridItem.Header) maxLineSpan else 1) },
-                contentType = { item -> if (item is EmojiProvider.EmojiGridItem.Header) "header" else "emoji" }
-            ) { item ->
-                when (item) {
-                    is EmojiProvider.EmojiGridItem.Header -> EmojiHeader(name = item.name, theme = theme)
-                    is EmojiProvider.EmojiGridItem.Emoji -> {
-                        EmojiItem(
-                            emoji = item.code,
-                            canonical = item.canonical,
-                            family = item.family,
-                            skinTone = skinTone,
-                            genderIndex = genderIndex,
-                            onSkinToneSelected = { viewModel?.setSkinTone(it) },
-                            onGenderSelected = { viewModel?.setGenderIndex(it) },
-                            onEmojiSelected = { finalEmoji ->
-                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                                viewModel?.saveRecentEmoji(context, finalEmoji)
-                                onEmojiSelected(finalEmoji)
-                            },
-                            theme = theme
-                        )
-                    }
-                }
-            }
-        }
-
-        if (searchQuery.isEmpty()) {
-            Row(
+    CompositionLocalProvider(
+        LocalAppBackdrop provides backdrop,
+        LocalGlassEffectConfig provides glassConfig
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + navBarBottomDp + 8).dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
             ) {
-                AnimatedVisibility(
-                    visible = isCategoriesVisible,
-                    enter = slideInVertically(
-                        initialOffsetY = { it / 2 },
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.9f),
-                    exit = slideOutVertically(
-                        targetOffsetY = { it / 2 },
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        )
-                    ) + fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f),
-                    modifier = Modifier.weight(1f)
+                if (searchQuery.isNotEmpty() && emojiList.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.SearchOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color(theme.keyTextColor)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "No se encontraron emojis",
+                                color = Color(theme.keyTextColor),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+
+                val topPadding = if (isEmojiSearchActive) 8.dp else 52.dp
+                val bottomPadding = if (isEmojiSearchActive) 8.dp else (70 + bottomOffset + navBarBottomDp).dp
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Adaptive(minSize = 44.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding)
                 ) {
-                    EmojiCategoryTabs(
-                        modifier = Modifier.fillMaxWidth(),
-                        selectedTabIndex = currentCategoryIndex,
-                        onCategoryClick = { categoryName ->
-                            val index = emojiList.indexOfFirst { it is EmojiProvider.EmojiGridItem.Header && it.name == categoryName }
-                            if (index >= 0) { 
-                                scope.launch { 
-                                    gridState.scrollToItem(index)
-                                } 
+                    items(
+                        items = emojiList,
+                        key = { item ->
+                            when(item) {
+                                is EmojiProvider.EmojiGridItem.Header -> "header_${item.name}"
+                                is EmojiProvider.EmojiGridItem.Emoji -> "${item.category}_${item.code}"
                             }
                         },
+                        span = { item -> GridItemSpan(if (item is EmojiProvider.EmojiGridItem.Header) maxLineSpan else 1) },
+                        contentType = { item -> if (item is EmojiProvider.EmojiGridItem.Header) "header" else "emoji" }
+                    ) { item ->
+                        when (item) {
+                            is EmojiProvider.EmojiGridItem.Header -> EmojiHeader(name = item.name, theme = theme)
+                            is EmojiProvider.EmojiGridItem.Emoji -> {
+                                EmojiItem(
+                                    emoji = item.code,
+                                    canonical = item.canonical,
+                                    family = item.family,
+                                    skinTone = skinTone,
+                                    genderIndex = genderIndex,
+                                    onSkinToneSelected = { viewModel?.setSkinTone(it) },
+                                    onGenderSelected = { viewModel?.setGenderIndex(it) },
+                                    onEmojiSelected = { finalEmoji ->
+                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                        viewModel?.saveRecentEmoji(context, finalEmoji)
+                                        onEmojiSelected(finalEmoji)
+                                    },
+                                    theme = theme
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!isEmojiSearchActive) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(58.dp)
+                        .background(topShadowMaskBrush)
+                )
+            }
+
+            if (viewModel != null && !isEmojiSearchActive) {
+                EmojiSearchBar(
+                    viewModel = viewModel,
+                    theme = theme,
+                    query = searchQuery,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                    glassConfig = glassConfig
+                )
+            }
+
+            if (searchQuery.isEmpty() && !isEmojiSearchActive) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + navBarBottomDp + 8).dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    AnimatedVisibility(
+                        visible = isCategoriesVisible,
+                        enter = slideInVertically(
+                            initialOffsetY = { it / 2 },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ) + fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.9f),
+                        exit = slideOutVertically(
+                            targetOffsetY = { it / 2 },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            )
+                        ) + fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        EmojiCategoryTabs(
+                            modifier = Modifier.fillMaxWidth(),
+                            selectedTabIndex = currentCategoryIndex,
+                            onCategoryClick = { categoryName ->
+                                val index = emojiList.indexOfFirst { it is EmojiProvider.EmojiGridItem.Header && it.name == categoryName }
+                                if (index >= 0) { 
+                                    scope.launch { 
+                                        gridState.scrollToItem(index)
+                                    } 
+                                }
+                            },
+                            theme = theme,
+                            glassConfig = glassConfig
+                        )
+                    }
+
+                    if (isCategoriesVisible) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
+                    EmojiDeleteButton(
+                        onDelete = {
+                            val service = context as? HexKeyboardService
+                            service?.handleDelete()
+                        },
                         theme = theme,
-                        hazeState = hazeState
+                        glassConfig = glassConfig
                     )
                 }
-
-                if (isCategoriesVisible) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-
-                EmojiDeleteButton(
-                    onDelete = {
-                        val service = context as? HexKeyboardService
-                        service?.handleDelete()
-                    },
-                    theme = theme,
-                    hazeState = hazeState
-                )
             }
         }
     }
@@ -284,7 +346,13 @@ fun EmojiHeader(name: String, theme: KeyboardTheme) {
 }
 
 @Composable
-fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, theme: KeyboardTheme, modifier: Modifier = Modifier, hazeState: HazeState? = null) {
+fun EmojiCategoryTabs(
+    selectedTabIndex: Int,
+    onCategoryClick: (String) -> Unit,
+    theme: KeyboardTheme,
+    modifier: Modifier = Modifier,
+    glassConfig: GlassEffectConfig = LocalGlassEffectConfig.current
+) {
     val context = LocalContext.current
     val categoryIcons = remember {
         mapOf(
@@ -310,20 +378,19 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
     }
     val selectedColor = activeColor
     val unselectedColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f)
-
-    val backgroundColor = Color(theme.keyBackgroundColor)
+    val categoryShape = remember { RoundedCornerShape(20.dp) }
 
     Surface(
         modifier = modifier
             .height(38.dp)
-            .then(
-                if (hazeState != null) {
-                    Modifier.hazeEffect(state = hazeState, style = HazeDefaults.style(backgroundColor = backgroundColor, blurRadius = 25.dp))
-                } else Modifier
+            .liquidGlass(
+                config = glassConfig,
+                shape = categoryShape,
+                highlightAlpha = 0.3f
             ),
-        color = backgroundColor.copy(alpha = if (hazeState != null) 0.95f else 1f),
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = 2.dp
+        color = Color.Transparent,
+        shape = categoryShape,
+        shadowElevation = 0.dp
     ) {
         @OptIn(ExperimentalMaterial3Api::class)
         CompositionLocalProvider(LocalRippleConfiguration provides null) {
@@ -374,10 +441,18 @@ fun EmojiCategoryTabs(selectedTabIndex: Int, onCategoryClick: (String) -> Unit, 
 }
 
 @Composable
-fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme, hazeState: HazeState? = null) {
+fun EmojiDeleteButton(
+    onDelete: () -> Unit,
+    theme: KeyboardTheme,
+    glassConfig: GlassEffectConfig = LocalGlassEffectConfig.current
+) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.85f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh), label = "delete_bounce")
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.85f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "delete_bounce"
+    )
 
     LaunchedEffect(isPressed) {
         if (isPressed) {
@@ -396,20 +471,24 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme, hazeState: Haz
         }
     }
 
-    val backgroundColor = Color(theme.keyBackgroundColor)
+    val buttonShape = CircleShape
+    val iconColor = if (isPressed) Color.Red else {
+        glassContentColorFor(
+            behind = Color(theme.backgroundColor),
+            tint = glassConfig.surfaceTintColor,
+            opacity = glassConfig.surfaceOpacity
+        )
+    }
 
     Box(
         modifier = Modifier
             .size(45.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(2.dp, CircleShape)
-            .clip(CircleShape)
-            .then(
-                if (hazeState != null) {
-                    Modifier.hazeEffect(state = hazeState, style = HazeDefaults.style(backgroundColor = backgroundColor, blurRadius = 25.dp))
-                } else Modifier
+            .liquidGlass(
+                config = glassConfig,
+                shape = buttonShape,
+                highlightAlpha = 0.3f
             )
-            .background(backgroundColor.copy(alpha = if (hazeState != null) 0.95f else 1f))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -420,7 +499,7 @@ fun EmojiDeleteButton(onDelete: () -> Unit, theme: KeyboardTheme, hazeState: Haz
         Icon(
             imageVector = if (isPressed) Icons.AutoMirrored.Filled.Backspace else Icons.AutoMirrored.Outlined.Backspace,
             contentDescription = "Borrar",
-            tint = if (isPressed) Color.Red else Color(theme.keyboardIconTint),
+            tint = iconColor,
             modifier = Modifier.size(24.dp).offset(x = (-1).dp)
         )
     }

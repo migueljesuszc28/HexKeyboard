@@ -139,7 +139,7 @@ class PredictionEngine(private val context: Context) {
 
     fun setLayoutType(type: String) {
         activeProximityMap = if (type == "qwerty") qwertyProximityMap else defaultProximityMap
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
     }
 
     private val accentMap = mapOf(
@@ -181,7 +181,7 @@ class PredictionEngine(private val context: Context) {
     suspend fun initialize(lang: String = "es", forceUserDictReload: Boolean = false, includeBase: Boolean = true) {
         if (!forceUserDictReload && isUserLoaded && isBaseLoaded && currentLanguage == lang) return
         currentLanguage = lang
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
 
         withContext(Dispatchers.IO) {
             if (forceUserDictReload || !isUserLoaded) {
@@ -404,7 +404,9 @@ class PredictionEngine(private val context: Context) {
 
         val lowPrefix = currentWord.lowercase()
         val cacheKey = "curr:${lowPrefix}_prev:${previousWord}_lang:$currentLanguage"
-        predictionCache.get(cacheKey)?.let { cached ->
+        synchronized(predictionCache) {
+            predictionCache.get(cacheKey)
+        }?.let { cached ->
             return cached.map { it.copy(text = matchCase(currentWord, it.text)) }
         }
 
@@ -450,7 +452,9 @@ class PredictionEngine(private val context: Context) {
             .take(limit)
             .map { it.copy(text = matchCase(currentWord, it.text)) }
 
-        predictionCache.put(cacheKey, finalResult)
+        synchronized(predictionCache) {
+            predictionCache.put(cacheKey, finalResult)
+        }
         return finalResult
     }
 
@@ -839,7 +843,7 @@ class PredictionEngine(private val context: Context) {
     // ------------------------------------------------------------------
 
     fun clearCaches() {
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
         wordCounts.clear()
     }
 
@@ -851,7 +855,7 @@ class PredictionEngine(private val context: Context) {
         if (isKnownWord(w)) {
             if (prev != null) addBigram(prev, w)
             wordCounts[w] = (wordCounts[w] ?: 0) + 1
-            predictionCache.evictAll()
+            synchronized(predictionCache) { predictionCache.evictAll() }
             return
         }
 
@@ -867,7 +871,7 @@ class PredictionEngine(private val context: Context) {
             }
             if (prev != null) addBigram(prev, w)
         }
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
     }
 
     fun addUserWord(word: String) {
@@ -876,14 +880,14 @@ class PredictionEngine(private val context: Context) {
         insert(w, 800, isUser = true)
         userDictionary.add(w)
         saveUserDictionary()
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
     }
 
     fun removeUserWord(word: String) {
         userDictionary.remove(word.lowercase())
         saveUserDictionary()
         isUserLoaded = false // Forzar recarga total para limpiar el trie
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
     }
 
     fun getUserWords(): List<String> = userDictionary.toList().sorted()
@@ -892,6 +896,6 @@ class PredictionEngine(private val context: Context) {
         userDictionary.clear()
         saveUserDictionary()
         isUserLoaded = false
-        predictionCache.evictAll()
+        synchronized(predictionCache) { predictionCache.evictAll() }
     }
 }

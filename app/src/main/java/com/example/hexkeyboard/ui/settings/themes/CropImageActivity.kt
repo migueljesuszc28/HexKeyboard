@@ -79,7 +79,9 @@ fun CropImageScreen(
     val context = LocalContext.current
     var cropImageViewInstance by remember { mutableStateOf<CropImageView?>(null) }
     
-    val keyboardAspectRatio = remember { ThemeUtils.getKeyboardAspectRatio(context) }
+    val keyboardAspectRatio by produceState(initialValue = 1.0f, context) {
+        value = ThemeUtils.getKeyboardAspectRatio(context)
+    }
     val density = LocalContext.current.resources.displayMetrics.density
     val screenWidthDp = LocalContext.current.resources.displayMetrics.widthPixels / density
     

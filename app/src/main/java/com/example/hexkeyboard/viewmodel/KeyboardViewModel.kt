@@ -69,6 +69,12 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     private val _isEmojiSearchActive = MutableStateFlow(false)
     val isEmojiSearchActive: StateFlow<Boolean> = _isEmojiSearchActive.asStateFlow()
 
+    private val _credentialsSearchQuery = MutableStateFlow("")
+    val credentialsSearchQuery: StateFlow<String> = _credentialsSearchQuery.asStateFlow()
+
+    private val _isCredentialsSearchActive = MutableStateFlow(false)
+    val isCredentialsSearchActive: StateFlow<Boolean> = _isCredentialsSearchActive.asStateFlow()
+
     private val _recentEmojis = MutableStateFlow<List<String>>(emptyList())
     val recentEmojis: StateFlow<List<String>> = _recentEmojis.asStateFlow()
 
@@ -85,6 +91,7 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
         object InsertNewLine : Action()
         data class ReplaceLastWord(val newWord: String) : Action()
         data class SetEmojiSearchActive(val active: Boolean) : Action()
+        data class SetCredentialsSearchActive(val active: Boolean) : Action()
         data class OpenSettings(val type: SettingsType) : Action()
         object RefreshClipboard : Action()
         object SwitchToNextLanguage : Action()
@@ -127,12 +134,26 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
             _emojiSearchQuery.value = ""
             _isEmojiSearchActive.value = false
         }
+        if (view != "credentials") {
+            _credentialsSearchQuery.value = ""
+            _isCredentialsSearchActive.value = false
+        }
     }
 
     fun setEmojiSearchActive(active: Boolean) {
         _isEmojiSearchActive.value = active
         if (!active) _emojiSearchQuery.value = ""
         onActionRequested?.invoke(Action.SetEmojiSearchActive(active))
+    }
+
+    fun setCredentialsSearchActive(active: Boolean) {
+        _isCredentialsSearchActive.value = active
+        if (!active) _credentialsSearchQuery.value = ""
+        onActionRequested?.invoke(Action.SetCredentialsSearchActive(active))
+    }
+
+    fun updateCredentialsSearchQuery(query: String) {
+        _credentialsSearchQuery.value = query
     }
 
     fun onEmojiSelected(emoji: String) {
@@ -143,6 +164,8 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     fun onCharTyped(text: String) {
         if (_isEmojiSearchActive.value) {
             updateEmojiSearchQuery(_emojiSearchQuery.value + text)
+        } else if (_isCredentialsSearchActive.value) {
+            updateCredentialsSearchQuery(_credentialsSearchQuery.value + text)
         } else {
             onActionRequested?.invoke(Action.InsertText(text))
         }
@@ -156,6 +179,13 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
             } else {
                 setEmojiSearchActive(false)
             }
+        } else if (_isCredentialsSearchActive.value) {
+            val current = _credentialsSearchQuery.value
+            if (current.isNotEmpty()) {
+                updateCredentialsSearchQuery(current.dropLast(1))
+            } else {
+                setCredentialsSearchActive(false)
+            }
         } else {
             onActionRequested?.invoke(Action.DeleteBackward)
         }
@@ -164,6 +194,8 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     fun onEnter() {
         if (_isEmojiSearchActive.value) {
             setEmojiSearchActive(false)
+        } else if (_isCredentialsSearchActive.value) {
+            setCredentialsSearchActive(false)
         } else {
             onActionRequested?.invoke(Action.InsertNewLine)
         }

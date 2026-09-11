@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -40,10 +41,12 @@ import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.ui.settings.ClipboardEditActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.flow.map
-import dev.chrisbanes.haze.HazeDefaults
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
+import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.example.hexkeyboard.ui.component.LocalAppBackdrop
+import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
+import com.example.hexkeyboard.ui.component.GlassEffectConfig
+import com.example.hexkeyboard.ui.component.liquidGlass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,7 +62,16 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
 
     val parallaxOffsetState = viewModel.parallaxOffset.collectAsState()
 
-    val hazeState = remember { HazeState() }
+    val keyboardBackdrop = rememberLayerBackdrop()
+    val glassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
+    val savedGlassConfig by glassConfigFlow.collectAsState(initial = GlassEffectConfig())
+    val glassConfig = remember(keyboardTheme, savedGlassConfig) {
+        savedGlassConfig.copy(
+            surfaceTintColor = Color(keyboardTheme.keyBackgroundColor),
+            textColor = Color(keyboardTheme.keyTextColor)
+        )
+    }
+
     val isGlassTheme = keyboardTheme.id == "glass"
     val hasBackgroundImage = keyboardTheme.backgroundImageUri != null
 
@@ -104,183 +116,189 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
 
     val currentView by viewModel.currentView.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
+    val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
+    val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
     val isFullPanel = currentView == "emoji" || currentView == "credentials"
     val clipboardItemWithOptions by viewModel.clipboardItemWithOptions.collectAsState()
 
-    Box(
+    val glassShape = remember { RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) }
+
+    CompositionLocalProvider(
+        LocalAppBackdrop provides keyboardBackdrop,
+        LocalGlassEffectConfig provides glassConfig
+    ) {
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
-                .background(
-                    color = Color(keyboardTheme.backgroundColor),
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                )
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .then(if (isGlassTheme || isFullPanel) Modifier.hazeSource(hazeState) else Modifier)
+                .clip(glassShape)
         ) {
-        // Continuous Background Layer
-        val img = blurredBitmap ?: backgroundBitmap
-        img?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier
-                    .matchParentSize()
-                    .alpha(keyboardTheme.backgroundOpacity)
-                    .graphicsLayer {
-                        if (keyboardTheme.parallaxEffect) {
-                            val parallaxLimit = 0.10f
-                            val scale = 1.0f + parallaxLimit
-                            val maxShiftX = (size.width * parallaxLimit) / 2f
-                            val maxShiftY = (size.height * parallaxLimit) / 2f
-
-                            val offset = parallaxOffsetState.value
-                            translationX = offset.x * maxShiftX
-                            translationY = offset.y * maxShiftY
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                    },
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        if (isGlassTheme) {
-            Box(modifier = Modifier.matchParentSize().hazeEffect(state = hazeState, style = HazeDefaults.style(backgroundColor = Color(keyboardTheme.backgroundColor), blurRadius = 20.dp)).background(Color(keyboardTheme.backgroundColor)))
-        } else if (!hasBackgroundImage) {
-            Box(modifier = Modifier.matchParentSize().background(Color(keyboardTheme.backgroundColor)))
-        } else {
-            Box(modifier = Modifier.matchParentSize().background(Color(keyboardTheme.backgroundColor).copy(alpha = 1f - keyboardTheme.backgroundOpacity)))
-        }
-
-        val navBarBottomDp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
-
-        val mainSectionAlpha by animateFloatAsState(
-            targetValue = if (isFullPanel && !isEmojiSearchActive) 0f else 1f,
-            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-            label = "main_section_fade"
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (isFullPanel && !isEmojiSearchActive) Modifier else Modifier.navigationBarsPadding())
-        ) {
+            // Capa 1: Registro del Backdrop (Imagen de fondo o Gradiente Ambiental para el tema Glass)
+            val img = blurredBitmap ?: backgroundBitmap
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
+                    .matchParentSize()
+                    .layerBackdrop(keyboardBackdrop)
             ) {
-                // Capa 1: Columna Ancla que determina la altura total exacta (46dp + Teclado + BottomOffset)
-                Column(
+                if (img != null) {
+                    Image(
+                        bitmap = img.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(keyboardTheme.backgroundOpacity)
+                            .graphicsLayer {
+                                if (keyboardTheme.parallaxEffect) {
+                                    val parallaxLimit = 0.10f
+                                    val scale = 1.0f + parallaxLimit
+                                    val maxShiftX = (size.width * parallaxLimit) / 2f
+                                    val maxShiftY = (size.height * parallaxLimit) / 2f
+
+                                    val offset = parallaxOffsetState.value
+                                    translationX = offset.x * maxShiftX
+                                    translationY = offset.y * maxShiftY
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                            },
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(if (isGlassTheme) Color.Transparent else Color(keyboardTheme.backgroundColor))
+                    )
+                }
+            }
+
+            // Capa 2: Efecto Liquid Glass Muestreando el Backdrop Registrado
+            if (isGlassTheme) {
+                val isDarkText = Color(keyboardTheme.keyTextColor).luminance() < 0.5f
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .liquidGlass(
+                            config = glassConfig.copy(
+                                surfaceOpacity = 0.08f,
+                                surfaceTintColor = if (isDarkText) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+                            ),
+                            shape = glassShape,
+                            applyEdgeEffects = true
+                        )
+                )
+            } else if (hasBackgroundImage) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color(keyboardTheme.backgroundColor).copy(alpha = 1f - keyboardTheme.backgroundOpacity))
+                )
+            }
+
+            val navBarBottomDp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value.toInt()
+
+            val mainSectionAlpha by animateFloatAsState(
+                targetValue = if (isFullPanel && !isSearchActive) 0f else 1f,
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                label = "main_section_fade"
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (isFullPanel && !isSearchActive) Modifier else Modifier.navigationBarsPadding())
+            ) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .alpha(mainSectionAlpha)
+                        .wrapContentHeight()
                 ) {
-                    Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
-                        SuggestionsBarSection(viewModel, keyboardTheme)
-                    }
-
-                    Box(
+                    // Capa 1: Columna Ancla que determina la altura total exacta (46dp + Teclado + BottomOffset)
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .wrapContentHeight(),
-                        contentAlignment = Alignment.TopCenter
+                            .alpha(mainSectionAlpha)
                     ) {
-                        KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
-                        if (!isFullPanel || isEmojiSearchActive) {
-                            PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset, navBarBottomDp)
+                        Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
+                            SuggestionsBarSection(viewModel, keyboardTheme)
                         }
-                    }
 
-                    val totalBottomSpacerHeight = if (isFullPanel && !isEmojiSearchActive) (bottomOffset + navBarBottomDp) else bottomOffset
-                    if (totalBottomSpacerHeight > 0) {
-                        Spacer(modifier = Modifier.fillMaxWidth().height(totalBottomSpacerHeight.dp))
-                    }
-                }
-
-                // Capa 2: Panel de Emojis a pantalla completa con Animación Material 3 Expressive y Shadow Mask
-                AnimatedContent(
-                    targetState = isFullPanel && !isEmojiSearchActive,
-                    transitionSpec = {
-                        if (targetState) {
-                            (slideInVertically(
-                                initialOffsetY = { (it * 0.18f).toInt() },
-                                animationSpec = spring(
-                                    dampingRatio = 0.82f,
-                                    stiffness = 380f
-                                )
-                            ) + scaleIn(
-                                initialScale = 0.93f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.82f,
-                                    stiffness = 380f
-                                )
-                            ) + fadeIn(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing))).togetherWith(
-                                fadeOut(animationSpec = tween(200, easing = FastOutLinearInEasing))
-                            )
-                        } else {
-                            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)).togetherWith(
-                                slideOutVertically(
-                                    targetOffsetY = { (it * 0.12f).toInt() },
-                                    animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
-                                ) + scaleOut(
-                                    targetScale = 0.95f,
-                                    animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
-                                ) + fadeOut(animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing))
-                            )
-                        }
-                    },
-                    label = "m3_expressive_emoji_transition",
-                    modifier = Modifier.matchParentSize()
-                ) { showEmojiPanel ->
-                    if (showEmojiPanel) {
-                    val baseThemeColor = Color(keyboardTheme.backgroundColor)
-
-                    val topShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to baseThemeColor.copy(alpha = 0.55f),
-                                0.6f to baseThemeColor.copy(alpha = 0.20f),
-                                1.0f to Color.Transparent
-                            )
-                        )
-                    }
-
-                    val bottomShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to Color.Transparent,
-                                0.3f to baseThemeColor.copy(alpha = 0.40f),
-                                1.0f to baseThemeColor.copy(alpha = 0.82f)
-                            )
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    ) {
-                        // 1. El Panel de Emojis ocupa la altura total de la capa base
-                        PanelsSection(viewModel, keyboardTheme, hazeState, bottomOffset, navBarBottomDp)
-
-                        // 2. Barra de Sugerencias Flotante Superior con Máscara de Sombra
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
                                 .fillMaxWidth()
-                                .height(58.dp)
-                                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                                .background(topShadowMaskBrush)
+                                .wrapContentHeight(),
+                            contentAlignment = Alignment.TopCenter
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
-                                SuggestionsBarSection(viewModel, keyboardTheme)
+                            KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
+                            if (!isFullPanel || isSearchActive) {
+                                PanelsSection(viewModel, keyboardTheme, bottomOffset, navBarBottomDp)
                             }
                         }
 
-                        // 3. Margen Inferior Flotante con Máscara de Sombra (Bloquea toques hacia los emojis)
-                        val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
+                        val totalBottomSpacerHeight = if (isFullPanel && !isSearchActive) (bottomOffset + navBarBottomDp) else bottomOffset
+                        if (totalBottomSpacerHeight > 0) {
+                            Spacer(modifier = Modifier.fillMaxWidth().height(totalBottomSpacerHeight.dp))
+                        }
+                    }
+
+                    // Capa 2: Panel de Emojis a pantalla completa con Animación Material 3 Expressive y Shadow Mask
+                    AnimatedContent(
+                        targetState = isFullPanel && !isSearchActive,
+                        transitionSpec = {
+                            if (targetState) {
+                                (slideInVertically(
+                                    initialOffsetY = { (it * 0.18f).toInt() },
+                                    animationSpec = spring(
+                                        dampingRatio = 0.82f,
+                                        stiffness = 380f
+                                    )
+                                ) + scaleIn(
+                                    initialScale = 0.93f,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.82f,
+                                        stiffness = 380f
+                                    )
+                                ) + fadeIn(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing))).togetherWith(
+                                    fadeOut(animationSpec = tween(200, easing = FastOutLinearInEasing))
+                                )
+                            } else {
+                                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)).togetherWith(
+                                    slideOutVertically(
+                                        targetOffsetY = { (it * 0.12f).toInt() },
+                                        animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
+                                    ) + scaleOut(
+                                        targetScale = 0.95f,
+                                        animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
+                                    ) + fadeOut(animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing))
+                                )
+                            }
+                        },
+                        label = "m3_expressive_emoji_transition",
+                        modifier = Modifier.matchParentSize()
+                    ) { showEmojiPanel ->
+                        if (showEmojiPanel) {
+                        val baseThemeColor = Color(keyboardTheme.backgroundColor)
+
+                        val bottomShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.3f to baseThemeColor.copy(alpha = 0.40f),
+                                    1.0f to baseThemeColor.copy(alpha = 0.82f)
+                                )
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                        ) {
+                            // 1. El Panel de Emojis ocupa la altura total de la capa base
+                            PanelsSection(viewModel, keyboardTheme, bottomOffset, navBarBottomDp)
+
+                            // 2. Margen Inferior Flotante con Máscara de Sombra (Bloquea toques hacia los emojis)
+                            val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
                         if (totalBottomHazeHeight > 0) {
                             Box(
                                 modifier = Modifier
@@ -295,10 +313,10 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                             )
                         }
                     }
-                    }
                 }
             }
         }
+    }
 
         // Full-Keyboard Dimming Scrim & Gboard Popup Menu when long-pressing clipboard item
         if (clipboardItemWithOptions != null) {
@@ -400,6 +418,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             }
         }
     }
+}
 }
 
 @Composable

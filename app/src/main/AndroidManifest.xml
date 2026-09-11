@@ -47,6 +47,13 @@
             android:theme="@style/Theme.HexKeyboard" />
 
         <activity
+            android:name="com.example.hexkeyboard.ui.settings.LiquidGlassSettingsActivity"
+            android:exported="false"
+            android:label="Efecto Liquid Glass"
+            android:parentActivityName="com.example.hexkeyboard.ui.settings.SettingsActivity"
+            android:theme="@style/Theme.HexKeyboard" />
+
+        <activity
             android:name="com.example.hexkeyboard.ui.settings.themes.ThemeEditorActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"

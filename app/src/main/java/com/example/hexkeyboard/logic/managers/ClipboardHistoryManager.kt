@@ -5,10 +5,11 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.datastore.preferences.core.edit
 import com.example.hexkeyboard.data.repository.ThemeUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -65,7 +66,7 @@ object ClipboardHistoryManager {
         }
     }
 
-    fun getHistory(context: Context): List<ClipboardItem> = runBlocking {
+    suspend fun getHistory(context: Context): List<ClipboardItem> = withContext(Dispatchers.IO) {
         getHistoryFlow(context).first()
     }
 

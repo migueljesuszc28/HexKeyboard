@@ -16,7 +16,7 @@ class SpellCheckerManager(
     val suggestionsState: StateFlow<List<String>> = _suggestionsState.asStateFlow()
 
     private var lastFetchJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     fun initSession() {
         // No-op: eliminada dependencia del sistema

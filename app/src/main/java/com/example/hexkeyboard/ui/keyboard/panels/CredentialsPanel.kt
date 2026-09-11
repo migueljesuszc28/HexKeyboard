@@ -1,8 +1,6 @@
 package com.example.hexkeyboard.ui.keyboard.panels
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,98 +18,137 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.example.hexkeyboard.data.model.CredentialItem
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.FeedbackManager
+import com.example.hexkeyboard.ui.component.GlassEffectConfig
+import com.example.hexkeyboard.ui.component.LocalAppBackdrop
+import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
+import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
 fun CredentialsPanel(
     credentials: List<CredentialItem>,
     onInsertText: (String) -> Unit,
+    onBack: () -> Unit = {},
     theme: KeyboardTheme,
+    viewModel: KeyboardViewModel? = null,
     bottomOffset: Int = 0,
     navBarBottomDp: Int = 0
 ) {
-    val baseThemeColor = Color(theme.backgroundColor)
+    val context = LocalContext.current
+    val searchQuery by (viewModel?.credentialsSearchQuery ?: MutableStateFlow("")).collectAsState()
+    val isCredentialsSearchActive by (viewModel?.isCredentialsSearchActive ?: MutableStateFlow(false)).collectAsState()
 
+    val filteredCredentials = remember(credentials, searchQuery) {
+        if (searchQuery.isBlank()) {
+            credentials
+        } else {
+            credentials.filter { item ->
+                item.title.contains(searchQuery, ignoreCase = true) ||
+                item.username.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    val backdrop = rememberLayerBackdrop()
+    val savedGlassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
+    val savedGlassConfig by savedGlassConfigFlow.collectAsState(initial = GlassEffectConfig())
+    val glassConfig = remember(theme, savedGlassConfig) {
+        savedGlassConfig.copy(
+            surfaceTintColor = Color(theme.keyBackgroundColor),
+            textColor = Color(theme.keyboardIconTint)
+        )
+    }
+
+    val baseThemeColor = Color(theme.backgroundColor)
     val topShadowMaskBrush = remember(theme.backgroundColor) {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.0f to baseThemeColor.copy(alpha = 0.55f),
-                0.6f to baseThemeColor.copy(alpha = 0.20f),
+                0.0f to baseThemeColor.copy(alpha = 0.40f),
+                0.6f to baseThemeColor.copy(alpha = 0.15f),
                 1.0f to Color.Transparent
             )
         )
     }
 
-    val bottomShadowMaskBrush = remember(theme.backgroundColor) {
-        Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.0f to Color.Transparent,
-                0.3f to baseThemeColor.copy(alpha = 0.40f),
-                1.0f to baseThemeColor.copy(alpha = 0.82f)
-            )
-        )
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
+    CompositionLocalProvider(
+        LocalAppBackdrop provides backdrop,
+        LocalGlassEffectConfig provides glassConfig
     ) {
-        if (credentials.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Transparent)
+        ) {
+            // Capa del Backdrop registrada para capturar y difuminar dinámicamente las tarjetas al hacer scroll
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 46.dp, bottom = (70 + bottomOffset + navBarBottomDp).dp),
-                contentAlignment = Alignment.Center
+                    .layerBackdrop(backdrop)
             ) {
-                Text(
-                    text = "No hay credenciales. Añádelas desde Ajustes.",
-                    color = Color(theme.keyTextColor).copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 52.dp,
-                    bottom = (70 + bottomOffset + navBarBottomDp).dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(credentials, key = { it.id }) { item ->
-                    CredentialKeyboardCard(item = item, theme = theme, onInsert = onInsertText)
+                if (filteredCredentials.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 52.dp, bottom = (70 + bottomOffset + navBarBottomDp).dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isNotEmpty()) "No se encontraron contraseñas." else "No hay credenciales. Añádelas desde Ajustes.",
+                            color = Color(theme.keyTextColor).copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                } else {
+                    val topPadding = if (isCredentialsSearchActive) 8.dp else 52.dp
+                    val bottomPadding = if (isCredentialsSearchActive) 8.dp else (70 + bottomOffset + navBarBottomDp).dp
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = topPadding,
+                            bottom = bottomPadding
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filteredCredentials, key = { it.id }) { item ->
+                            CredentialKeyboardCard(item = item, theme = theme, onInsert = onInsertText)
+                        }
+                    }
                 }
             }
-        }
 
-        // Top Shadow Mask (under suggestions bar)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(58.dp)
-                .background(topShadowMaskBrush)
-        )
+            if (!isCredentialsSearchActive) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(58.dp)
+                        .background(topShadowMaskBrush)
+                )
+            }
 
-        // Bottom Floating Shadow Mask
-        val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
-        if (totalBottomHazeHeight > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(totalBottomHazeHeight.dp)
-                    .background(bottomShadowMaskBrush)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { /* Absorbe toques */ }
-            )
+            // Encabezado flotante con la barra de búsqueda Liquid Glass
+            // Difumina dinámicamente las tarjetas de credenciales que se desplazan por debajo al hacer scroll
+            if (viewModel != null && !isCredentialsSearchActive) {
+                CredentialsSearchBar(
+                    viewModel = viewModel,
+                    theme = theme,
+                    query = searchQuery,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                    glassConfig = glassConfig
+                )
+            }
         }
     }
 }

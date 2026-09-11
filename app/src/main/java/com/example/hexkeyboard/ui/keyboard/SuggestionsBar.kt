@@ -28,6 +28,7 @@ import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.settings.PermissionActivity
@@ -197,15 +198,36 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
             }
         }
 
+        val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
+        val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
+        val credentialsSearchQuery by viewModel.credentialsSearchQuery.collectAsState()
+
         AnimatedVisibility(
-            visible = currentView == "emoji",
+            visible = currentView == "emoji" && isEmojiSearchActive,
             enter = fadeIn(), exit = fadeOut()
         ) {
-            EmojiSearchBar(viewModel, theme, emojiSearchQuery)
+            EmojiSearchBar(
+                viewModel = viewModel,
+                theme = theme,
+                query = emojiSearchQuery,
+                modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp)
+            )
         }
 
         AnimatedVisibility(
-            visible = currentView != "keyboard" && currentView != "emoji",
+            visible = currentView == "credentials" && isCredentialsSearchActive,
+            enter = fadeIn(), exit = fadeOut()
+        ) {
+            CredentialsSearchBar(
+                viewModel = viewModel,
+                theme = theme,
+                query = credentialsSearchQuery,
+                modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = currentView != "keyboard" && currentView != "emoji" && !(currentView == "credentials" && isCredentialsSearchActive),
             enter = fadeIn(), exit = fadeOut()
         ) {
             val title = when(currentView) {
@@ -214,7 +236,12 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 "credentials" -> "Contraseñas"
                 else -> currentView
             }
-            PanelHeader(title, theme) { viewModel.setCurrentView("keyboard") }
+            PanelHeader(
+                title = title,
+                theme = theme,
+                modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                onBack = { viewModel.setCurrentView("keyboard") }
+            )
         }
     }
 }

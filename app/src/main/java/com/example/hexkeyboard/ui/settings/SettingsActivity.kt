@@ -359,6 +359,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                             context.startActivity(Intent(context, FontSelectorActivity::class.java))
                         }
                     )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Efecto Liquid Glass", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text("Ajustar desenfoque, refracción, vibrancia y estilo de cristal") },
+                        leadingContent = { Icon(Icons.Default.WaterDrop, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable {
+                            context.startActivity(Intent(context, LiquidGlassSettingsActivity::class.java))
+                        }
+                    )
                 }
             }
 

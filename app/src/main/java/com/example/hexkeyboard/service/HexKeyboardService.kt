@@ -89,6 +89,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.text.BreakIterator
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 @AndroidEntryPoint
 class HexKeyboardService : InputMethodService(),
@@ -365,8 +366,9 @@ class HexKeyboardService : InputMethodService(),
                 is KeyboardViewModel.Action.DeleteBackward -> handleDelete()
                 is KeyboardViewModel.Action.InsertNewLine -> handleEnter()
                 is KeyboardViewModel.Action.ReplaceLastWord -> replaceLastWord(action.newWord)
-                is KeyboardViewModel.Action.SetEmojiSearchActive -> {
-                    // La lógica ya está en el ViewModel, pero si el servicio necesita reaccionar:
+                is KeyboardViewModel.Action.SetEmojiSearchActive,
+                is KeyboardViewModel.Action.SetCredentialsSearchActive -> {
+                    // La lógica ya se maneja en el ViewModel
                 }
                 is KeyboardViewModel.Action.OpenSettings -> {
                     val intent = when (action.type) {
@@ -417,8 +419,15 @@ class HexKeyboardService : InputMethodService(),
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterReceiver(wallpaperReceiver)
-        clipboardManager.removePrimaryClipChangedListener(clipboardListener)
+        try {
+            unregisterReceiver(wallpaperReceiver)
+        } catch (_: Exception) {}
+        if (::clipboardManager.isInitialized) {
+            try {
+                clipboardManager.removePrimaryClipChangedListener(clipboardListener)
+            } catch (_: Exception) {}
+        }
+        parallaxSensorManager.stop()
         spellCheckerManager.closeSession()
         voiceRecognitionHelper.destroy()
         serviceScope.cancel()
@@ -1087,13 +1096,14 @@ class HexKeyboardService : InputMethodService(),
         }
     }
 
+    private val stickyEmojiCache = ConcurrentHashMap<String, String>()
+
     fun getStickyVariant(canonicalEmoji: String): String? {
-        return runBlocking {
-            ThemeUtils.getDataStore(this@HexKeyboardService).data.first()[stringPreferencesKey("sticky_emoji_$canonicalEmoji")]
-        }
+        return stickyEmojiCache[canonicalEmoji]
     }
 
     fun saveStickyVariant(canonicalEmoji: String, variant: String) {
+        stickyEmojiCache[canonicalEmoji] = variant
         serviceScope.launch {
             ThemeUtils.getDataStore(this@HexKeyboardService).edit { prefs ->
                 prefs[stringPreferencesKey("sticky_emoji_$canonicalEmoji")] = variant

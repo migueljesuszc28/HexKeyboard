@@ -192,22 +192,32 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         invalidate()
     }
 
+    private var bgLoadJob: Job? = null
+
     private fun loadBackgroundImage(uriString: String?, blurRadius: Float) {
+        bgLoadJob?.cancel()
         if (uriString == null) {
             backgroundImage?.recycle(); backgroundBlurImage?.recycle()
             backgroundImage = null; backgroundBlurImage = null
+            invalidate()
             return
         }
-        try {
-            val uri = Uri.parse(uriString)
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                val original = BitmapFactory.decodeStream(inputStream)
-                backgroundImage?.recycle(); backgroundBlurImage?.recycle()
-                backgroundImage = original
-                backgroundBlurImage = if (blurRadius > 0) ThemeUtils.blurBitmap(original, blurRadius) else null
+        bgLoadJob = viewScope.launch(Dispatchers.IO) {
+            try {
+                val uri = Uri.parse(uriString)
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val original = BitmapFactory.decodeStream(inputStream)
+                    val blurred = if (blurRadius > 0 && original != null) ThemeUtils.blurBitmap(original, blurRadius) else null
+                    withContext(Dispatchers.Main) {
+                        backgroundImage?.recycle(); backgroundBlurImage?.recycle()
+                        backgroundImage = original
+                        backgroundBlurImage = blurred
+                        invalidate()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HexKB", "Error loading background image", e)
             }
-        } catch (e: Exception) {
-            Log.e("HexKB", "Error loading background image", e)
         }
     }
 
