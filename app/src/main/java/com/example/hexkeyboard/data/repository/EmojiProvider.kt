@@ -11,6 +11,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
+import java.io.File
+import java.text.Normalizer
 
 @Serializable
 data class EmojibaseItem(
@@ -73,10 +75,17 @@ object EmojiProvider {
         ) : EmojiGridItem()
     }
 
+    private data class EmojiSearchEntry(
+        val unicode: String,
+        val normalizedLabel: String,
+        val keywords: Set<String>,
+        val order: Int
+    )
+
     private var allEmojis: List<EmojibaseItem> = emptyList()
     private val emojiToFamily = mutableMapOf<String, EmojiFamily>()
     private var emojiMap: Map<String, EmojibaseItem> = emptyMap()
-    private val keywordIndex = mutableMapOf<String, MutableSet<String>>()
+    private val searchEntries = mutableListOf<EmojiSearchEntry>()
     private val skinToneRegex = "[\uD83C\uDFFB-\uD83C\uDFFF]".toRegex()
 
     var categories: List<EmojiCategory> = emptyList()
@@ -100,6 +109,68 @@ object EmojiProvider {
         "Objetos" to "💡", "Símbolos" to "🔣", "Banderas" to "🏳️"
     )
 
+    private val countryAliases = mapOf(
+        "US" to listOf("eeuu", "usa", "estados unidos", "america"),
+        "ES" to listOf("espana", "españa", "spain"),
+        "MX" to listOf("mexico", "méxico"),
+        "AR" to listOf("argentina"),
+        "CO" to listOf("colombia"),
+        "CL" to listOf("chile"),
+        "PE" to listOf("peru", "perú"),
+        "VE" to listOf("venezuela"),
+        "BR" to listOf("brasil", "brazil"),
+        "EC" to listOf("ecuador"),
+        "GT" to listOf("guatemala"),
+        "CU" to listOf("cuba"),
+        "PR" to listOf("puerto rico"),
+        "UY" to listOf("uruguay"),
+        "BO" to listOf("bolivia"),
+        "PY" to listOf("paraguay"),
+        "CR" to listOf("costa rica"),
+        "PA" to listOf("panama", "panamá"),
+        "DO" to listOf("dominicana", "republica dominicana", "república dominicana"),
+        "HN" to listOf("honduras"),
+        "NI" to listOf("nicaragua"),
+        "SV" to listOf("el salvador", "salvador"),
+        "CA" to listOf("canada", "canadá"),
+        "FR" to listOf("francia", "france"),
+        "DE" to listOf("alemania", "germany"),
+        "IT" to listOf("italia", "italy"),
+        "JP" to listOf("japon", "japón", "japan"),
+        "CN" to listOf("china"),
+        "GB" to listOf("inglaterra", "reino unido", "uk", "gran bretaña"),
+        "RU" to listOf("rusia", "russia"),
+        "KR" to listOf("corea", "corea del sur", "korea"),
+        "KP" to listOf("corea del norte"),
+        "UA" to listOf("ucrania", "ukraine"),
+        "PT" to listOf("portugal"),
+        "NL" to listOf("paises bajos", "países bajos", "holanda"),
+        "BE" to listOf("belgica", "bélgica"),
+        "CH" to listOf("suiza"),
+        "AT" to listOf("austria"),
+        "GR" to listOf("grecia"),
+        "TR" to listOf("turquia", "turquía"),
+        "MA" to listOf("marruecos"),
+        "EG" to listOf("egipto"),
+        "ZA" to listOf("sudafrica", "sudáfrica"),
+        "AU" to listOf("australia"),
+        "NZ" to listOf("nueva zelanda")
+    )
+
+    private val stopWords = setOf(
+        "de", "del", "la", "el", "los", "las", "un", "una", "unos", "unas", "con", "en", "y", "o", "para", "por", "mi", "su"
+    )
+
+    fun normalizeText(text: String): String {
+        if (text.isEmpty()) return ""
+        val temp = Normalizer.normalize(text, Normalizer.Form.NFD)
+        val noDiacritics = temp.replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+        return noDiacritics.lowercase()
+            .replace(Regex("[^a-z0-9ñ\\s]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
     @Volatile
     private var isInitializing = false
 
@@ -112,13 +183,18 @@ object EmojiProvider {
         }
 
         try {
-            val jsonString = context.assets.open("emojis.json").bufferedReader().use { it.readText() }
+            val jsonString = try {
+                context.assets.open("emojis.json").bufferedReader().use { it.readText() }
+            } catch (_: Exception) {
+                val file = File("src/main/assets/emojis.json").takeIf { it.exists() }
+                    ?: File("app/src/main/assets/emojis.json")
+                file.readText()
+            }
             val json = Json { ignoreUnknownKeys = true }
             val loadedEmojis = json.decodeFromString<List<EmojibaseItem>>(jsonString)
             emojiMap = loadedEmojis.associateBy { it.unicode }
 
             // FASE 1: Identificación estricta de variaciones (Skins)
-            // Coleccionamos TODOS los unicodes que Emojibase define como variantes de otro
             val variationUnicodes = mutableSetOf<String>()
             loadedEmojis.forEach { item ->
                 item.skins?.forEach { skin -> 
@@ -127,30 +203,21 @@ object EmojiProvider {
             }
 
             // FASE 2: Agrupación por Concepto (Familias)
-            // Solo procesamos los que NO son variaciones de tono de piel ya identificadas
             val baseEmojis = loadedEmojis.filter { !variationUnicodes.contains(it.unicode) }
             
             val familiesMap = baseEmojis.groupBy { item ->
                 val hex = item.hexcode ?: ""
-                
-                // Los grupos/subgrupos de Familias y Parejas NO deben reducirse a un concepto
-                // porque contienen múltiples personas y causarían colisiones (ej. colisionar con "niño")
-                val isSocialGroup = item.subgroup in listOf(15, 16, 17) // family, person-social, person-sport (algunos casos)
+                val isSocialGroup = item.subgroup in listOf(15, 16, 17)
                 val hasMultiplePeople = hex.split("-").count { it.startsWith("1F46") || it.startsWith("1F9D") } > 1
 
                 if (isSocialGroup || hasMultiplePeople) {
-                    "social_${item.unicode}" // Mantener como elemento único
+                    "social_${item.unicode}"
                 } else {
-                    // Identificar si es una profesión o rol basado en una persona (ej. Piloto = Persona + Avión)
                     val isProfession = hex.contains("200D") && (hex.startsWith("1F468") || hex.startsWith("1F469") || hex.startsWith("1F9D1"))
-
-                    // Normalización agresiva solo para profesiones y actividades individuales
                     val conceptHex = hex.replace("-FE0F", "")
                                        .replace(Regex("-200D-264[02]"), "")
                                        .replace(Regex("(1F468|1F469|1F9D1)-200D-"), "")
                     
-                    // Usar namespaces diferentes para evitar que el objeto solo (ej. Cohete) 
-                    // colisione con la profesión que lo usa (ej. Astronauta)
                     if (isProfession) "profession_$conceptHex" else "family_$conceptHex"
                 }
             }
@@ -165,7 +232,6 @@ object EmojiProvider {
 
                 members.forEach { m ->
                     val hex = m.hexcode ?: ""
-                    // Identificación de género basada en el estándar ZWJ de Emojibase
                     when {
                         hex.contains("2642") || hex.startsWith("1F468") -> male = m.unicode
                         hex.contains("2640") || hex.startsWith("1F469") -> female = m.unicode
@@ -173,18 +239,15 @@ object EmojiProvider {
                     }
                 }
 
-                // El representante principal (Root) es el neutral, o el primero que encontremos
                 val root = neutral ?: male ?: female ?: members.first().unicode
                 rootsToInclude.add(root)
 
-                // Construir la familia con todas las variaciones posibles (incluyendo skins de cada miembro)
                 val allVars = members.flatMap { m ->
                     listOf(m.unicode) + (m.skins?.map { it.unicode } ?: emptyList())
                 }.distinct()
 
                 val family = EmojiFamily(neutral, male, female, allVars)
                 
-                // Mapear cada miembro (y sus skins) a esta familia única
                 members.forEach { m ->
                     emojiToFamily[m.unicode] = family
                     m.skins?.forEach { skin -> emojiToFamily[skin.unicode] = family }
@@ -195,15 +258,10 @@ object EmojiProvider {
             val categoryList = mutableListOf<EmojiCategory>()
             categoryList.add(EmojiCategory("Recientes", "🕒", emptyList()))
 
-            // Reiniciar índice
-            keywordIndex.clear()
+            searchEntries.clear()
 
             groupNames.forEach { (groupId, name) ->
                 val emojisInGroup = loadedEmojis.filter { it.group == groupId }
-                
-                // Solo incluir en el panel principal los que marcamos como Roots.
-                // Ordenamos primero por subgrupo (ej: manos, partes del cuerpo, roles) 
-                // y luego por su orden interno para una navegación lógica estilo Gboard.
                 val filteredUnicodes = emojisInGroup
                     .filter { rootsToInclude.contains(it.unicode) }
                     .sortedWith(compareBy({ it.subgroup ?: 0 }, { it.order ?: 0 }))
@@ -214,20 +272,46 @@ object EmojiProvider {
                 }
             }
             
-            // Llenar el índice de búsqueda con las familias para evitar resultados duplicados
-            rootsToInclude.forEach { rootUnicode ->
-                val item = emojiMap[rootUnicode] ?: return@forEach
+            // FASE 4: Índice de Búsqueda Avanzado
+            val targetUnicodes = (rootsToInclude + loadedEmojis.map { it.unicode }).distinct()
+            
+            targetUnicodes.forEach { unicode ->
+                val item = emojiMap[unicode] ?: return@forEach
+                val normLabel = normalizeText(item.label)
                 val keywords = mutableSetOf<String>()
-                keywords.add(item.label.lowercase())
-                item.tags?.forEach { keywords.add(it.lowercase()) }
-                
-                keywords.forEach { kw ->
-                    kw.split(" ", "-", "_").forEach { word ->
-                        if (word.length >= 2) {
-                            keywordIndex.getOrPut(word) { mutableSetOf() }.add(rootUnicode)
-                        }
+
+                normLabel.split(" ").filter { it.isNotEmpty() }.forEach { keywords.add(it) }
+
+                item.tags?.forEach { tag ->
+                    val normTag = normalizeText(tag)
+                    normTag.split(" ").filter { it.isNotEmpty() }.forEach { keywords.add(it) }
+
+                    val upperTag = tag.uppercase()
+                    countryAliases[upperTag]?.forEach { alias ->
+                        val normAlias = normalizeText(alias)
+                        normAlias.split(" ").filter { it.isNotEmpty() }.forEach { keywords.add(it) }
                     }
                 }
+
+                if (normLabel.startsWith("bandera")) {
+                    keywords.add("bandera")
+                    keywords.add("banderas")
+                    keywords.add("pais")
+                    keywords.add("paises")
+                    val countryPart = normLabel.removePrefix("bandera").trim()
+                    if (countryPart.isNotEmpty()) {
+                        countryPart.split(" ").filter { it.isNotEmpty() }.forEach { keywords.add(it) }
+                    }
+                }
+
+                searchEntries.add(
+                    EmojiSearchEntry(
+                        unicode = unicode,
+                        normalizedLabel = normLabel,
+                        keywords = keywords,
+                        order = item.order ?: 9999
+                    )
+                )
             }
 
             categories = categoryList
@@ -246,7 +330,7 @@ object EmojiProvider {
             }
             flatGridItems = flatItems
             
-            allEmojis = emptyList() // Liberar memoria
+            allEmojis = emptyList()
             
         } catch (e: Exception) {
             Log.e("EmojiProvider", "Error cargando emojis: ${e.message}", e)
@@ -264,10 +348,6 @@ object EmojiProvider {
         return getEmojiFamily(emoji.replace(skinToneRegex, "")).neutral ?: emoji.replace(skinToneRegex, "")
     }
 
-    /**
-     * Devuelve la variante de género correspondiente (0=Neutro, 1=Masculino, 2=Femenino)
-     * para un emoji base.
-     */
     fun getGenderedVariant(emoji: String, genderIndex: Int): String {
         val family = getEmojiFamily(emoji.replace(skinToneRegex, ""))
         return when (genderIndex) {
@@ -277,10 +357,6 @@ object EmojiProvider {
         } ?: emoji
     }
 
-    /**
-     * Devuelve las variaciones organizadas en filas (por género/rol) y columnas (por tono de piel).
-     * Solo incluye variaciones que sean realmente distintas al emoji base.
-     */
     fun getEmojiVariationGrid(emoji: String): List<List<String>> {
         val family = getEmojiFamily(emoji)
         val roots = listOfNotNull(family.neutral, family.male, family.female).distinct()
@@ -288,10 +364,9 @@ object EmojiProvider {
         val grid = roots.map { root ->
             skinToneModifiers.map { modifier ->
                 applySkinTone(root, modifier)
-            }.distinct() // Eliminar duplicados en la fila (si no soporta tonos de piel)
+            }.distinct()
         }.filter { it.isNotEmpty() }
 
-        // Si el resultado es solo una celda igual al emoji original, no hay variaciones reales
         if (grid.size == 1 && grid[0].size == 1) return emptyList()
         
         return grid
@@ -300,8 +375,6 @@ object EmojiProvider {
     fun hasVariations(emoji: String): Boolean {
         val grid = getEmojiVariationGrid(emoji)
         if (grid.isEmpty()) return false
-        
-        // Contar cuántos emojis únicos hay en total en el grid
         val uniqueCount = grid.flatten().distinct().size
         return uniqueCount > 1
     }
@@ -336,19 +409,72 @@ object EmojiProvider {
     }
 
     fun searchEmojis(query: String): List<String> {
-        val q = query.trim().lowercase()
-        if (q.isEmpty()) return emptyList()
-        
-        // Búsqueda Indexada (O(1) por palabra) en lugar de búsqueda lineal
-        val queryWords = q.split(" ", "-", "_").filter { it.length >= 2 }
-        if (queryWords.isEmpty()) return emptyList()
+        val normQuery = normalizeText(query)
+        if (normQuery.isEmpty()) return emptyList()
 
-        var results: Set<String>? = null
-        queryWords.forEach { word ->
-            val matches = keywordIndex[word] ?: emptySet()
-            results = if (results == null) matches else results!!.intersect(matches)
+        val allTokens = normQuery.split(" ").filter { it.isNotEmpty() }
+        if (allTokens.isEmpty()) return emptyList()
+
+        val tokens = if (allTokens.size > 1) {
+            val filtered = allTokens.filter { !stopWords.contains(it) }
+            if (filtered.isNotEmpty()) filtered else allTokens
+        } else {
+            allTokens
         }
-        
-        return results?.toList() ?: emptyList()
+
+        data class ScoredEmoji(val unicode: String, val score: Int, val order: Int)
+
+        val scoredResults = mutableListOf<ScoredEmoji>()
+
+        for (entry in searchEntries) {
+            var score = 0
+
+            if (entry.normalizedLabel == normQuery) {
+                score += 300
+            } else if (entry.normalizedLabel.startsWith(normQuery)) {
+                score += 200
+            } else if (entry.normalizedLabel.contains(normQuery)) {
+                score += 120
+            }
+
+            var matchedTokenCount = 0
+
+            for (token in tokens) {
+                var tokenMatched = false
+
+                for (kw in entry.keywords) {
+                    if (kw == token) {
+                        score += 80
+                        tokenMatched = true
+                        break
+                    } else if (kw.startsWith(token)) {
+                        score += 50
+                        tokenMatched = true
+                        break
+                    } else if (kw.contains(token)) {
+                        score += 25
+                        tokenMatched = true
+                        break
+                    }
+                }
+
+                if (tokenMatched) {
+                    matchedTokenCount++
+                }
+            }
+
+            if (matchedTokenCount == tokens.size) {
+                score += 100
+            }
+
+            if (score > 0) {
+                scoredResults.add(ScoredEmoji(entry.unicode, score, entry.order))
+            }
+        }
+
+        return scoredResults
+            .sortedWith(compareByDescending<ScoredEmoji> { it.score }.thenBy { it.order })
+            .map { it.unicode }
+            .distinct()
     }
 }
