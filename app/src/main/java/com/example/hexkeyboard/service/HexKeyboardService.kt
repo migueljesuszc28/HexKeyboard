@@ -153,6 +153,7 @@ class HexKeyboardService : InputMethodService(),
     }
 
     internal var mHexKeyboardView: HexKeyboardView? = null
+    private var lastSwipedWord: String? = null
     private var mComposeView: ComposeView? = null
 
     private lateinit var viewModel: KeyboardViewModel
@@ -686,6 +687,16 @@ class HexKeyboardService : InputMethodService(),
         }
         
         ic.beginBatchEdit()
+
+        if (text in listOf(".", ",", "!", "?", ";", ":")) {
+            val textBefore = ic.getTextBeforeCursor(2, 0)
+            if (textBefore != null && textBefore.endsWith(" ")) {
+                ic.deleteSurroundingText(1, 0)
+            }
+            lastSwipedWord = null
+        } else if (text != " ") {
+            lastSwipedWord = null
+        }
         
         if ((text == " " || text == "." || text == "," || text == "!") && !lastKeyWasSpace) {
             val before = ic.getTextBeforeCursor(40, 0) ?: ""
@@ -751,6 +762,23 @@ class HexKeyboardService : InputMethodService(),
         // La lógica de borrar en búsqueda de emojis ahora se maneja en el ViewModel.
         
         val ic = currentInputConnection ?: return
+
+        if (lastSwipedWord != null) {
+            val sw = lastSwipedWord!!
+            val textBefore = ic.getTextBeforeCursor(sw.length + 1, 0)
+            if (textBefore != null && textBefore.toString() == "$sw ") {
+                mHexKeyboardView?.triggerVibration(FeedbackManager.HapticType.DELETE)
+                mHexKeyboardView?.triggerSound()
+                ic.beginBatchEdit()
+                ic.deleteSurroundingText(sw.length + 1, 0)
+                ic.endBatchEdit()
+                lastSwipedWord = null
+                updateShiftState()
+                updateSuggestions()
+                return
+            }
+            lastSwipedWord = null
+        }
 
         if (undoCorrectionOnBackspace) {
             lastAutoCorrection?.let { correction ->
@@ -879,23 +907,58 @@ class HexKeyboardService : InputMethodService(),
         updateSuggestions()
     }
 
-    fun handleGesture(points: List<PointF>, keys: List<HexLayoutEngine.Key>) {
+    fun handleLiveGesture(points: List<PointF>, keys: List<HexLayoutEngine.Key>) {
         if (points.size < 2) return
-        
+
         serviceScope.launch(Dispatchers.IO) {
             val charPoints = keys.filter { it.type == HexLayoutEngine.KeyType.CHAR && it.value.length == 1 }
                 .map { PredictionEngine.CharPoint(it.value[0], it.cx, it.cy) }
-            
-            val suggestions = predictionEngine.getGestureSuggestions(points, charPoints)
-            
+
+            val suggestions = predictionEngine.getGestureSuggestions(points, charPoints, limit = 4)
+
+            withContext(Dispatchers.Main) {
+                if (suggestions.isNotEmpty()) {
+                    viewModel.updateSuggestions(suggestions.map { it.text })
+                }
+            }
+        }
+    }
+
+    fun handleGesture(points: List<PointF>, keys: List<HexLayoutEngine.Key>) {
+        if (points.size < 2) return
+
+        serviceScope.launch(Dispatchers.IO) {
+            val charPoints = keys.filter { it.type == HexLayoutEngine.KeyType.CHAR && it.value.length == 1 }
+                .map { PredictionEngine.CharPoint(it.value[0], it.cx, it.cy) }
+
+            val suggestions = predictionEngine.getGestureSuggestions(points, charPoints, limit = 5)
+
             withContext(Dispatchers.Main) {
                 if (suggestions.isNotEmpty()) {
                     val best = suggestions.first()
-                    if (best.score > 200) {
-                        handleChar(best.text + " ")
+                    val textToCommit = if (mHexKeyboardView?.shifted == true) {
+                        best.text.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
                     } else {
-                        viewModel.updateSuggestions(suggestions.map { it.text })
+                        best.text
                     }
+
+                    if (best.confidence >= 0.12f || best.score >= 30.0) {
+                        val ic = currentInputConnection
+                        ic?.beginBatchEdit()
+                        ic?.commitText("$textToCommit ", 1)
+                        ic?.endBatchEdit()
+                        lastSwipedWord = textToCommit
+
+                        val textBefore = ic?.getTextBeforeCursor(40, 0) ?: ""
+                        val words = textBefore.split(" ", "\n", "\t").filter { it.isNotEmpty() }
+                        val prevWord = if (words.size > 1) words[words.size - 2] else null
+                        predictionEngine.learnFromInput(textToCommit, prevWord)
+
+                        if (mHexKeyboardView?.shifted == true && mHexKeyboardView?.capsLock == false) {
+                            mHexKeyboardView?.shifted = false
+                        }
+                    }
+                    viewModel.updateSuggestions(suggestions.map { it.text })
                 }
             }
         }

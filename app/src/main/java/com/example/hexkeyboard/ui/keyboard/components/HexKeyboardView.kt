@@ -50,6 +50,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         fun onKeyClick(key: HexLayoutEngine.Key) {}
         fun onParallaxChange(x: Float, y: Float) {}
         fun onGesture(points: List<PointF>) {}
+        fun onLiveGesture(points: List<PointF>) {}
     }
 
     var listener: Listener? = null
@@ -167,7 +168,8 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private var isGestureActive = false
     private var gestureStartX = 0f
     private var gestureStartY = 0f
-    private val gestureThreshold get() = (ViewConfiguration.get(context).scaledTouchSlop * 4.5f).coerceAtLeast(60f)
+    private var lastLiveGestureTime = 0L
+    private val gestureThreshold get() = if (keys.isNotEmpty()) (keys.first().rx * 0.45f).coerceAtLeast(40f) else 50f
 
     private val pGesture = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -459,7 +461,47 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 drawKey(canvas, key)
             }
         }
-        if (isGestureActive && !gesturePath.isEmpty) canvas.drawPath(gesturePath, pGesture)
+        if (isGestureActive && gesturePoints.size >= 2) {
+            drawSmoothGestureTrail(canvas)
+        }
+    }
+
+    private fun drawSmoothGestureTrail(canvas: Canvas) {
+        val count = gesturePoints.size
+        if (count < 2) return
+        val activeColor = renderer.colorShiftActive
+        val alphaBase = Color.alpha(activeColor)
+        val red = Color.red(activeColor)
+        val green = Color.green(activeColor)
+        val blue = Color.blue(activeColor)
+
+        val trailPath = Path()
+        for (i in 0 until count - 1) {
+            val p1 = gesturePoints[i]
+            val p2 = gesturePoints[i + 1]
+
+            val progress = (i + 1).toFloat() / count.toFloat()
+            val segAlpha = (alphaBase * (0.25f + 0.75f * progress * progress)).toInt().coerceIn(0, 255)
+            val segWidth = 4f + 14f * progress
+
+            pGesture.color = Color.argb(segAlpha, red, green, blue)
+            pGesture.strokeWidth = segWidth
+
+            trailPath.reset()
+            if (i == 0) {
+                trailPath.moveTo(p1.x, p1.y)
+                trailPath.lineTo(p2.x, p2.y)
+            } else {
+                val pPrev = gesturePoints[i - 1]
+                val mid1X = (pPrev.x + p1.x) / 2f
+                val mid1Y = (pPrev.y + p1.y) / 2f
+                val mid2X = (p1.x + p2.x) / 2f
+                val mid2Y = (p1.y + p2.y) / 2f
+                trailPath.moveTo(mid1X, mid1Y)
+                trailPath.quadTo(p1.x, p1.y, mid2X, mid2Y)
+            }
+            canvas.drawPath(trailPath, pGesture)
+        }
     }
 
     private fun drawKey(canvas: Canvas, key: HexLayoutEngine.Key) {
@@ -677,10 +719,26 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             listener?.onChar(if (shifted || capsLock) "Ñ" else "ñ"); if (shifted && !capsLock) shifted = false
                             invalidate()
                         } else if (!isGestureActive && totalDist > gestureThreshold) {
-                            isGestureActive = true; cancelKeyLongPress(); hidePopup()
+                            isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                         }
-                    } else if (!isGestureActive && totalDist > gestureThreshold) { isGestureActive = true; cancelKeyLongPress(); hidePopup() }
-                    if (isGestureActive) { gesturePoints.add(PointF(x, y)); gesturePath.lineTo(x, y); invalidate() }
+                    } else if (!isGestureActive && totalDist > gestureThreshold) {
+                        isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
+                    }
+                    if (isGestureActive) {
+                        val lastP = gesturePoints.lastOrNull()
+                        if (lastP == null || hypot(x - lastP.x, y - lastP.y) > 8f) {
+                            gesturePoints.add(PointF(x, y))
+                            gesturePath.lineTo(x, y)
+                        }
+                        val now = System.currentTimeMillis()
+                        if (now - lastLiveGestureTime > 60) {
+                            lastLiveGestureTime = now
+                            if (gesturePoints.size >= 3) {
+                                listener?.onLiveGesture(ArrayList(gesturePoints))
+                            }
+                        }
+                        invalidate()
+                    }
                 }
                 for (i in 0 until e.pointerCount) {
                     val pid = e.getPointerId(i)

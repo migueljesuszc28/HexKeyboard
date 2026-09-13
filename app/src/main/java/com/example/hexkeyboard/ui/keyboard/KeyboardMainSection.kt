@@ -106,6 +106,9 @@ fun KeyboardMainSection(
                     override fun onGesture(points: List<PointF>) {
                         service?.handleGesture(points, allKeys)
                     }
+                    override fun onLiveGesture(points: List<PointF>) {
+                        service?.handleLiveGesture(points, allKeys)
+                    }
                     override fun onKeyClick(key: HexLayoutEngine.Key) {
                         when(key.type) {
                             HexLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")

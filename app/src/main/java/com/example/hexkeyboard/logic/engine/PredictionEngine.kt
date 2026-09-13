@@ -459,34 +459,40 @@ class PredictionEngine(private val context: Context) {
     }
 
     /**
-     * Algoritmo de coincidencia de gestos (Glide Typing).
-     * Evalúa palabras del diccionario contra la trayectoria del dedo.
+     * Algoritmo de coincidencia de gestos (Glide Typing) mejorado.
+     * Soporta escalado por radio de hexágono, orden temporal monótono e inflexiones.
      */
     fun getGestureSuggestions(
         points: List<PointF>,
         keyMap: List<CharPoint>,
         limit: Int = 5
     ): List<Suggestion> {
-        if (points.size < 2 || !isBaseLoaded) return emptyList()
+        if (points.size < 2 || !isBaseLoaded || keyMap.isEmpty()) return emptyList()
 
-        val results = mutableListOf<Suggestion>()
-        val startPoint = points.first()
-        val endPoint = points.last()
+        val hexRadius = computeHexRadius(keyMap)
+        val resampledPoints = resampleGesturePoints(points, 35)
+        if (resampledPoints.size < 2) return emptyList()
 
-        // 1. Filtrar teclas por proximidad a los puntos de inicio y fin para reducir el espacio de búsqueda
-        val startChars = keyMap.filter { hypot(it.x - startPoint.x, it.y - startPoint.y) < 150f }.map { it.char }
-        val endChars = keyMap.filter { hypot(it.x - endPoint.x, it.y - endPoint.y) < 150f }.map { it.char }
+        val cornerPoints = findCornerPoints(resampledPoints)
+        val startPoint = resampledPoints.first()
+        val endPoint = resampledPoints.last()
+
+        val maxEdgeDist = hexRadius * 2.5f
+        val startChars = keyMap.filter { hypot(it.x - startPoint.x, it.y - startPoint.y) <= maxEdgeDist }.map { it.char }.toSet()
+        val endChars = keyMap.filter { hypot(it.x - endPoint.x, it.y - endPoint.y) <= maxEdgeDist }.map { it.char }.toSet()
 
         if (startChars.isEmpty() || endChars.isEmpty()) return emptyList()
 
-        // 2. Buscar en memoria
-        searchGestureInMemory(trie, "", points, keyMap, results)
+        val results = mutableListOf<Suggestion>()
 
-        // 3. Buscar en binario
+        // 1. Buscar en memoria
+        searchGestureInMemory(trie, "", resampledPoints, cornerPoints, keyMap, results, hexRadius, 0, startChars, endChars)
+
+        // 2. Buscar en binario
         baseDictBuffer?.let { buffer ->
             val dup = buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
             dup.position(baseDictHeaderSize)
-            searchGestureInBinary(dup, "", points, keyMap, results)
+            searchGestureInBinary(dup, "", resampledPoints, cornerPoints, keyMap, results, hexRadius, 0, startChars, endChars)
         }
 
         return results
@@ -495,26 +501,126 @@ class PredictionEngine(private val context: Context) {
             .take(limit)
     }
 
+    private fun computeHexRadius(keyMap: List<CharPoint>): Float {
+        if (keyMap.size < 2) return 100f
+        var minDistSum = 0f
+        var count = 0
+        for (i in keyMap.indices) {
+            var minD = Float.MAX_VALUE
+            for (j in keyMap.indices) {
+                if (i == j) continue
+                val d = hypot(keyMap[i].x - keyMap[j].x, keyMap[i].y - keyMap[j].y)
+                if (d in 1f..<minD) {
+                    minD = d
+                }
+            }
+            if (minD < Float.MAX_VALUE) {
+                minDistSum += minD
+                count++
+            }
+        }
+        return if (count > 0) (minDistSum / count) / 2f else 100f
+    }
+
+    private fun resampleGesturePoints(points: List<PointF>, targetCount: Int): List<PointF> {
+        val cleanPoints = mutableListOf<PointF>()
+        for (p in points) {
+            if (cleanPoints.isEmpty() || hypot(p.x - cleanPoints.last().x, p.y - cleanPoints.last().y) > 3f) {
+                cleanPoints.add(p)
+            }
+        }
+        if (cleanPoints.size <= 2) return cleanPoints
+
+        var totalLength = 0f
+        for (i in 0 until cleanPoints.size - 1) {
+            totalLength += hypot(cleanPoints[i + 1].x - cleanPoints[i].x, cleanPoints[i + 1].y - cleanPoints[i].y)
+        }
+        if (totalLength <= 0f) return cleanPoints
+
+        val interval = totalLength / (targetCount - 1)
+        val resampled = mutableListOf<PointF>()
+        resampled.add(cleanPoints.first())
+
+        var accumulated = 0f
+        var currIdx = 0
+        var currPt = cleanPoints[0]
+
+        while (currIdx < cleanPoints.size - 1 && resampled.size < targetCount) {
+            val nextPt = cleanPoints[currIdx + 1]
+            val segLen = hypot(nextPt.x - currPt.x, nextPt.y - currPt.y)
+
+            if (accumulated + segLen >= interval) {
+                val ratio = (interval - accumulated) / segLen
+                val nx = currPt.x + ratio * (nextPt.x - currPt.x)
+                val ny = currPt.y + ratio * (nextPt.y - currPt.y)
+                val newPt = PointF(nx, ny)
+                resampled.add(newPt)
+                currPt = newPt
+                accumulated = 0f
+            } else {
+                accumulated += segLen
+                currPt = nextPt
+                currIdx++
+            }
+        }
+        if (resampled.size < targetCount) {
+            resampled.add(cleanPoints.last())
+        }
+        return resampled
+    }
+
+    private fun findCornerPoints(points: List<PointF>): List<PointF> {
+        if (points.size < 3) return emptyList()
+        val corners = mutableListOf<PointF>()
+        for (i in 1 until points.size - 1) {
+            val pPrev = points[i - 1]
+            val pCurr = points[i]
+            val pNext = points[i + 1]
+
+            val v1x = pCurr.x - pPrev.x
+            val v1y = pCurr.y - pPrev.y
+            val v2x = pNext.x - pCurr.x
+            val v2y = pNext.y - pCurr.y
+
+            val len1 = hypot(v1x, v1y)
+            val len2 = hypot(v2x, v2y)
+
+            if (len1 > 0f && len2 > 0f) {
+                val dot = (v1x * v2x + v1y * v2y) / (len1 * len2)
+                if (dot < 0.75f) { // Cambio de dirección notable (> ~40 grados)
+                    corners.add(pCurr)
+                }
+            }
+        }
+        return corners
+    }
+
     private fun searchGestureInMemory(
         node: TrieNode,
         word: String,
-        points: List<PointF>,
+        resampledPoints: List<PointF>,
+        cornerPoints: List<PointF>,
         keyMap: List<CharPoint>,
-        results: MutableList<Suggestion>
+        results: MutableList<Suggestion>,
+        hexRadius: Float,
+        lastPointIndex: Int,
+        startChars: Set<Char>,
+        endChars: Set<Char>
     ) {
-        if (results.size > 100) return
+        if (results.size > 120) return
 
         if (node.isWord && word.length >= 2) {
-            val score = calculateGestureScore(word, points, keyMap, node.frequency)
+            val score = calculateGestureScore(word, resampledPoints, cornerPoints, keyMap, node.frequency, hexRadius, endChars)
             if (score > 0) {
-                results.add(Suggestion(word, score, isGesture = true, confidence = (score / 1000.0).toFloat().coerceIn(0f, 1f)))
+                val confidence = (score / 350.0).toFloat().coerceIn(0f, 1f)
+                results.add(Suggestion(word, score, isGesture = true, confidence = confidence))
             }
         }
 
         node.children.forEach { (char, child) ->
-            // Poda básica: el carácter debe aparecer en algún punto después del anterior
-            if (isCharPossibleInGesture(word, char, points, keyMap)) {
-                searchGestureInMemory(child, word + char, points, keyMap, results)
+            val nextIndex = isCharPossibleInGesture(word, char, resampledPoints, keyMap, hexRadius, lastPointIndex, startChars)
+            if (nextIndex >= 0) {
+                searchGestureInMemory(child, word + char, resampledPoints, cornerPoints, keyMap, results, hexRadius, nextIndex, startChars, endChars)
             }
         }
     }
@@ -522,92 +628,124 @@ class PredictionEngine(private val context: Context) {
     private fun searchGestureInBinary(
         buffer: ByteBuffer,
         prefix: String,
-        points: List<PointF>,
+        resampledPoints: List<PointF>,
+        cornerPoints: List<PointF>,
         keyMap: List<CharPoint>,
-        results: MutableList<Suggestion>
+        results: MutableList<Suggestion>,
+        hexRadius: Float,
+        lastPointIndex: Int,
+        startChars: Set<Char>,
+        endChars: Set<Char>
     ) {
-        if (results.size > 100) return
+        if (results.size > 120) return
 
         val count = readPtNodeCount(buffer)
         repeat(count) {
             val node = parseNextNode(buffer, prefix)
             val segment = node.word.substring(prefix.length)
 
-            // Verificar si el segmento completo es posible en el gesto
             var possible = true
             var tempWord = prefix
+            var currIndex = lastPointIndex
+
             for (ch in segment) {
-                if (!isCharPossibleInGesture(tempWord, ch, points, keyMap)) {
+                val nextIdx = isCharPossibleInGesture(tempWord, ch, resampledPoints, keyMap, hexRadius, currIndex, startChars)
+                if (nextIdx < 0) {
                     possible = false
                     break
                 }
                 tempWord += ch
+                currIndex = nextIdx
             }
 
             if (possible) {
                 if (node.isTerminal && node.word.length >= 2) {
-                    val score = calculateGestureScore(node.word, points, keyMap, node.frequency)
+                    val score = calculateGestureScore(node.word, resampledPoints, cornerPoints, keyMap, node.frequency, hexRadius, endChars)
                     if (score > 0) {
-                        results.add(Suggestion(node.word, score, isGesture = true, confidence = (score / 1000.0).toFloat().coerceIn(0f, 1f)))
+                        val confidence = (score / 350.0).toFloat().coerceIn(0f, 1f)
+                        results.add(Suggestion(node.word, score, isGesture = true, confidence = confidence))
                     }
                 }
                 if (node.childrenAddr != null) {
                     val savedPos = buffer.position()
                     buffer.position(node.addressBase + node.childrenAddr)
-                    searchGestureInBinary(buffer, node.word, points, keyMap, results)
+                    searchGestureInBinary(buffer, node.word, resampledPoints, cornerPoints, keyMap, results, hexRadius, currIndex, startChars, endChars)
                     buffer.position(savedPos)
                 }
             }
         }
     }
 
-    private fun isCharPossibleInGesture(word: String, nextChar: Char, points: List<PointF>, keyMap: List<CharPoint>): Boolean {
+    private fun isCharPossibleInGesture(
+        word: String,
+        nextChar: Char,
+        resampledPoints: List<PointF>,
+        keyMap: List<CharPoint>,
+        hexRadius: Float,
+        lastPointIndex: Int,
+        startChars: Set<Char>
+    ): Int {
         if (word.isEmpty()) {
-            // El primer carácter debe estar cerca del inicio
-            val cp = keyMap.find { it.char == nextChar } ?: return false
-            return hypot(cp.x - points.first().x, cp.y - points.first().y) < 180f
+            if (nextChar !in startChars) return -1
+            return 0
         }
-
-        // El siguiente carácter debe aparecer en la trayectoria después del anterior
-        // Por simplicidad, buscamos si existe algún punto que esté "cerca" de la tecla
-        val cp = keyMap.find { it.char == nextChar } ?: return false
-
-        // En un teclado hexagonal, permitimos un radio de búsqueda generoso
-        val threshold = 160f
-        return points.any { hypot(it.x - cp.x, it.y - cp.y) < threshold }
+        val cp = keyMap.find { it.char == nextChar } ?: return -1
+        val threshold = hexRadius * 2.2f
+        for (i in lastPointIndex until resampledPoints.size) {
+            if (hypot(cp.x - resampledPoints[i].x, cp.y - resampledPoints[i].y) < threshold) {
+                return i
+            }
+        }
+        return -1
     }
 
-    private fun calculateGestureScore(word: String, points: List<PointF>, keyMap: List<CharPoint>, freq: Int): Double {
-        var totalDist = 0.0
+    private fun calculateGestureScore(
+        word: String,
+        resampledPoints: List<PointF>,
+        cornerPoints: List<PointF>,
+        keyMap: List<CharPoint>,
+        freq: Int,
+        hexRadius: Float,
+        endChars: Set<Char>
+    ): Double {
+        if (word.length < 2) return 0.0
+        if (word.last() !in endChars) return 0.0
+
+        var totalNormalizedDist = 0.0
         var lastPointIdx = 0
+        var cornerMatchBonus = 0.0
 
         for (char in word) {
             val cp = keyMap.find { it.char == char } ?: return 0.0
             var minDist = Double.MAX_VALUE
             var bestIdx = lastPointIdx
 
-            // Buscamos el punto más cercano a esta tecla, empezando desde donde nos quedamos
-            for (i in lastPointIdx until points.size) {
-                val d = hypot(cp.x - points[i].x, cp.y - points[i].y).toDouble()
+            for (i in lastPointIdx until resampledPoints.size) {
+                val d = hypot(cp.x - resampledPoints[i].x, cp.y - resampledPoints[i].y).toDouble()
                 if (d < minDist) {
                     minDist = d
                     bestIdx = i
                 }
             }
-            totalDist += minDist
+            if (minDist > hexRadius * 2.5) return 0.0
+            totalNormalizedDist += minDist / hexRadius
             lastPointIdx = bestIdx
+
+            if (cornerPoints.any { hypot(cp.x - it.x, cp.y - it.y) < hexRadius * 1.2f }) {
+                cornerMatchBonus += 0.25
+            }
         }
 
-        // El último carácter debe estar cerca del final del gesto
         val lastCharPos = keyMap.find { it.char == word.last() } ?: return 0.0
-        val distToEnd = hypot(lastCharPos.x - points.last().x, lastCharPos.y - points.last().y)
-        if (distToEnd > 200f) return 0.0
+        val distToEnd = hypot(lastCharPos.x - resampledPoints.last().x, lastCharPos.y - resampledPoints.last().y)
+        if (distToEnd > hexRadius * 2.2f) return 0.0
 
-        val avgDist = totalDist / word.length
-        if (avgDist > 120.0) return 0.0
+        val avgDist = totalNormalizedDist / word.length
+        if (avgDist > 2.2) return 0.0
 
-        val proximityFactor = 1.0 / (avgDist / 50.0 + 1.0)
-        return ln(freq.toDouble() + 2.0) * proximityFactor * 100.0
+        val proximityFactor = 1.0 / (1.0 + 0.6 * avgDist)
+        val freqScore = ln(freq.toDouble() + 2.0)
+        return freqScore * proximityFactor * (1.0 + cornerMatchBonus) * 100.0
     }
 
     /**
