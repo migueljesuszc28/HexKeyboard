@@ -393,7 +393,8 @@ object ThemeUtils {
 
         val backgroundColor = colorScheme.surface.toArgb()
         val keyBackgroundColor = colorScheme.surfaceContainerHigh.toArgb()
-        val keyBackgroundPressedColor = colorScheme.surfaceContainerHighest.toArgb()
+        val actionkeybackground = colorScheme.secondaryContainer.toArgb()
+        val keyBackgroundPressedColor = colorScheme.surfaceContainer.toArgb()
         val keyTextColor = colorScheme.onSurface.toArgb()
         val keyboardIconTint = colorScheme.onSurfaceVariant.toArgb()
         val keyShiftActiveColor = colorScheme.primary.toArgb()
@@ -414,7 +415,17 @@ object ThemeUtils {
             popupTextColor = keyTextColor,
             popupSelectedBackgroundColor = keyShiftActiveColor,
             popupSelectedTextColor = colorOnPrimary,
-            individualKeyColors = emptyMap()
+            keyShiftInactiveColor = actionkeybackground,
+            deletePressedIconColor = Color.RED,
+            individualKeyColors = mapOf(
+                "ENTER" to actionkeybackground,
+                "DELETE" to actionkeybackground,
+                "SHIFT" to actionkeybackground,
+                "123" to actionkeybackground,
+                "?123" to actionkeybackground,
+                "→" to actionkeybackground,
+                "FONT_PAGE" to actionkeybackground
+            )
         )
     }
 
