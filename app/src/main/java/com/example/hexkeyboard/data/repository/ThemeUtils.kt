@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import androidx.palette.graphics.Palette
@@ -824,7 +823,7 @@ object ThemeUtils {
             popupSelectedTextColor = if (ColorUtils.calculateLuminance(shiftActive) > 0.5) Color.BLACK else Color.WHITE,
             individualKeyColors = mapOf(
                 "ENTER" to enterColor,
-                "DELETE" to Color.parseColor("#E31212")
+                "DELETE" to "#E31212".toColorInt()
             ),
             isKeyTextColorCustom = true
         )

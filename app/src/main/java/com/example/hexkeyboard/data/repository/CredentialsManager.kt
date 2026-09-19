@@ -3,6 +3,7 @@ package com.example.hexkeyboard.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.hexkeyboard.data.model.CredentialItem
@@ -33,7 +34,7 @@ object CredentialsManager {
 
     suspend fun saveCredential(context: Context, item: CredentialItem) = withContext(Dispatchers.IO) {
         val prefs = getPrefs(context)
-        prefs.edit().putString(item.id, Json.encodeToString(item)).apply()
+        prefs.edit { putString(item.id, Json.encodeToString(item)) }
     }
 
     suspend fun getCredential(context: Context, id: String): CredentialItem? = withContext(Dispatchers.IO) {
@@ -41,7 +42,7 @@ object CredentialsManager {
         prefs.getString(id, null)?.let {
             try {
                 Json.decodeFromString<CredentialItem>(it)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }
@@ -49,17 +50,17 @@ object CredentialsManager {
 
     suspend fun deleteCredential(context: Context, id: String) = withContext(Dispatchers.IO) {
         val prefs = getPrefs(context)
-        prefs.edit().remove(id).apply()
+        prefs.edit { remove(id) }
     }
 
     suspend fun getAllCredentials(context: Context): List<CredentialItem> = withContext(Dispatchers.IO) {
         val prefs = getPrefs(context)
         prefs.all.values
-            .mapNotNull { it as? String }
+            .filterIsInstance<String>()
             .mapNotNull {
                 try {
                     Json.decodeFromString<CredentialItem>(it)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     null
                 }
             }
@@ -71,11 +72,13 @@ object CredentialsManager {
         val sb = StringBuilder()
         var inQuotes = false
         for (char in line) {
-            when {
-                char == '"' -> inQuotes = !inQuotes
-                char == ',' && !inQuotes -> {
+            when (char) {
+                '"' -> inQuotes = !inQuotes
+                ',' -> if (!inQuotes) {
                     result.add(sb.toString().trim(' ', '"'))
                     sb.clear()
+                } else {
+                    sb.append(char)
                 }
                 else -> sb.append(char)
             }
@@ -142,7 +145,7 @@ object CredentialsManager {
                         )
 
                         val prefs = getPrefs(context)
-                        prefs.edit().putString(item.id, Json.encodeToString(item)).apply()
+                        prefs.edit { putString(item.id, Json.encodeToString(item)) }
                         importedCount++
                     }
                 }

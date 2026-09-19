@@ -1,6 +1,5 @@
 package com.example.hexkeyboard.service
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipDescription
@@ -8,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PointF
@@ -18,6 +16,7 @@ import android.os.Build
 import android.provider.Settings
 import android.text.InputType
 import android.text.TextUtils
+import androidx.core.net.toUri
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -1011,7 +1010,7 @@ class HexKeyboardService : InputMethodService(),
         val mimeType = item.mimeType ?: "image/png"
 
         try {
-            val imageUri = Uri.parse(imageUriString)
+            val imageUri = imageUriString.toUri()
             val editorMimeTypes = EditorInfoCompat.getContentMimeTypes(info)
             val isSupported = editorMimeTypes.any { editorMime ->
                 ClipDescription.compareMimeTypes(editorMime, mimeType) || editorMime == "*/*"
@@ -1024,10 +1023,7 @@ class HexKeyboardService : InputMethodService(),
                     null
                 )
                 
-                var flags = 0
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
-                }
+                val flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
                 
                 val committed = InputConnectionCompat.commitContent(ic, info, inputContentInfo, flags, null)
                 if (committed) {

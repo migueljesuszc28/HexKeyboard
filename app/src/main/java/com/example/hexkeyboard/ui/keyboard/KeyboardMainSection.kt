@@ -6,8 +6,6 @@ import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
