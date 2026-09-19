@@ -60,8 +60,13 @@ fun CredentialsPanel(
     val savedGlassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
     val savedGlassConfig by savedGlassConfigFlow.collectAsState(initial = GlassEffectConfig())
     val glassConfig = remember(theme, savedGlassConfig) {
+        val glassTint = if (theme.id == "m3_dynamic") {
+            Color(theme.backgroundColor)
+        } else {
+            Color(theme.keyBackgroundColor)
+        }
         savedGlassConfig.copy(
-            surfaceTintColor = Color(theme.keyBackgroundColor),
+            surfaceTintColor = glassTint,
             textColor = Color(theme.keyboardIconTint)
         )
     }

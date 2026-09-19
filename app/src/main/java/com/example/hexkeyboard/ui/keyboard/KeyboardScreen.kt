@@ -66,8 +66,13 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val glassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
     val savedGlassConfig by glassConfigFlow.collectAsState(initial = GlassEffectConfig())
     val glassConfig = remember(keyboardTheme, savedGlassConfig) {
+        val glassTint = if (keyboardTheme.id == "m3_dynamic") {
+            Color(keyboardTheme.backgroundColor)
+        } else {
+            Color(keyboardTheme.keyBackgroundColor)
+        }
         savedGlassConfig.copy(
-            surfaceTintColor = Color(keyboardTheme.keyBackgroundColor),
+            surfaceTintColor = glassTint,
             textColor = Color(keyboardTheme.keyTextColor)
         )
     }
