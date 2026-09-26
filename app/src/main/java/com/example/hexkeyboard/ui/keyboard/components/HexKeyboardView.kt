@@ -2,8 +2,7 @@ package com.example.hexkeyboard.ui.keyboard.components
 
 import android.content.Context
 import android.graphics.*
-import android.graphics.drawable.Drawable
-import android.net.Uri
+import java.util.Locale
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -11,12 +10,15 @@ import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.PopupWindow
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withSave
+import androidx.core.graphics.withTranslation
+import androidx.core.net.toUri
 import androidx.datastore.preferences.core.Preferences
 import androidx.dynamicanimation.animation.FloatPropertyCompat
 import androidx.dynamicanimation.animation.SpringAnimation
@@ -161,15 +163,25 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private var parallaxY = 0f
     private var currentBackgroundUri: String? = null
     private var currentBackgroundBlur: Float = -1f
-    private val parallaxLimit = 0.10f
 
     private val gesturePath = Path()
     private val gesturePoints = mutableListOf<PointF>()
     private var isGestureActive = false
+    private var isDissolvingTrail = false
+    private var dissolveStartTime = 0L
+    private var isShiftGesture = false
     private var gestureStartX = 0f
     private var gestureStartY = 0f
     private var lastLiveGestureTime = 0L
     private val gestureThreshold get() = if (keys.isNotEmpty()) (keys.first().rx * 0.45f).coerceAtLeast(40f) else 50f
+
+    var livePredictedWord: String = ""
+        set(value) {
+            if (field != value) {
+                field = value
+                if (isGestureActive) invalidate()
+            }
+        }
 
     private val pGesture = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -177,6 +189,19 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         strokeJoin = Paint.Join.ROUND
         strokeWidth = 12f
     }
+
+    private val pFloatingText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 34f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+    private val pFloatingBg = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pFloatingShadow = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pFloatingStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+    private val floatingRect = RectF()
 
     fun setParallaxOffset(x: Float, y: Float) {
         parallaxX = x; parallaxY = y; invalidate()
@@ -206,7 +231,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
         bgLoadJob = viewScope.launch(Dispatchers.IO) {
             try {
-                val uri = Uri.parse(uriString)
+                val uri = uriString.toUri()
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     val original = BitmapFactory.decodeStream(inputStream)
                     val blurred = if (blurRadius > 0 && original != null) ThemeUtils.blurBitmap(original, blurRadius) else null
@@ -231,11 +256,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private var keyBounceEnabled = true
+    private var gestureTypingEnabled = true
 
     private fun applyPrefs(prefs: Preferences) {
         showKeyPopup = prefs[ThemeUtils.SHOW_KEY_POPUP] ?: true
         showLongPressIndicators = prefs[ThemeUtils.SHOW_LONG_PRESS_INDICATORS] ?: true
         keyBounceEnabled = prefs[ThemeUtils.KEY_BOUNCE_ANIMATION] ?: true
+        gestureTypingEnabled = prefs[ThemeUtils.GESTURE_TYPING_ENABLED] ?: true
         popupScale = (prefs[ThemeUtils.POPUP_SCALE] ?: 95) / 100f
         vibrationEnabled = prefs[ThemeUtils.KEYBOARD_VIBRATION] ?: true
         soundEnabled = prefs[ThemeUtils.KEYBOARD_SOUND] ?: true
@@ -342,8 +369,6 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         pressedKey?.let { if (it.alternatives.isNotEmpty() && !isGestureActive) { longPressStarted = true; popupVisibleKey = it; popupSelectedIndex = 0; showPopup(it, true) } }
     }
     private var deleteRepeatRunnable: Runnable? = null
-    private val deleteRepeatDelay = 400L
-    private val deleteRepeatInterval = 80L
     private var lastShiftClickTime = 0L
     private val doubleClickThreshold = 280L
     private val keysToIgnoreDuringNGesture = setOf("l", "d", "g", "p", "c", "f", "u")
@@ -437,7 +462,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         if (w <= 0 || h <= 0) return
         if (keysBitmap == null || keysBitmap?.width != w || keysBitmap?.height != h) {
             keysBitmap?.recycle()
-            keysBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            keysBitmap = createBitmap(w, h)
             keysCanvas.setBitmap(keysBitmap)
         }
         keysCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
@@ -461,16 +486,30 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 drawKey(canvas, key)
             }
         }
+
         if (isGestureActive && gesturePoints.size >= 2) {
-            drawSmoothGestureTrail(canvas)
+            drawSmoothGestureTrail(canvas, 1f)
+            if (livePredictedWord.isNotEmpty()) {
+                drawFloatingLiveBubble(canvas)
+            }
+        } else if (isDissolvingTrail && gesturePoints.size >= 2) {
+            val elapsed = System.currentTimeMillis() - dissolveStartTime
+            val fadeProgress = (1f - elapsed / 140f).coerceIn(0f, 1f)
+            if (fadeProgress > 0f) {
+                drawSmoothGestureTrail(canvas, fadeProgress)
+                postInvalidateOnAnimation()
+            } else {
+                isDissolvingTrail = false
+                gesturePoints.clear()
+            }
         }
     }
 
-    private fun drawSmoothGestureTrail(canvas: Canvas) {
+    private fun drawSmoothGestureTrail(canvas: Canvas, alphaScale: Float = 1f) {
         val count = gesturePoints.size
         if (count < 2) return
         val activeColor = renderer.colorShiftActive
-        val alphaBase = Color.alpha(activeColor)
+        val alphaBase = (Color.alpha(activeColor) * alphaScale).toInt().coerceIn(0, 255)
         val red = Color.red(activeColor)
         val green = Color.green(activeColor)
         val blue = Color.blue(activeColor)
@@ -502,6 +541,43 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             }
             canvas.drawPath(trailPath, pGesture)
         }
+    }
+
+    private fun drawFloatingLiveBubble(canvas: Canvas) {
+        val tip = gesturePoints.lastOrNull() ?: return
+        val rawText = livePredictedWord.trim()
+        if (rawText.isEmpty()) return
+
+        val text = if (isShiftGesture || shifted) {
+            rawText.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+        } else rawText
+
+        pFloatingText.color = if (renderer.colorPopupText != 0) renderer.colorPopupText else Color.WHITE
+        pFloatingBg.color = renderer.colorPopupBg
+        pFloatingShadow.color = renderer.colorPopupShadow
+        pFloatingStroke.color = renderer.colorShiftActive
+
+        val textWidth = pFloatingText.measureText(text)
+        val paddingH = 32f
+        val paddingV = 16f
+        val bubbleW = textWidth + paddingH * 2f
+        val bubbleH = pFloatingText.textSize + paddingV * 2f
+
+        val cx = tip.x.coerceIn(bubbleW / 2f + 16f, (width.toFloat() - bubbleW / 2f - 16f).coerceAtLeast(bubbleW / 2f + 16f))
+        val cy = (tip.y - 110f).coerceAtLeast(bubbleH / 2f + 10f)
+
+        floatingRect.set(cx - bubbleW / 2f, cy - bubbleH / 2f, cx + bubbleW / 2f, cy + bubbleH / 2f)
+
+        canvas.withTranslation(0f, 4f) {
+            drawRoundRect(floatingRect, bubbleH / 2f, bubbleH / 2f, pFloatingShadow)
+        }
+
+        canvas.drawRoundRect(floatingRect, bubbleH / 2f, bubbleH / 2f, pFloatingBg)
+        canvas.drawRoundRect(floatingRect, bubbleH / 2f, bubbleH / 2f, pFloatingStroke)
+
+        val fontMetrics = pFloatingText.fontMetrics
+        val textY = cy - (fontMetrics.ascent + fontMetrics.descent) / 2f
+        canvas.drawText(text, cx, textY, pFloatingText)
     }
 
     private fun drawKey(canvas: Canvas, key: HexLayoutEngine.Key) {
@@ -547,9 +623,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
             if (!isLongPress) {
                 renderer.updateHexPath(localPopupHexPath, px, py, prx, pry)
-                canvas.save(); canvas.translate(0f, 6f)
-                renderer.pShadow.color = renderer.colorPopupShadow; canvas.drawPath(localPopupHexPath, renderer.pShadow)
-                canvas.restore()
+                canvas.withTranslation(0f, 6f) {
+                    renderer.pShadow.color = renderer.colorPopupShadow
+                    drawPath(localPopupHexPath, renderer.pShadow)
+                }
                 renderer.pPopupBg.color = renderer.colorPopupBg; canvas.drawPath(localPopupHexPath, renderer.pPopupBg)
                 if (renderer.strokeWidth > 0) {
                     renderer.pStroke.color = renderer.colorStroke; renderer.pStroke.strokeWidth = 2f; canvas.drawPath(localPopupHexPath, renderer.pStroke)
@@ -573,7 +650,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 val th = rows * sH + (rows - 1) * g
                 localPopupPath.reset(); val cornerRadius = sW * 0.45f
                 localPopupPath.addRoundRect(px - tw/2f - p, py - th/2f - p/2f, px + tw/2f + p, py + th/2f + p/2f, cornerRadius, cornerRadius, Path.Direction.CW)
-                canvas.save(); canvas.translate(0f, 6f); renderer.pShadow.color = renderer.colorPopupShadow; canvas.drawPath(localPopupPath, renderer.pShadow); canvas.restore()
+                canvas.withTranslation(0f, 6f) {
+                    renderer.pShadow.color = renderer.colorPopupShadow
+                    drawPath(localPopupPath, renderer.pShadow)
+                }
                 renderer.pPopupBg.color = renderer.colorPopupBg; canvas.drawPath(localPopupPath, renderer.pPopupBg)
                 if (renderer.strokeWidth > 0) { renderer.pStroke.color = renderer.colorStroke; renderer.pStroke.strokeWidth = 1f; canvas.drawPath(localPopupPath, renderer.pStroke) }
                 renderer.pPopupText.textSize = textSize * 0.9f
@@ -587,7 +667,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     if (i == selectedIndex) {
                         renderer.updateHexPath(localPopupHexPath, kx, ky, sW * 0.48f, sH * 0.48f)
                         val themeId = keyboardTheme?.id ?: ""
-                        val highlightColor = if (themeId.contains("dark") || themeId == "terminal") Color.parseColor("#4285F4") else renderer.colorPopupSelectedBg
+                        val highlightColor = if (themeId.contains("dark") || themeId == "terminal") "#4285F4".toColorInt() else renderer.colorPopupSelectedBg
                         canvas.drawPath(localPopupHexPath, renderer.pPress.apply { color = highlightColor })
                         renderer.pPopupText.color = renderer.colorPopupSelectedText
                     } else renderer.pPopupText.color = renderer.colorPopupText
@@ -644,7 +724,8 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val location = IntArray(2); getLocationInWindow(location)
         val offsetX = (key.cx - w / 2f).toInt()
         val offsetY = getPopupOffsetY(key, isLongPress, h)
-        var x = location[0] + offsetX; var y = location[1] + offsetY
+        var x = location[0] + offsetX
+        val y = location[1] + offsetY
         if (x < 0) x = 0; if (x + w > screenWidth) x = screenWidth - w
         if (popupWindow?.isShowing == true) popupWindow?.update(x, y, w, h)
         else popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
@@ -687,10 +768,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     if (hit.type != HexLayoutEngine.KeyType.DELETE) { triggerVibration(); triggerSound() }
                     if (pointerId == e.getPointerId(0)) {
                         val currentPressed = pressedKey
-                        if (hit != currentPressed) {
-                            if (currentPressed in spaceKeys && hit in spaceKeys) {} else if (currentPressed in shiftKeys && hit in shiftKeys) {} else if (currentPressed in deleteKeys && hit in deleteKeys) {} else {
-                                animateKeyToScale(currentPressed, 1.0f); cancelKeyLongPress(); cancelDeleteRepeat()
-                            }
+                        val isSameGroup = (currentPressed in spaceKeys && hit in spaceKeys) ||
+                                          (currentPressed in shiftKeys && hit in shiftKeys) ||
+                                          (currentPressed in deleteKeys && hit in deleteKeys)
+                        if (hit != currentPressed && !isSameGroup) {
+                            animateKeyToScale(currentPressed, 1.0f); cancelKeyLongPress(); cancelDeleteRepeat()
                         }
                         pressedKey = hit; animateKeyToScale(hit, 0.85f)
                         lastScrollX = x; lastScrollY = y; gestureStartX = x; gestureStartY = y; gesturePoints.clear(); gesturePath.reset(); gesturePoints.add(PointF(x, y)); gesturePath.moveTo(x, y)
@@ -718,10 +800,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             triggerVibration(FeedbackManager.HapticType.LONG_PRESS); triggerSound()
                             listener?.onChar(if (shifted || capsLock) "Ñ" else "ñ"); if (shifted && !capsLock) shifted = false
                             invalidate()
-                        } else if (!isGestureActive && totalDist > gestureThreshold) {
+                        } else if (!isGestureActive && gestureTypingEnabled && totalDist > gestureThreshold) {
                             isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                         }
-                    } else if (!isGestureActive && totalDist > gestureThreshold) {
+                    } else if (!isGestureActive && gestureTypingEnabled && totalDist > gestureThreshold) {
                         isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                     }
                     if (isGestureActive) {
@@ -742,7 +824,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 }
                 for (i in 0 until e.pointerCount) {
                     val pid = e.getPointerId(i)
-                    if (pid == e.getPointerId(0) && (longPressStarted || isScrollingCursor || longPressTriggered || isGestureActive || (pressedKey?.value == "n" && !isGestureActive))) continue
+                    if (pid == e.getPointerId(0) && (longPressStarted || isScrollingCursor || longPressTriggered || isGestureActive || pressedKey?.value == "n")) continue
                     val px = e.getX(i); val py = e.getY(i); val oldHit = activePointers[pid]; val newHit = hitTest(px, py)
                     if (newHit != oldHit && newHit != null) {
                         oldHit?.isPressed = false
@@ -855,7 +937,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val location = IntArray(2); getLocationInWindow(location)
         val screenWidth = context.resources.displayMetrics.widthPixels
         var finalPopupX = location[0] + (k.cx - w / 2f)
-        if (finalPopupX < 0) finalPopupX = 0f; if (finalPopupX + w > screenWidth) finalPopupX = (screenWidth - w).toFloat()
+        if (finalPopupX < 0) finalPopupX = 0f; if (finalPopupX + w > screenWidth) finalPopupX = screenWidth - w
         val offsetY = getPopupOffsetY(k, true, h.toInt())
         val rx = x - finalPopupX; val ry = y - (location[1] + offsetY)
         var minDist = Float.MAX_VALUE; var newIndex = 0

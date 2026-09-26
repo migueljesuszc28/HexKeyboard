@@ -7,19 +7,22 @@
  * scale for cheaper effect rendering. KMP expect/actual declarations were
  * merged into this single Android source set. Package renamed accordingly.
  */
+@file:Suppress("PackageDirectoryMismatch")
+
 package com.convx.music.ui.component.backdrop.internal
 
 import android.graphics.BlurMaskFilter
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.nativePaint
 import com.convx.music.ui.component.backdrop.RuntimeShader
 import com.convx.music.ui.component.backdrop.asAndroidRuntimeShader
 
 internal fun Paint.blur(radius: Float) {
-    this.asFrameworkPaint().maskFilter =
+    this.nativePaint.maskFilter =
         if (radius > 0f) BlurMaskFilter(radius, BlurMaskFilter.Blur.NORMAL)
         else null
 }
 
 internal fun Paint.setRuntimeShader(runtimeShader: RuntimeShader?) {
-    this.asFrameworkPaint().shader = runtimeShader?.asAndroidRuntimeShader()
+    this.nativePaint.shader = runtimeShader?.asAndroidRuntimeShader()
 }

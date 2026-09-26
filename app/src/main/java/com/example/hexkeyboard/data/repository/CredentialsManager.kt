@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.hexkeyboard.data.repository
 
 import android.content.Context
@@ -9,7 +11,6 @@ import androidx.security.crypto.MasterKey
 import com.example.hexkeyboard.data.model.CredentialItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -18,6 +19,7 @@ object CredentialsManager {
 
     private const val PREFS_FILENAME = "secure_credentials_prefs"
 
+    @Suppress("DEPRECATION")
     private fun getPrefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context, MasterKey.DEFAULT_MASTER_KEY_ALIAS)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -28,7 +30,7 @@ object CredentialsManager {
             PREFS_FILENAME,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     }
 

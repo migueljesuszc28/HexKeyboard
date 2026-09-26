@@ -1,6 +1,12 @@
 package com.example.hexkeyboard.ui.keyboard.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -11,21 +17,98 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.component.glassContentColorFor
 import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import kotlinx.coroutines.launch
+
+val LocalKeyBounceEnabled = staticCompositionLocalOf { true }
+
+@Composable
+fun rememberKeyBounceEnabled(): Boolean {
+    val context = LocalContext.current
+    val prefsFlow = remember { ThemeUtils.getDataStore(context).data }
+    val prefs by prefsFlow.collectAsState(initial = null)
+    return prefs?.get(ThemeUtils.KEY_BOUNCE_ANIMATION) ?: true
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.bounceClick(
+    enabled: Boolean = true,
+    bounceEnabled: Boolean = LocalKeyBounceEnabled.current,
+    pressedScale: Float = 0.88f,
+    onClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null
+): Modifier {
+    if (!enabled) return this
+    if (!bounceEnabled) {
+        return this.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    }
+
+    val scale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
+    return this
+        .graphicsLayer {
+            scaleX = scale.value
+            scaleY = scale.value
+        }
+        .pointerInput(onClick, onLongClick, bounceEnabled) {
+            detectTapGestures(
+                onPress = {
+                    scope.launch {
+                        scale.animateTo(
+                            pressedScale,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessHigh
+                            )
+                        )
+                    }
+                    try {
+                        tryAwaitRelease()
+                    } catch (_: Exception) {
+                    }
+                    scope.launch {
+                        scale.animateTo(
+                            1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        )
+                    }
+                },
+                onTap = { onClick() },
+                onLongPress = {
+                    onLongClick?.invoke()
+                }
+            )
+        }
+}
 
 @Composable
 fun EmojiSearchBar(
@@ -54,22 +137,21 @@ fun EmojiSearchBar(
         Box(
             modifier = Modifier
                 .size(38.dp)
+                .bounceClick(
+                    onClick = {
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                        if (viewModel.isEmojiSearchActive.value) {
+                            viewModel.setEmojiSearchActive(false)
+                        } else {
+                            viewModel.setCurrentView("keyboard")
+                        }
+                    }
+                )
                 .liquidGlass(
                     config = glassConfig,
                     shape = CircleShape,
                     highlightAlpha = 0.3f
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                    if (viewModel.isEmojiSearchActive.value) {
-                        viewModel.setEmojiSearchActive(false)
-                    } else {
-                        viewModel.setCurrentView("keyboard")
-                    }
-                },
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -148,22 +230,21 @@ fun CredentialsSearchBar(
         Box(
             modifier = Modifier
                 .size(38.dp)
+                .bounceClick(
+                    onClick = {
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                        if (viewModel.isCredentialsSearchActive.value) {
+                            viewModel.setCredentialsSearchActive(false)
+                        } else {
+                            viewModel.setCurrentView("keyboard")
+                        }
+                    }
+                )
                 .liquidGlass(
                     config = glassConfig,
                     shape = CircleShape,
                     highlightAlpha = 0.3f
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                    if (viewModel.isCredentialsSearchActive.value) {
-                        viewModel.setCredentialsSearchActive(false)
-                    } else {
-                        viewModel.setCurrentView("keyboard")
-                    }
-                },
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -241,18 +322,17 @@ fun PanelHeader(
         Box(
             modifier = Modifier
                 .size(38.dp)
+                .bounceClick(
+                    onClick = {
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                        onBack()
+                    }
+                )
                 .liquidGlass(
                     config = glassConfig,
                     shape = CircleShape,
                     highlightAlpha = 0.3f
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                    onBack()
-                },
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(

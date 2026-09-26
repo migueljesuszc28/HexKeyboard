@@ -3,11 +3,11 @@ package com.example.hexkeyboard.ui.keyboard.panels
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
@@ -41,20 +42,33 @@ fun FunctionsPanel(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .padding(horizontal = 8.dp, vertical = 16.dp),
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         contentAlignment = Alignment.TopCenter
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
-            FunctionItem(
-                icon = Icons.Default.Settings,
-                label = "Ajustes",
-                onClick = onSettings,
-                theme = theme
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FunctionItem(
+                    icon = Icons.Default.Settings,
+                    label = "Ajustes",
+                    onClick = onSettings,
+                    theme = theme
+                )
+                FunctionItem(
+                    icon = Icons.Default.ContentPaste,
+                    label = "Portapapeles",
+                    onClick = {
+                        viewModel?.setCurrentView("clipboard", context)
+                    },
+                    theme = theme
+                )
+            }
             FunctionItem(
                 icon = Icons.Default.Palette,
                 label = "Temas",
@@ -103,11 +117,9 @@ fun FunctionItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(76.dp)
-            .combinedClickable(
+            .bounceClick(
                 onClick = onClick,
-                onLongClick = onLongClick,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
+                onLongClick = onLongClick
             )
     ) {
         Surface(

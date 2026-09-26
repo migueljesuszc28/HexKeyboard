@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +30,7 @@ import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
+import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.settings.PermissionActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,13 +63,12 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                            viewModel.setCurrentView("functions")
-                        },
+                        .bounceClick(
+                            onClick = {
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                viewModel.setCurrentView("functions")
+                            }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -155,37 +154,36 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                            if (isListening) {
-                                service?.voiceRecognitionHelper?.stopListening()
-                            } else {
-                                val permission = Manifest.permission.RECORD_AUDIO
-                                val granted = ContextCompat.checkSelfPermission(
-                                    context, permission
-                                ) == PackageManager.PERMISSION_GRANTED
-
-                                if (granted) {
-                                    service?.voiceRecognitionHelper?.startListening(
-                                        object : VoiceRecognitionHelper.VoiceResultListener {
-                                            override fun onVoiceResult(text: String) {
-                                                viewModel.onCharTyped("$text ")
-                                            }
-                                            override fun onVoiceError(error: Int) {}
-                                        }
-                                    )
+                        .bounceClick(
+                            onClick = {
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                if (isListening) {
+                                    service?.voiceRecognitionHelper?.stopListening()
                                 } else {
-                                    val intent = Intent(context, PermissionActivity::class.java).apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        putExtra("request_permission", permission)
+                                    val permission = Manifest.permission.RECORD_AUDIO
+                                    val granted = ContextCompat.checkSelfPermission(
+                                        context, permission
+                                    ) == PackageManager.PERMISSION_GRANTED
+
+                                    if (granted) {
+                                        service?.voiceRecognitionHelper?.startListening(
+                                            object : VoiceRecognitionHelper.VoiceResultListener {
+                                                override fun onVoiceResult(text: String) {
+                                                    viewModel.onCharTyped("$text ")
+                                                }
+                                                override fun onVoiceError(error: Int) {}
+                                            }
+                                        )
+                                    } else {
+                                        val intent = Intent(context, PermissionActivity::class.java).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            putExtra("request_permission", permission)
+                                        }
+                                        context.startActivity(intent)
                                     }
-                                    context.startActivity(intent)
                                 }
                             }
-                        },
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -275,9 +273,7 @@ fun GboardCapsule(
     Surface(
         modifier = modifier
             .height(34.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+            .bounceClick(
                 onClick = onClick
             ),
         color = bgColor,
@@ -308,9 +304,7 @@ fun ClipboardSuggestionChip(clipText: String, theme: KeyboardTheme, onClick: () 
         modifier = Modifier
             .fillMaxWidth()
             .height(34.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+            .bounceClick(
                 onClick = onClick
             ),
         color = Color(theme.keyBackgroundColor).copy(alpha = 0.95f),

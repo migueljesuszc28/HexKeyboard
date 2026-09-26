@@ -80,6 +80,7 @@ import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
+import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.ui.component.glassContentColorFor
@@ -555,13 +556,13 @@ fun EmojiItem(
                 cellCoords[3] = coordinates.size.height.toFloat()
             }
             .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(
+            .bounceClick(
                 onClick = {
                     FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                     onEmojiSelected(displayEmoji)
                 },
-                onLongClick = {
-                    if (hasVariations) {
+                onLongClick = if (hasVariations) {
+                    {
                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
                         showEmojiVariationPopupWindow(
                             context = context,
@@ -578,7 +579,7 @@ fun EmojiItem(
                             service = service
                         )
                     }
-                }
+                } else null
             ),
         contentAlignment = Alignment.Center
     ) {

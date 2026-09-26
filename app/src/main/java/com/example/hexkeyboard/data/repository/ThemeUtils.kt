@@ -103,6 +103,7 @@ object ThemeUtils {
 
     val AUTO_CAPITALIZE = booleanPreferencesKey("auto_capitalize")
     val AUTO_CORRECT = booleanPreferencesKey("auto_correct")
+    val GESTURE_TYPING_ENABLED = booleanPreferencesKey("gesture_typing_enabled")
     val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
     val UNDO_CORRECTION_ON_BACKSPACE = booleanPreferencesKey("undo_correction_on_backspace")
     val SHOW_KEY_POPUP = booleanPreferencesKey("show_key_popup")

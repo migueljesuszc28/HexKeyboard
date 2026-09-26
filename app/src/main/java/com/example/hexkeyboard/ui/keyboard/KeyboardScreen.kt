@@ -47,6 +47,8 @@ import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.liquidGlass
+import com.example.hexkeyboard.ui.keyboard.components.LocalKeyBounceEnabled
+import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBounceEnabled
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -127,8 +129,10 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val clipboardItemWithOptions by viewModel.clipboardItemWithOptions.collectAsState()
 
     val glassShape = remember { RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) }
+    val keyBounceEnabled = rememberKeyBounceEnabled()
 
     CompositionLocalProvider(
+        LocalKeyBounceEnabled provides keyBounceEnabled,
         LocalAppBackdrop provides keyboardBackdrop,
         LocalGlassEffectConfig provides glassConfig
     ) {

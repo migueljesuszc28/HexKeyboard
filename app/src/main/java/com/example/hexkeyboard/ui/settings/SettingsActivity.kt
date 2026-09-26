@@ -469,6 +469,15 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SettingsCardContainer {
                     SwitchPreference(
+                        title = "Escritura por deslizamiento",
+                        subtitle = "Escribir palabras deslizando el dedo por las teclas",
+                        key = ThemeUtils.GESTURE_TYPING_ENABLED,
+                        defaultValue = true,
+                        icon = Icons.Default.Gesture,
+                        context = context
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SwitchPreference(
                         title = "Auto-corrección",
                         subtitle = "Corregir automáticamente palabras al presionar espacio",
                         key = ThemeUtils.AUTO_CORRECT,

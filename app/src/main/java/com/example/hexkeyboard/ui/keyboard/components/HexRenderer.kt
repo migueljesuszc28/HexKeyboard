@@ -246,7 +246,7 @@ class HexRenderer(private val context: Context) {
         overrideCx: Float? = null
     ) {
         val themeObj = theme ?: return
-        val floating = key.type == HexLayoutEngine.KeyType.CLIPBOARD || key.type == HexLayoutEngine.KeyType.FUNCTIONS || key.type == HexLayoutEngine.KeyType.EMOJI || key.type == HexLayoutEngine.KeyType.LANGUAGE
+        val floating = false
 
         val individualColor = themeObj.individualKeyColors[key.value]
         var activeBgColor = colorFill
@@ -257,7 +257,7 @@ class HexRenderer(private val context: Context) {
                 key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> { pFill.color = colorShiftActive; pFill }
                 key.type == HexLayoutEngine.KeyType.SHIFT && (!shifted && !capsLock) -> { pFill.color = colorShiftInactive; pFill }
                 individualColor != null -> { pFill.color = individualColor; pFill }
-                key.type in listOf(HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER, HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.SHIFT, HexLayoutEngine.KeyType.DELETE) -> { pSpec.color = colorSpec; pSpec }
+                key.type in listOf(HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER, HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD, HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.SHIFT, HexLayoutEngine.KeyType.DELETE) -> { pSpec.color = colorSpec; pSpec }
                 else -> { pFill.color = colorFill; pFill }
             }
             activeBgColor = fill.color
@@ -269,7 +269,7 @@ class HexRenderer(private val context: Context) {
                     fill.color = colorShiftInactive
                 } else if (individualColor != null) {
                     fill.color = individualColor
-                } else if (key.type in listOf(HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER, HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.SHIFT, HexLayoutEngine.KeyType.DELETE)) {
+                } else if (key.type in listOf(HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER, HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD, HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.SHIFT, HexLayoutEngine.KeyType.DELETE)) {
                     fill.color = colorSpec
                 } else {
                     fill.color = colorFill
@@ -312,14 +312,6 @@ class HexRenderer(private val context: Context) {
                     customLabel = "BORRAR"
                 }
             }
-            HexLayoutEngine.KeyType.SPACE -> {
-                if (overrideCx == null || key.display.isNotEmpty()) {
-                    customLabel = try {
-                        val loc = Locale(language)
-                        loc.getDisplayLanguage(loc).uppercase()
-                    } catch (_: Exception) { language.uppercase() }
-                }
-            }
             HexLayoutEngine.KeyType.ENTER -> {
                 if (isEnterWithText) {
                     customLabel = when (currentImeAction) {
@@ -337,7 +329,7 @@ class HexRenderer(private val context: Context) {
         }
 
         val sz = when {
-            customLabel != null && (key.type == HexLayoutEngine.KeyType.SHIFT || key.type == HexLayoutEngine.KeyType.DELETE || key.type == HexLayoutEngine.KeyType.ENTER || key.type == HexLayoutEngine.KeyType.SPACE) ->
+            customLabel != null && (key.type == HexLayoutEngine.KeyType.SHIFT || key.type == HexLayoutEngine.KeyType.DELETE || key.type == HexLayoutEngine.KeyType.ENTER) ->
                 min(key.rx, key.ry) * 0.45f
             customLabel != null && customLabel.length <= 3 -> min(key.rx, key.ry) * 0.5f
             customLabel != null -> min(key.rx, key.ry) * 0.35f
@@ -377,7 +369,7 @@ class HexRenderer(private val context: Context) {
         }
 
         if (dr != null) {
-            val s = (min(key.rx, key.ry) * (if (key.type == HexLayoutEngine.KeyType.FUNCTIONS || key.type == HexLayoutEngine.KeyType.CLIPBOARD || key.type == HexLayoutEngine.KeyType.EMOJI) 0.8f else 1.0f)).toInt()
+            val s = (min(key.rx, key.ry) * 1.0f).toInt()
             dr.setBounds((drawCx - s/2).toInt(), (key.cy - s/2).toInt(), (drawCx + s/2).toInt(), (key.cy + s/2).toInt())
             val tint = when {
                 (key.type == HexLayoutEngine.KeyType.ENTER || key.type == HexLayoutEngine.KeyType.DELETE) && individualColor != null -> Color.WHITE

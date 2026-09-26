@@ -251,11 +251,9 @@ class HexLayoutEngine {
         val row2 = if (layoutType == "qwerty") listOf("f","g","h","j","k","l","z","x") else listOf("a","e","s","r","h","t","n","l")
         val row3Chars = if (layoutType == "qwerty") listOf("c","v","b","n","m") else listOf("v","y","x","z","j")
 
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(0f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         row0.forEachIndexed { i, l ->
             keys += Key(l, KeyType.CHAR, l, longPressAlternatives[l[0]] ?: emptyList(), cx = cx8(i.toFloat() + 1f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         }
-        keys += Key("CLIP", KeyType.CLIPBOARD, "CLIPBOARD", emptyList(), cx = cx8(7f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
 
         row1.forEachIndexed { i, l ->
             keys += Key(l, KeyType.CHAR, l, longPressAlternatives[l[0]] ?: emptyList(), cx = cx7(i.toFloat()), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale)
@@ -295,14 +293,14 @@ class HexLayoutEngine {
 
         if (language == "es") {
             keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-            keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
-            keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
+            keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+            keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(5f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
         } else {
             keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-            keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
-            keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
+            keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+            keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(5f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(6f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
@@ -322,13 +320,12 @@ class HexLayoutEngine {
         fun ry(row: Int) = tp + dry + row * rs
 
         listOf("1", "2", "3", "4", "5").forEachIndexed { i, l -> keys += Key(l, KeyType.CHAR, l, emptyList(), cx = cx5(i.toFloat()), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale) }
-        keys += Key("CLIP", KeyType.CLIPBOARD, "CLIPBOARD", emptyList(), cx = cx6(0f), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale)
         listOf("6", "7", "8", "9").forEachIndexed { i, l -> keys += Key(l, KeyType.CHAR, l, emptyList(), cx = cx6(i.toFloat() + 1f), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale) }
         keys += Key("⌫", KeyType.DELETE, "DELETE", emptyList(), cx = cx6(5f), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale)
         listOf("0", ",", ".", "-", "+").forEachIndexed { i, l -> keys += Key(l, KeyType.CHAR, l, emptyList(), cx = cx5(i.toFloat()), cy = ry(2), rx = dr, ry = dry, keyScale = keyScale) }
         keys += Key("ABC", KeyType.TOGGLE, "?123", listOf("#+=", "𝔉"), cx = cx6(0f), cy = ry(3), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(1f), cy = ry(3), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
-        keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(3), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(1f), cy = ry(3), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(3), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(3f), cy = ry(3), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(4f), cy = ry(3), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
         keys += Key("↩", KeyType.ENTER, "ENTER", emptyList(), cx = cx6(5f), cy = ry(3), rx = dr, ry = dry, keyScale = keyScale)
@@ -343,11 +340,9 @@ class HexLayoutEngine {
         fun cx6(c: Float) = u/2f + (c - 2.5f) * hw
         fun ry(row: Int) = tp + dry + row * rs
 
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(-1f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         listOf("1","2","3","4","5","6").forEachIndexed { i, l ->
             keys += Key(l, KeyType.CHAR, l, (longPressAlternatives[l[0]] ?: emptyList()), cx = cx6(i.toFloat()), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         }
-        keys += Key("CLIP", KeyType.CLIPBOARD, "CLIPBOARD", emptyList(), cx = cx6(6f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         listOf("7","8","9","0","-","+","=").forEachIndexed { i, l -> keys += Key(l, KeyType.CHAR, l, longPressAlternatives[l[0]] ?: emptyList(), cx = cx7(i.toFloat()), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale) }
         listOf("@", "#", "$", "_", "&", "(", ")", "*").forEachIndexed { i, l ->
             keys += Key(l, KeyType.CHAR, l, if (l.length == 1) (longPressAlternatives[l[0]] ?: emptyList()) else emptyList(), cx = cx8(i.toFloat()), cy = ry(2), rx = dr, ry = dry, keyScale = keyScale)
@@ -377,8 +372,8 @@ class HexLayoutEngine {
         }
         keys += Key("ABC", KeyType.TOGGLE, "123", listOf("#+=", "𝔉"), cx = cx6(-1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
         keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx6(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
-        keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
         keys += Key("", KeyType.ENTER, "ENTER", emptyList(), cx = cx6(5f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
@@ -404,12 +399,10 @@ class HexLayoutEngine {
             return currentFonts.getOrElse(alphaIndex + offset) { letter.toString() }
         }
 
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(0f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         for (i in 0 until 6) {
             val char = nextChar()
             keys += Key(char, KeyType.CHAR, char, emptyList(), cx = cx8(i.toFloat() + 1f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         }
-        keys += Key("CLIP", KeyType.CLIPBOARD, "CLIPBOARD", emptyList(), cx = cx8(7f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         for (i in 0 until 7) {
             val char = nextChar()
             keys += Key(char, KeyType.CHAR, char, emptyList(), cx = cx7(i.toFloat()), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale)
@@ -428,8 +421,8 @@ class HexLayoutEngine {
         keys += Key("⌫", KeyType.DELETE, "DELETE", emptyList(), cx = cx7(6.0f), cy = ry(3), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("ABC", KeyType.TOGGLE, "?123", listOf("123", "#+=", "𝔉"), cx = cx8(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
         keys += Key((fontPage + 1).toString(), KeyType.FONT_PAGE, "FONT_PAGE", (1..10).map { it.toString() }, cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
-        keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(5f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
         keys += Key("", KeyType.ENTER, "ENTER", emptyList(), cx = cx8(6f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
@@ -450,12 +443,10 @@ class HexLayoutEngine {
         var idx = 0
         fun nextSym(): String = if (idx < symbols.size) symbols[idx++] else ""
 
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(-1f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         for (i in 0 until 6) {
             val s = nextSym()
             keys += Key(s, KeyType.CHAR, s, if (s.length == 1) longPressAlternatives[s[0]] ?: emptyList() else emptyList(), cx = cx6(i.toFloat()), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         }
-        keys += Key("CLIP", KeyType.CLIPBOARD, "CLIPBOARD", emptyList(), cx = cx6(6f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale)
         for (i in 0 until 7) {
             val s = nextSym()
             keys += Key(s, KeyType.CHAR, s, if (s.length == 1) longPressAlternatives[s[0]] ?: emptyList() else emptyList(), cx = cx7(i.toFloat()), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale)
@@ -474,8 +465,8 @@ class HexLayoutEngine {
         keys += Key("⌫", KeyType.DELETE, "DELETE", emptyList(), cx = cx7(6.0f), cy = ry(3), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("ABC", KeyType.TOGGLE, "?123", listOf("123", "𝔉"), cx = cx6(-1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
         keys += Key("→", KeyType.SYMBOL_PAGE, "→", pages.mapIndexed { i, _ -> (i + 1).toString() }, cx = cx6(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
-        keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
         keys += Key("", KeyType.ENTER, "ENTER", emptyList(), cx = cx6(5f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
