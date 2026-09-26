@@ -116,7 +116,8 @@ fun EmojiSearchBar(
     theme: KeyboardTheme,
     query: String,
     modifier: Modifier = Modifier,
-    glassConfig: GlassEffectConfig = LocalGlassEffectConfig.current
+    glassConfig: GlassEffectConfig = LocalGlassEffectConfig.current,
+    showBackButton: Boolean = true
 ) {
     val context = LocalContext.current
     val iconColor = glassContentColorFor(
@@ -133,36 +134,38 @@ fun EmojiSearchBar(
             .height(42.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Botón circular con efecto Liquid Glass dinámico para el icono de teclado (solo en panel de emojis)
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .bounceClick(
-                    onClick = {
-                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                        if (viewModel.isEmojiSearchActive.value) {
-                            viewModel.setEmojiSearchActive(false)
-                        } else {
-                            viewModel.setCurrentView("keyboard")
+        if (showBackButton) {
+            // Botón circular con efecto Liquid Glass dinámico para el icono de teclado (solo en panel de emojis)
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .bounceClick(
+                        onClick = {
+                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                            if (viewModel.isEmojiSearchActive.value) {
+                                viewModel.setEmojiSearchActive(false)
+                            } else {
+                                viewModel.setCurrentView("keyboard")
+                            }
                         }
-                    }
+                    )
+                    .liquidGlass(
+                        config = glassConfig,
+                        shape = CircleShape,
+                        highlightAlpha = 0.3f
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Keyboard,
+                    contentDescription = "Cerrar",
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp)
                 )
-                .liquidGlass(
-                    config = glassConfig,
-                    shape = CircleShape,
-                    highlightAlpha = 0.3f
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Keyboard,
-                contentDescription = "Cerrar",
-                tint = iconColor,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+            }
 
-        Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+        }
 
         // Barra de búsqueda de emojis con efecto Liquid Glass dinámico
         Box(

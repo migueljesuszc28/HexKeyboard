@@ -69,14 +69,14 @@ fun KeyboardMainSection(
             "nunito" -> ResourcesCompat.getFont(context, R.font.nunito) ?: Typeface.DEFAULT
             "system" -> Typeface.DEFAULT
             else -> {
-                val file = File(fontPath)
-                if (file.exists()) {
-                    try {
-                        Typeface.createFromFile(file)
-                    } catch (_: Exception) {
+                try {
+                    val file = File(fontPath)
+                    if (file.exists() && file.length() > 0) {
+                        Typeface.createFromFile(file) ?: Typeface.DEFAULT
+                    } else {
                         Typeface.DEFAULT
                     }
-                } else {
+                } catch (_: Exception) {
                     Typeface.DEFAULT
                 }
             }

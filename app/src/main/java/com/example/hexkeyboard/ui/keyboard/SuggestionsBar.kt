@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +33,7 @@ import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.settings.PermissionActivity
+import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -145,6 +147,48 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                                     FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                     viewModel.onSuggestionClick(rightCandidate)
                                 }
+                            }
+                        }
+                    } else {
+                        // Cuando no hay sugerencias ni dictado activo: Muestra los 3 accesos directos (Temas, Portapapeles, Contraseñas)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Cápsula 1: Temas
+                            ShortcutIconCapsule(
+                                icon = Icons.Default.Palette,
+                                contentDescription = "Temas",
+                                theme = theme,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                context.startActivity(Intent(context, ThemeSettingsActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                })
+                            }
+
+                            // Cápsula 2: Portapapeles (Papelera)
+                            ShortcutIconCapsule(
+                                icon = Icons.Default.ContentPaste,
+                                contentDescription = "Portapapeles",
+                                theme = theme,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                viewModel.setCurrentView("clipboard")
+                            }
+
+                            // Cápsula 3: Contraseñas
+                            ShortcutIconCapsule(
+                                icon = Icons.Default.Key,
+                                contentDescription = "Contraseñas",
+                                theme = theme,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                viewModel.setCurrentView("credentials", context)
                             }
                         }
                     }
@@ -290,6 +334,41 @@ fun GboardCapsule(
                 fontWeight = fontWeight,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/**
+ * Cápsula con únicamente el icono para acceso directo cuando no hay sugerencias.
+ */
+@Composable
+fun ShortcutIconCapsule(
+    icon: ImageVector,
+    contentDescription: String,
+    theme: KeyboardTheme,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bgColor = Color(theme.keyBackgroundColor).copy(alpha = 0.75f)
+    val iconColor = Color(theme.keyboardIconTint)
+
+    Surface(
+        modifier = modifier
+            .height(34.dp)
+            .bounceClick(onClick = onClick),
+        color = bgColor,
+        shape = CircleShape
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = iconColor,
+                modifier = Modifier.size(18.dp)
             )
         }
     }

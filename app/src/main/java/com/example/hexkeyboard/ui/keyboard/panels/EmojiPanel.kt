@@ -146,29 +146,6 @@ fun EmojiPanel(
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
 
-    // Lógica para mostrar/ocultar la barra de categorías según el scroll
-    var isCategoriesVisible by remember { mutableStateOf(true) }
-
-    LaunchedEffect(gridState) {
-        var lastScrollIndex = 0
-        var lastScrollOffset = 0
-        
-        snapshotFlow { Pair(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
-            .collect { (currentIndex, currentOffset) ->
-                if (gridState.isScrollInProgress) {
-                    val indexDiff = currentIndex - lastScrollIndex
-                    val offsetDiff = currentOffset - lastScrollOffset
-                    if (indexDiff > 0 || (indexDiff == 0 && offsetDiff > 40)) {
-                        if (isCategoriesVisible) isCategoriesVisible = false
-                    } else if (indexDiff < 0 || offsetDiff < -40) {
-                        if (!isCategoriesVisible) isCategoriesVisible = true
-                    }
-                }
-                lastScrollIndex = currentIndex
-                lastScrollOffset = currentOffset
-            }
-    }
-
     val currentCategoryIndex by remember(emojiList) {
         derivedStateOf {
             val firstIndex = gridState.firstVisibleItemIndex
@@ -273,7 +250,8 @@ fun EmojiPanel(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(start = 8.dp, end = 8.dp, top = 4.dp),
-                    glassConfig = glassConfig
+                    glassConfig = glassConfig,
+                    showBackButton = false
                 )
             }
 
@@ -282,47 +260,33 @@ fun EmojiPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + navBarBottomDp + 8).dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
+                        .padding(start = 8.dp, end = 8.dp, bottom = (bottomOffset + navBarBottomDp + 0).dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AnimatedVisibility(
-                        visible = isCategoriesVisible,
-                        enter = slideInVertically(
-                            initialOffsetY = { it / 2 },
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        ) + fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.9f),
-                        exit = slideOutVertically(
-                            targetOffsetY = { it / 2 },
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        ) + fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        EmojiCategoryTabs(
-                            modifier = Modifier.fillMaxWidth(),
-                            selectedTabIndex = currentCategoryIndex,
-                            onCategoryClick = { categoryName ->
-                                val index = emojiList.indexOfFirst { it is EmojiProvider.EmojiGridItem.Header && it.name == categoryName }
-                                if (index >= 0) { 
-                                    scope.launch { 
-                                        gridState.scrollToItem(index)
-                                    } 
-                                }
-                            },
-                            theme = theme,
-                            glassConfig = glassConfig
-                        )
-                    }
+                    EmojiBackButton(
+                        onBack = onBack,
+                        theme = theme,
+                        glassConfig = glassConfig
+                    )
 
-                    if (isCategoriesVisible) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    EmojiCategoryTabs(
+                        modifier = Modifier.weight(1f),
+                        selectedTabIndex = currentCategoryIndex,
+                        onCategoryClick = { categoryName ->
+                            val index = emojiList.indexOfFirst { it is EmojiProvider.EmojiGridItem.Header && it.name == categoryName }
+                            if (index >= 0) { 
+                                scope.launch { 
+                                    gridState.scrollToItem(index)
+                                } 
+                            }
+                        },
+                        theme = theme,
+                        glassConfig = glassConfig
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     EmojiDeleteButton(
                         onDelete = {
@@ -335,6 +299,45 @@ fun EmojiPanel(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun EmojiBackButton(
+    onBack: () -> Unit,
+    theme: KeyboardTheme,
+    glassConfig: GlassEffectConfig = LocalGlassEffectConfig.current
+) {
+    val context = LocalContext.current
+    val buttonShape = CircleShape
+    val iconColor = glassContentColorFor(
+        behind = Color(theme.backgroundColor),
+        tint = glassConfig.surfaceTintColor,
+        opacity = glassConfig.surfaceOpacity
+    )
+
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .bounceClick(
+                onClick = {
+                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                    onBack()
+                }
+            )
+            .liquidGlass(
+                config = glassConfig,
+                shape = buttonShape,
+                highlightAlpha = 0.3f
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Keyboard,
+            contentDescription = "Volver",
+            tint = iconColor,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

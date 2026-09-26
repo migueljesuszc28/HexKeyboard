@@ -85,8 +85,10 @@ object FontManager {
 
     fun loadTypeface(file: File): Typeface? {
         return try {
-            Typeface.createFromFile(file)
-        } catch (e: Exception) {
+            if (file.exists() && file.length() > 0) {
+                Typeface.createFromFile(file)
+            } else null
+        } catch (_: Exception) {
             null
         }
     }

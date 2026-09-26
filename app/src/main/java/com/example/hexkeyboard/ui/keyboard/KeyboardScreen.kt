@@ -91,17 +91,20 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                 ThemeUtils.loadBitmapFromUri(context, keyboardTheme.backgroundImageUri!!)
             } as Bitmap?
             if (newBitmap != null) {
-                backgroundBitmap?.recycle()
-                blurredBitmap?.recycle()
+                val oldBg = backgroundBitmap
+                val oldBlur = blurredBitmap
 
                 backgroundBitmap = newBitmap
                 blurredBitmap = if (keyboardTheme.backgroundBlur > 0) {
                     withContext(Dispatchers.IO) {
-                        ThemeUtils.blurBitmap(newBitmap!!, keyboardTheme.backgroundBlur)
+                        ThemeUtils.blurBitmap(newBitmap, keyboardTheme.backgroundBlur)
                     } as Bitmap?
                 } else {
                     null
                 }
+
+                oldBg?.recycle()
+                oldBlur?.recycle()
             }
         } else {
             backgroundBitmap?.recycle()
@@ -149,7 +152,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                     .matchParentSize()
                     .layerBackdrop(keyboardBackdrop)
             ) {
-                if (img != null) {
+                if (img != null && !img.isRecycled) {
                     Image(
                         bitmap = img.asImageBitmap(),
                         contentDescription = null,

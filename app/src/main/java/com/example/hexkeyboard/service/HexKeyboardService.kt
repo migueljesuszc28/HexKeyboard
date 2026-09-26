@@ -337,6 +337,11 @@ class HexKeyboardService : InputMethodService(),
         serviceScope.launch {
             ThemeUtils.getKeyboardThemeFlow(this@HexKeyboardService).collect { theme ->
                 viewModel.updateKeyboardTheme(theme)
+                if (theme.parallaxEffect) {
+                    parallaxSensorManager.start()
+                } else {
+                    parallaxSensorManager.stop()
+                }
             }
         }
 
@@ -558,29 +563,31 @@ class HexKeyboardService : InputMethodService(),
         }
     }
 
+    private var lastProcessedTextBefore: String? = null
+
     fun updateSuggestions() {
         val ic = currentInputConnection ?: return
-        val textBefore = ic.getTextBeforeCursor(40, 0) ?: ""
+        val textBeforeSequence = ic.getTextBeforeCursor(40, 0) ?: ""
+        val textBefore = textBeforeSequence.toString()
         
+        val capsMode = ic.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS)
+        val isShifted = mHexKeyboardView?.shifted == true
+        val shouldCapitalize = (capsMode != 0) || isShifted
+
+        if (textBefore == lastProcessedTextBefore) return
+        lastProcessedTextBefore = textBefore
+
         serviceScope.launch(Dispatchers.Default) {
             val history = viewModel.clipboardHistory.value
             val topHistoryText = history.firstOrNull()?.text?.trim()
-            
-            val currentSystemClipText = try {
-                if (::clipboardManager.isInitialized && clipboardManager.hasPrimaryClip()) {
-                    clipboardManager.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
-                } else null
-            } catch (_: Exception) { null }
 
             val clipToSuggest = if (!topHistoryText.isNullOrEmpty() &&
-                !currentSystemClipText.isNullOrEmpty() &&
-                topHistoryText == currentSystemClipText &&
                 topHistoryText != lastUsedClipboardText?.trim()
             ) {
                 topHistoryText
             } else null
 
-            val allWords = textBefore.toString().trim().split(" ", "\n", "\t").filter { it.isNotEmpty() }
+            val allWords = textBefore.trim().split(" ", "\n", "\t").filter { it.isNotEmpty() }
             val lastWord = if (textBefore.isNotEmpty() && !textBefore.endsWith(" ")) {
                 allWords.lastOrNull() ?: ""
             } else ""
@@ -592,8 +599,6 @@ class HexKeyboardService : InputMethodService(),
                 val rawPredictions = predictionEngine.getSuggestions(lastWord, prevWord, limit = 10)
                 var rawCandidates = rawPredictions.map { it.text }.distinct()
 
-                val capsMode = ic.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS)
-                val shouldCapitalize = (capsMode != 0) || (mHexKeyboardView?.shifted == true)
                 if (shouldCapitalize) {
                     rawCandidates = rawCandidates.map { word ->
                         word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
@@ -613,12 +618,12 @@ class HexKeyboardService : InputMethodService(),
                         it.lowercase() != primaryCandidate.lowercase() && it.lowercase() != fallbackCandidate.lowercase()
                     } ?: rawCandidates.getOrNull(2)
 
-                    localSuggestions.add(primaryCandidate) // Índice 0: Centro (Predeterminada / Autocorrección)
+                    localSuggestions.add(primaryCandidate)
                     if (fallbackCandidate.isNotEmpty()) {
-                        localSuggestions.add(fallbackCandidate) // Índice 1: Izquierda (Literal / Fallback)
+                        localSuggestions.add(fallbackCandidate)
                     }
                     if (alternativeCandidate != null && alternativeCandidate.isNotEmpty()) {
-                        localSuggestions.add(alternativeCandidate) // Índice 2: Derecha (Alternativa)
+                        localSuggestions.add(alternativeCandidate)
                     }
                 } else {
                     localSuggestions.add(lastWord)
@@ -1118,9 +1123,10 @@ class HexKeyboardService : InputMethodService(),
             val history = ClipboardHistoryManager.getHistory(this@HexKeyboardService)
             withContext(Dispatchers.Main) {
                 viewModel.updateClipboardHistory(history)
-            }
-            if (triggerSuggestionsUpdate) {
-                updateSuggestions()
+                if (triggerSuggestionsUpdate) {
+                    lastProcessedTextBefore = null
+                    updateSuggestions()
+                }
             }
         }
     }

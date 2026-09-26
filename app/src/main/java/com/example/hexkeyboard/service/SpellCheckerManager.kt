@@ -24,6 +24,7 @@ class SpellCheckerManager(
 
     fun closeSession() {
         lastFetchJob?.cancel()
+        scope.coroutineContext.cancelChildren()
     }
 
     fun clearSuggestions() {

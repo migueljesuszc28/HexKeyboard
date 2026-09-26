@@ -40,11 +40,7 @@ fun KeyboardPreview(
     var backgroundBlurImage by remember(theme.backgroundImageUri, theme.backgroundBlur) { mutableStateOf<Bitmap?>(null) }
     
     val parallaxManager = remember { ParallaxSensorManager(context) }
-    val parallaxOffset = if (theme.parallaxEffect) {
-        parallaxManager.parallaxOffset.collectAsState().value
-    } else {
-        ParallaxSensorManager.Offset(0f, 0f)
-    }
+    val parallaxOffsetState = parallaxManager.parallaxOffset.collectAsState()
 
     DisposableEffect(theme.parallaxEffect) {
         if (theme.parallaxEffect) {
@@ -97,8 +93,9 @@ fun KeyboardPreview(
                             val maxShiftX = (size.width * parallaxLimit) / 2f
                             val maxShiftY = (size.height * parallaxLimit) / 2f
                             
-                            translationX = parallaxOffset.x * maxShiftX
-                            translationY = parallaxOffset.y * maxShiftY
+                            val offset = parallaxOffsetState.value
+                            translationX = offset.x * maxShiftX
+                            translationY = offset.y * maxShiftY
                             scaleX = scale
                             scaleY = scale
                         }
@@ -150,9 +147,6 @@ fun KeyboardPreview(
                     if (view.keyboardTheme != theme) {
                         view.keyboardTheme = theme
                         view.drawBackground = false
-                    }
-                    if (theme.parallaxEffect) {
-                        view.setParallaxOffset(parallaxOffset.x, parallaxOffset.y)
                     }
                 },
                 modifier = Modifier.fillMaxWidth()

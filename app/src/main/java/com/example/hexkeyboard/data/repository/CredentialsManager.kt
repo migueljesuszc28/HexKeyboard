@@ -21,6 +21,23 @@ object CredentialsManager {
 
     @Suppress("DEPRECATION")
     private fun getPrefs(context: Context): SharedPreferences {
+        return try {
+            createEncryptedPrefs(context)
+        } catch (_: Exception) {
+            // Backup or reinstall invalidated the Keystore master key.
+            // Clear unreadable encrypted preferences file and recreate cleanly.
+            try {
+                context.deleteSharedPreferences(PREFS_FILENAME)
+            } catch (_: Exception) {}
+            try {
+                createEncryptedPrefs(context)
+            } catch (_: Exception) {
+                context.getSharedPreferences(PREFS_FILENAME, Context.MODE_PRIVATE)
+            }
+        }
+    }
+
+    private fun createEncryptedPrefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context, MasterKey.DEFAULT_MASTER_KEY_ALIAS)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()

@@ -77,9 +77,15 @@ fun FontSelectorScreen(onBack: () -> Unit) {
     val selectedFontPath by selectedFontPathFlow.collectAsState("system")
     var customFonts by remember { mutableStateOf(emptyList<File>()) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedFontPath) {
         if (!isPreview) {
             customFonts = FontManager.listCustomFonts(context)
+            if (selectedFontPath != "system" && selectedFontPath != "nunito") {
+                val file = File(selectedFontPath)
+                if (!file.exists() || file.length() == 0L) {
+                    dataStore.edit { it[customFontKey] = "system" }
+                }
+            }
         }
     }
 

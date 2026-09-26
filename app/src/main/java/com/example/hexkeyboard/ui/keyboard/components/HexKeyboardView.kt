@@ -204,7 +204,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private val floatingRect = RectF()
 
     fun setParallaxOffset(x: Float, y: Float) {
-        parallaxX = x; parallaxY = y; invalidate()
+        if (drawBackground && (parallaxX != x || parallaxY != y)) {
+            parallaxX = x
+            parallaxY = y
+            invalidate()
+        }
     }
 
     private fun applyTheme(theme: KeyboardTheme) {

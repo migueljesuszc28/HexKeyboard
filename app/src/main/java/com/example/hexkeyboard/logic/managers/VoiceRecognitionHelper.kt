@@ -36,6 +36,8 @@ class VoiceRecognitionHelper(private val context: Context) {
             return
         }
 
+        stopListening()
+
         resultListener = listener
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
             setRecognitionListener(createRecognitionListener())

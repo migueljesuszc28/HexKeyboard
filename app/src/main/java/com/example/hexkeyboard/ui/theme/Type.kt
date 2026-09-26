@@ -37,14 +37,15 @@ fun getTypography(): Typography {
         "nunito" -> NunitoFontFamily
         "system" -> FontFamily.Default
         else -> {
-            val file = File(fontPath)
-            if (file.exists()) {
-                try {
-                    FontFamily(Typeface.createFromFile(file))
-                } catch (e: Exception) {
+            try {
+                val file = File(fontPath)
+                if (file.exists() && file.length() > 0) {
+                    val tf = Typeface.createFromFile(file)
+                    if (tf != null) FontFamily(tf) else FontFamily.Default
+                } else {
                     FontFamily.Default
                 }
-            } else {
+            } catch (_: Exception) {
                 FontFamily.Default
             }
         }

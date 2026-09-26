@@ -834,11 +834,11 @@ object ThemeUtils {
         val enabled = prefs[GLASS_GLOBAL_ENABLED] ?: true
         val styleStr = prefs[GLASS_STYLE] ?: "LIQUID"
         val style = try { GlassStyle.valueOf(styleStr) } catch (_: Exception) { GlassStyle.LIQUID }
-        val blurRadius = prefs[GLASS_BLUR_RADIUS] ?: 2f
+        val blurRadius = prefs[GLASS_BLUR_RADIUS] ?: 0f
         val vibrancy = prefs[GLASS_VIBRANCY] ?: 1.2f
         val lensHeight = prefs[GLASS_LENS_HEIGHT] ?: 0.4f
         val lensAmount = prefs[GLASS_LENS_AMOUNT] ?: 0.6f
-        val surfaceOpacity = prefs[GLASS_SURFACE_OPACITY] ?: 0.5f
+        val surfaceOpacity = prefs[GLASS_SURFACE_OPACITY] ?: 0.9f
         val depthEffect = prefs[GLASS_DEPTH_EFFECT] ?: false
         val chromaticAberration = prefs[GLASS_CHROMATIC_ABERRATION] ?: false
 
