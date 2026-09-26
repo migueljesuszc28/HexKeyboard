@@ -1,31 +1,28 @@
 package com.example.hexkeyboard.ui.keyboard.panels
 
 import android.content.Context
-import android.graphics.drawable.ColorDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.PopupWindow
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -33,7 +30,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,57 +37,49 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.preference.PreferenceManager
-import androidx.datastore.preferences.core.edit
-import com.example.hexkeyboard.data.repository.ThemeUtils
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.tween
+import androidx.core.graphics.drawable.toDrawable
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
-import com.example.hexkeyboard.ui.keyboard.components.bounceClick
-import com.example.hexkeyboard.ui.component.GlassEffectConfig
-import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.ui.component.glassContentColorFor
+import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlin.math.*
-
+import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun EmojiPanel(
@@ -212,13 +200,10 @@ fun EmojiPanel(
                             is EmojiProvider.EmojiGridItem.Header -> EmojiHeader(name = item.name, theme = theme)
                             is EmojiProvider.EmojiGridItem.Emoji -> {
                                 EmojiItem(
-                                    emoji = item.code,
                                     canonical = item.canonical,
                                     family = item.family,
                                     skinTone = skinTone,
                                     genderIndex = genderIndex,
-                                    onSkinToneSelected = { viewModel?.setSkinTone(it) },
-                                    onGenderSelected = { viewModel?.setGenderIndex(it) },
                                     onEmojiSelected = { finalEmoji ->
                                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                         viewModel?.saveRecentEmoji(context, finalEmoji)
@@ -318,7 +303,7 @@ fun EmojiBackButton(
 
     Box(
         modifier = Modifier
-            .size(38.dp)
+            .size(45.dp)
             .bounceClick(
                 onClick = {
                     FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
@@ -336,7 +321,7 @@ fun EmojiBackButton(
             imageVector = Icons.Default.Keyboard,
             contentDescription = "Volver",
             tint = iconColor,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(24.dp)
         )
     }
 }
@@ -385,7 +370,6 @@ fun EmojiCategoryTabs(
             Color(0xFF1A73E8)
         }
     }
-    val selectedColor = activeColor
     val unselectedColor = Color(theme.keyboardIconTint).copy(alpha = 0.5f)
     val categoryShape = remember { RoundedCornerShape(20.dp) }
 
@@ -403,10 +387,10 @@ fun EmojiCategoryTabs(
     ) {
         @OptIn(ExperimentalMaterial3Api::class)
         CompositionLocalProvider(LocalRippleConfiguration provides null) {
-            ScrollableTabRow(
+            SecondaryScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.Transparent,
-                contentColor = selectedColor,
+                contentColor = activeColor,
                 edgePadding = 4.dp,
                 modifier = Modifier.fillMaxWidth(),
                 divider = {},
@@ -414,7 +398,7 @@ fun EmojiCategoryTabs(
             ) {
                 EmojiProvider.categories.forEachIndexed { index, category ->
                     val isSelected = index == selectedTabIndex
-                    val tint = if (isSelected) selectedColor else unselectedColor
+                    val tint = if (isSelected) activeColor else unselectedColor
                     Tab(
                         selected = isSelected,
                         onClick = {
@@ -422,20 +406,19 @@ fun EmojiCategoryTabs(
                             onCategoryClick(category.name)
                         },
                         unselectedContentColor = unselectedColor,
-                        selectedContentColor = selectedColor,
+                        selectedContentColor = activeColor,
                         icon = {
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
                                     .then(
-                                        if (isSelected) Modifier.background(selectedColor.copy(alpha = 0.18f))
+                                        if (isSelected) Modifier.background(activeColor.copy(alpha = 0.18f))
                                         else Modifier
                                     )
                                     .padding(horizontal = 8.dp, vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                val iconData = categoryIcons[category.name]
-                                when (iconData) {
+                                when (val iconData = categoryIcons[category.name]) {
                                     is ImageVector -> Icon(imageVector = iconData, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
                                     is Int -> Icon(painter = painterResource(iconData), contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
                                     else -> Text(category.icon, fontSize = 18.sp, color = tint)
@@ -465,7 +448,7 @@ fun EmojiDeleteButton(
 
     LaunchedEffect(isPressed) {
         if (isPressed) {
-            delay(400)
+            delay(400.milliseconds)
             var count = 0
             while (isActive) {
                 onDelete()
@@ -475,7 +458,7 @@ fun EmojiDeleteButton(
                     count < 15 -> 60L
                     else -> 45L
                 }
-                delay(nextInterval)
+                delay(nextInterval.milliseconds)
             }
         }
     }
@@ -514,16 +497,12 @@ fun EmojiDeleteButton(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EmojiItem(
-    emoji: String,
     canonical: String,
     family: EmojiProvider.EmojiFamily,
     skinTone: String,
     genderIndex: Int,
-    onSkinToneSelected: (String) -> Unit,
-    onGenderSelected: (Int) -> Unit,
     onEmojiSelected: (String) -> Unit,
     theme: KeyboardTheme
 ) {
@@ -531,8 +510,6 @@ fun EmojiItem(
     val service = context as? HexKeyboardService
     val parentView = LocalView.current
 
-    // Sincronización Global Total (Estilo Gboard):
-    // Los emojis reaccionan dinámicamente al tono y género global usando la familia pre-calculada
     val displayEmoji = remember(canonical, skinTone, genderIndex) {
         val gendered = when (genderIndex) {
             1 -> family.male ?: family.neutral ?: family.female
@@ -545,7 +522,6 @@ fun EmojiItem(
     val variationGrid = remember(canonical) { EmojiProvider.getEmojiVariationGrid(canonical) }
     val hasVariations = remember(canonical) { EmojiProvider.hasVariations(canonical) }
 
-    // Almacena las coordenadas reales de la celda sin desencadenar recomposiciones durante el scroll
     val cellCoords = remember { floatArrayOf(0f, 0f, 0f, 0f) }
 
     Box(
@@ -626,10 +602,7 @@ fun showEmojiVariationPopupWindow(
     val popupWidthPx = (cols * itemSizePx + (16 * density)).toInt()
     val popupHeightPx = (rows * itemSizePx + (16 * density)).toInt()
 
-    val globalCellX = cellX
-    val globalCellY = cellY
-
-    val cellCenterX = globalCellX + (cellWidth / 2f)
+    val cellCenterX = cellX + (cellWidth / 2f)
     val idealLeftX = cellCenterX - (popupWidthPx / 2f)
     val clampedLeftX = idealLeftX.coerceIn(marginPx.toFloat(), (screenWidth - marginPx - popupWidthPx).toFloat().coerceAtLeast(marginPx.toFloat()))
 
@@ -643,12 +616,12 @@ fun showEmojiVariationPopupWindow(
         -1000
     }
 
-    val idealTopY = (globalCellY - popupHeightPx - (8 * density)).toInt()
+    val idealTopY = (cellY - popupHeightPx - (8 * density)).toInt()
 
     val targetY = if (idealTopY >= minAllowedYInWindow) {
         idealTopY
     } else {
-        (globalCellY + cellHeight + (8 * density)).toInt()
+        (cellY + cellHeight + (8 * density)).toInt()
     }
 
     var popupWindow: PopupWindow? = null
@@ -706,9 +679,9 @@ fun showEmojiVariationPopupWindow(
         elevation = 20f
         isTouchable = true
         isOutsideTouchable = true
-        setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+        setBackgroundDrawable(android.graphics.Color.TRANSPARENT.toDrawable())
         inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
-        isClippingEnabled = false // PERMITE FLOTAR LIBREMENTE FUERA Y POR ENCIMA DEL TECLADO IME
+        isClippingEnabled = false
         animationStyle = 0
     }
 
