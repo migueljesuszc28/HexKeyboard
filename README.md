@@ -54,7 +54,7 @@ Puedes descargar el archivo `.apk` de la versión estable más reciente directam
 </p>
 
 ### Pasos para activar el teclado:
-1. Instala el archivo `app-release.apk` en tu dispositivo.
+1. Instala el archivo `HexKeyboard.apk` en tu dispositivo.
 2. Abre **Ajustes** > **Sistema** > **Idiomas y entrada** > **Teclado en pantalla**.
 3. Activa **HexKeyboard**.
 4. Selecciónalo como método de entrada predeterminado.
