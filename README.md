@@ -48,7 +48,7 @@
 Puedes descargar el archivo `.apk` de la versión estable más reciente directamente desde la sección de lanzamientos:
 
 <p align="center">
-  <a href="https://github.com/TU_USUARIO/hexkeyboard/releases/latest">
+  <a href="https://github.com/migueljesuszc28/hexkeyboard/releases/latest">
     <img src="https://img.shields.io/badge/Descargar%20APK-Última%20Versión-success?style=for-the-badge&logo=android" alt="Descargar APK" />
   </a>
 </p>
