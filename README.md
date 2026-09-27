@@ -11,7 +11,7 @@
 <p align="center">
   <!-- Reemplaza TU_USUARIO por tu nombre de usuario en GitHub -->
   <a href="https://github.com/migueljesuszc28/hexkeyboard/releases/latest">
-    <img src="https://img.shields.io/github/v/release/TU_USUARIO/hexkeyboard?style=flat-square&color=blue" alt="Latest Release" />
+    <img src="https://img.shields.io/github/v/release/migueljesuszc28/hexkeyboard?style=flat-square&color=blue" alt="Latest Release" />
   </a>
   <img src="https://img.shields.io/badge/Platform-Android-brightgreen?style=flat-square&logo=android" alt="Platform Android" />
   <img src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-purple?style=flat-square&logo=kotlin" alt="Kotlin & Compose" />
