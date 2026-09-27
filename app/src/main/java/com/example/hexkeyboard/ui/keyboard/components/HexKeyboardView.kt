@@ -13,7 +13,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.PopupWindow
-import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withSave
@@ -23,13 +22,11 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.dynamicanimation.animation.FloatPropertyCompat
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
-import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.service.HexKeyboardService
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
 import kotlin.math.*
 
 class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
@@ -61,7 +58,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             if (field != value) {
                 field = value
                 if (!value) capsLock = false
-                if (layoutMode == HexLayoutEngine.LayoutMode.FONTS && width > 0) buildLayout(width.toFloat())
+                if ((layoutMode == HexLayoutEngine.LayoutMode.FONTS) && (width > 0)) buildLayout(width.toFloat())
                 invalidate()
             }
         }
@@ -203,6 +200,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
     private val floatingRect = RectF()
 
+    @Suppress("unused")
     fun setParallaxOffset(x: Float, y: Float) {
         if (drawBackground && (parallaxX != x || parallaxY != y)) {
             parallaxX = x
@@ -343,7 +341,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private val keys = mutableListOf<HexLayoutEngine.Key>()
-    val allKeys: List<HexLayoutEngine.Key> get() = keys
+    val allKeys: List<HexLayoutEngine.Key> = keys
     private val uiKeyMap = mutableMapOf<HexLayoutEngine.Key, UIKey>()
     private val spaceKeys = mutableListOf<HexLayoutEngine.Key>()
     private val shiftKeys = mutableListOf<HexLayoutEngine.Key>()
@@ -370,7 +368,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private var longPressStarted = false
     private val longPressTimeout: Long get() = cachedLongPressTimeout
     private val longPressRunnable = Runnable {
-        pressedKey?.let { if (it.alternatives.isNotEmpty() && !isGestureActive) { longPressStarted = true; popupVisibleKey = it; popupSelectedIndex = 0; showPopup(it, true) } }
+        pressedKey?.let { if (it.alternatives.isNotEmpty() && !isGestureActive) { longPressStarted = true; popupVisibleKey = it; popupSelectedIndex = 0; showPopup(it, isLongPress = true) } }
     }
     private var deleteRepeatRunnable: Runnable? = null
     private var lastShiftClickTime = 0L
@@ -452,11 +450,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private fun getGroupCenter(key: HexLayoutEngine.Key): Float? {
-        return when {
-            key.type == HexLayoutEngine.KeyType.SPACE && spaceKeys.size >= 2 -> unifiedSpaceCenterX
-            key.type == HexLayoutEngine.KeyType.SHIFT && shiftKeys.size >= 2 -> unifiedShiftCenterX
-            key.type == HexLayoutEngine.KeyType.DELETE && deleteKeys.size >= 2 -> unifiedDeleteCenterX
-            key.type == HexLayoutEngine.KeyType.ENTER && enterKeys.size >= 2 -> unifiedEnterCenterX
+        return when (key.type) {
+            HexLayoutEngine.KeyType.SPACE -> if (spaceKeys.size >= 2) unifiedSpaceCenterX else null
+            HexLayoutEngine.KeyType.SHIFT -> if (shiftKeys.size >= 2) unifiedShiftCenterX else null
+            HexLayoutEngine.KeyType.DELETE -> if (deleteKeys.size >= 2) unifiedDeleteCenterX else null
+            HexLayoutEngine.KeyType.ENTER -> if (enterKeys.size >= 2) unifiedEnterCenterX else null
             else -> null
         }
     }
@@ -585,7 +583,6 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private fun drawKey(canvas: Canvas, key: HexLayoutEngine.Key) {
-        canvas.save()
         val isSpace = key.type == HexLayoutEngine.KeyType.SPACE
         val pressed = when {
             isSpace -> spacePressed && popupVisibleKey == null
@@ -603,9 +600,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
         val drawCx = getGroupCenter(key)
         val scaleCx = drawCx ?: key.cx
-        canvas.scale(appliedScale, appliedScale, scaleCx, key.cy)
-        renderer.drawSingleKey(canvas, key, keyboardTheme, pressed, shifted, capsLock, appliedScale, drawCx)
-        canvas.restore()
+        canvas.withSave {
+            scale(appliedScale, appliedScale, scaleCx, key.cy)
+            renderer.drawSingleKey(canvas, key, keyboardTheme, pressed, shifted, capsLock, appliedScale, drawCx)
+        }
     }
 
     private var popupWindow: PopupWindow? = null
@@ -893,11 +891,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     private fun animateKeyToScale(key: HexLayoutEngine.Key?, target: Float) {
         if (key == null) return
-        when {
-            key in spaceKeys -> spaceKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
-            key in shiftKeys -> shiftKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
-            key in deleteKeys -> deleteKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
-            key in enterKeys -> enterKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
+        when (key) {
+            in spaceKeys -> spaceKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
+            in shiftKeys -> shiftKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
+            in deleteKeys -> deleteKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
+            in enterKeys -> enterKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
             else -> uiKeyMap[key]?.animateToScale(target)
         }
     }

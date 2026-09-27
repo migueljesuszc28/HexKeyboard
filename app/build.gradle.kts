@@ -11,12 +11,12 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.hexkeyboard"
+        applicationId = "dev.cozu2806.hexkeyboard"
         minSdk = 26
         //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 1
-        versionName = "10.0"
+        versionName = "10.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
