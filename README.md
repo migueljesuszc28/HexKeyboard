@@ -5,82 +5,88 @@
 <h1 align="center">HexKeyboard</h1>
 
 <p align="center">
-  Un teclado virtual nativo para Android con disposición hexagonal ergonómica, predicción local y personalización avanzada.
+  Teclado virtual nativo para Android con disposición hexagonal ergonómica, procesamiento local de texto y personalización avanzada.
 </p>
-
-<p align="center">
-  <!-- Reemplaza TU_USUARIO por tu nombre de usuario en GitHub -->
-  <a href="https://github.com/migueljesuszc28/hexkeyboard/releases/latest">
-    <img src="https://img.shields.io/github/v/release/migueljesuszc28/hexkeyboard?style=flat-square&color=blue" alt="Latest Release" />
-  </a>
-  <img src="https://img.shields.io/badge/Platform-Android-brightgreen?style=flat-square&logo=android" alt="Platform Android" />
-  <img src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-purple?style=flat-square&logo=kotlin" alt="Kotlin & Compose" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
-</p>
-
----
-
-## 📱 Capturas de Pantalla
-
-<p align="center">
-  <img src="art/screenshots/keyboard_main.png" width="28%" alt="Vista Principal Hexagonal" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="art/screenshots/emoji_panel.png" width="28%" alt="Panel de Emojis" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="art/screenshots/settings.png" width="28%" alt="Ajustes y Personalización" />
-</p>
-
----
-
-## ✨ Características Principales
-
-- ⬡ **Distribución Hexagonal Ergonómica:** Diseño geométrico optimizado para facilitar la escritura con pulgares y reducir errores de pulsación.
-- ⚡ **Desarrollado en Jetpack Compose:** Interfaz fluida, moderna y reactiva construida completamente en Kotlin nativo.
-- 🔒 **Privacidad Total (Sin Conexión):** Todo el procesamiento de texto, predicciones y aprendizaje de palabras ocurre estrictamente de forma local en tu dispositivo, sin telemetría ni acceso a internet.
-- 💡 **Barra de Candidatos y Predicción:** Motor de sugerencias contextuales rápido e integrado.
-- 😊 **Panel de Emojis Dedicado:** Navegación organizada por categorías y selector rápido.
-- 🎨 **Soporte de Temas Visuales:** Adaptable a modo claro, oscuro y personalización dinámica del estilo de las teclas.
-
----
-
-## 📥 Descarga e Instalación
-
-Puedes descargar el archivo `.apk` de la versión estable más reciente directamente desde la sección de lanzamientos:
 
 <p align="center">
   <a href="https://github.com/migueljesuszc28/hexkeyboard/releases/latest">
-    <img src="https://img.shields.io/badge/Descargar%20APK-Última%20Versión-success?style=for-the-badge&logo=android" alt="Descargar APK" />
+    <img src="https://img.shields.io/github/v/release/migueljesuszc28/hexkeyboard?style=flat-square&color=blue" alt="Última versión" />
   </a>
+  <img src="https://img.shields.io/badge/Plataforma-Android-brightgreen?style=flat-square&logo=android" alt="Plataforma Android" />
+  <img src="https://img.shields.io/badge/Lenguaje-Kotlin-purple?style=flat-square&logo=kotlin" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-blue?style=flat-square&logo=jetpackcompose" alt="Jetpack Compose" />
+  <img src="https://img.shields.io/badge/Licencia-MIT-green?style=flat-square" alt="Licencia MIT" />
 </p>
 
-### Pasos para activar el teclado:
-1. Instala el archivo `HexKeyboard.apk` en tu dispositivo.
-2. Abre **Ajustes** > **Sistema** > **Idiomas y entrada** > **Teclado en pantalla**.
-3. Activa **HexKeyboard**.
+---
+
+## Capturas de Pantalla
+
+<p align="center">
+  <img src="art/screenshots/main.jpg" width="28%" alt="Vista Principal" />
+
+  <img src="art/screenshots/keyboard.jpg" width="28%" alt="Vista Principal del Teclado Hexagonal" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="art/screenshots/emojis.jpg" width="28%" alt="Panel de Emojis" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="art/screenshots/settings.jpg" width="28%" alt="Ajustes y Personalización" />
+</p>
+
+---
+
+## Características Principales
+
+- **Distribución Hexagonal Ergonómica:** Diseño geométrico optimizado para la escritura con pulgares, reduciendo errores de pulsación accidentales.
+- **Desarrollado en Jetpack Compose:** Interfaz nativa, fluida y reactiva integrada mediante interoperabilidad con `InputMethodService`.
+- **Privacidad Local sin Conexión:** Procesamiento de texto, predicciones y aprendizaje de palabras realizado estrictamente en el dispositivo, sin telemetría ni acceso a red.
+- **Motor de Predicción y Sugerencias:** Sugerencias contextuales de alta velocidad y soporte de autocorrección local.
+- **Panel de Emojis Integrado:** Navegación por categorías, variantes de tono de piel y gestión de emojis frecuentes.
+- **Gestión de Credenciales y Portapapeles:** Historial local seguro y autocompletado de datos frecuentes.
+- **Personalización de Temas:** Soporte para modo claro, oscuro, efectos translúcidos (Liquid Glass) y fuentes personalizadas.
+
+---
+
+## Descarga e Instalación
+
+Puedes descargar el archivo APK ejecutable de la versión más reciente desde la sección de lanzamientos del repositorio:
+
+[Descargar APK (Última versión)](https://github.com/migueljesuszc28/hexkeyboard/releases/latest)
+
+### Configuración en el dispositivo:
+1. Instala el archivo `HexKeyboard.apk` en tu dispositivo Android.
+2. Abre **Ajustes** > **Sistema** > **Idiomas e introducción de texto** > **Teclado en pantalla**.
+3. Activa **HexKeyboard** en la lista de teclados disponibles.
 4. Selecciónalo como método de entrada predeterminado.
 
 ---
 
-## 🛠️ Tecnologías y Requisitos
+## Requisitos del Sistema
 
 - **Lenguaje:** Kotlin
-- **UI:** Jetpack Compose (Compose Multiplatform / Android Toolkit)
-- **Min SDK:** Android 8.0 (API 26) o superior
-- **Target SDK:** Android 14+ (API 34+)
-- **Herramienta de compilación:** Gradle con Kotlin DSL (`build.gradle.kts`)
+- **Toolkit UI:** Jetpack Compose (Material 3)
+- **Versión mínima:** Android 8.0 (API Nivel 26)
+- **Versión objetivo:** Android 14+ (API Nivel 34)
+- **Sistema de construcción:** Gradle con Kotlin DSL (`build.gradle.kts`)
 
 ---
 
-## 💻 Compilación Local
+## Compilación del Proyecto
 
-Si deseas clonar el proyecto y compilarlo tú mismo en Android Studio:
+Para clonar y compilar el proyecto localmente utilizando Android Studio o la consola:
 
 ```bash
-# 1. Clonar el repositorio
-git clone [https://github.com/TU_USUARIO/hexkeyboard.git](https://github.com/TU_USUARIO/hexkeyboard.git)
+# Clonar el repositorio
+git clone https://github.com/migueljesuszc28/hexkeyboard.git
 
-# 2. Entrar a la carpeta
+# Acceder al directorio del proyecto
 cd hexkeyboard
 
-# 3. Compilar APK de depuración
+# Compilar el archivo APK de depuración
 ./gradlew assembleDebug
+```
+
+---
+
+## Licencia
+
+Este proyecto está bajo la Licencia MIT. Consulta el archivo `LICENSE` para obtener más información.
