@@ -24,19 +24,12 @@
 
 <p align="center">
   <img src="art/screenshots/main.jpg" width="28%" alt="Vista Principal" />
-
   <img src="art/screenshots/settings.jpg" width="28%" alt="Ajustes y Personalización" />
-
   <img src="art/screenshots/themes.png" width="28%" alt="Pantalla de Temas" />
-
   <img src="art/screenshots/keyboard.jpg" width="28%" alt="Vista Principal del Teclado Hexagonal" />
-
   <img src="art/screenshots/symbols.png" width="28%" alt="Panel de Símbolos" />
-
   <img src="art/screenshots/fonts.png" width="28%" alt="Panel de Fuentes" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="art/screenshots/emojis.jpg" width="28%" alt="Panel de Emojis" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
 </p>
 
 ---
@@ -45,11 +38,30 @@
 
 - **Distribución Hexagonal Ergonómica:** Diseño geométrico optimizado para la escritura con pulgares, reduciendo errores de pulsación accidentales.
 - **Desarrollado en Jetpack Compose:** Interfaz nativa, fluida y reactiva integrada mediante interoperabilidad con `InputMethodService`.
-- **Privacidad Local sin Conexión:** Procesamiento de texto, predicciones y aprendizaje de palabras realizado estrictamente en el dispositivo, sin telemetría ni acceso a red.
+- **Privacidad Local sin Conexión:** Procesamiento de texto, predicciones y aprendizaje de palabras realizado strictly en el dispositivo, sin telemetría ni acceso a red.
 - **Motor de Predicción y Sugerencias:** Sugerencias contextuales de alta velocidad y soporte de autocorrección local.
 - **Panel de Emojis Integrado:** Navegación por categorías, variantes de tono de piel y gestión de emojis frecuentes.
 - **Gestión de Credenciales y Portapapeles:** Historial local seguro y autocompletado de datos frecuentes.
 - **Personalización de Temas:** Soporte para modo claro, oscuro, efectos translúcidos (Liquid Glass) y fuentes personalizadas.
+
+---
+
+## Sistema de Interfaz Liquid Glass
+
+HexKeyboard incorpora un sistema de diseño visual translúcido con desenfoque de fondo y refracción en tiempo real.
+
+### Arquitectura Técnica del Efecto:
+1. **Captura de Fondo (`Backdrop`):** Mediante `rememberLayerBackdrop()` y `Modifier.layerBackdrop(...)`, la aplicación registra los píxeles renderizados en las capas inferiores de la vista.
+2. **Muestreo y Refracción (`liquidGlass`):** Cualesquiera superficies superiores (barra de sugerencias, botones flotantes, menús desplegables) aplican el modificador `Modifier.liquidGlass(...)` para muestrear, desenfocar y refractar el mapa de píxeles capturado.
+
+---
+
+## Créditos y Reconocimientos
+
+Este proyecto hace uso de soluciones de la comunidad de código abierto:
+
+- **[Convx](https://github.com/CosmicTaser/Convx)** por **Aryan ([CosmicTaser](https://github.com/CosmicTaser))**: Inspiración e implementación base del sistema de diseño **Liquid Glass** UI y el modificador `liquidGlass` para Jetpack Compose.
+- **[Kyant0/backdrop](https://github.com/Kyant0/backdrop)** por **[Kyant0](https://github.com/Kyant0)**: Librería fundamental que proporciona el motor de muestreo de píxeles, desenfoque y refracción en tiempo real (*backdrop blur*).
 
 ---
 
