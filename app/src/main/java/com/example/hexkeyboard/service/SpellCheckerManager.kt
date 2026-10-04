@@ -49,7 +49,7 @@ class SpellCheckerManager(
             // Obtener sugerencias de nuestro motor interno (en hilo de fondo)
             val internalSuggestions = withContext(Dispatchers.Default) {
                 predictionEngine.getSuggestions(text)
-                    .filter { it.isCorrection }
+                    .filter { it.isCorrection || it.text.lowercase() != text.lowercase() }
                     .map { it.text }
             }
 

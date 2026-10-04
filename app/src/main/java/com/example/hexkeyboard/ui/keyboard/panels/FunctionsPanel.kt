@@ -3,17 +3,33 @@ package com.example.hexkeyboard.ui.keyboard.panels
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,8 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
+import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBorderStroke
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
-
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 
 @Composable
@@ -37,6 +53,9 @@ fun FunctionsPanel(
     viewModel: KeyboardViewModel? = null
 ) {
     val context = LocalContext.current
+    val currentLocaleFlow = remember(viewModel) { viewModel?.currentLocale ?: kotlinx.coroutines.flow.MutableStateFlow("es") }
+    val currentLocale by currentLocaleFlow.collectAsState("es")
+    val isEn = currentLocale == "en"
 
     Box(
         modifier = Modifier
@@ -55,14 +74,14 @@ fun FunctionsPanel(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FunctionItem(
-                    icon = Icons.Default.Settings,
-                    label = "Ajustes",
+                    icon = Icons.Rounded.Settings,
+                    label = if (isEn) "Settings" else "Ajustes",
                     onClick = onSettings,
                     theme = theme
                 )
                 FunctionItem(
-                    icon = Icons.Default.ContentPaste,
-                    label = "Portapapeles",
+                    icon = Icons.AutoMirrored.Outlined.Assignment,
+                    label = if (isEn) "Clipboard" else "Portapapeles",
                     onClick = {
                         viewModel?.setCurrentView("clipboard", context)
                     },
@@ -70,8 +89,8 @@ fun FunctionsPanel(
                 )
             }
             FunctionItem(
-                icon = Icons.Default.Palette,
-                label = "Temas",
+                icon = Icons.Outlined.Palette,
+                label = if (isEn) "Themes" else "Temas",
                 onClick = {
                     context.startActivity(Intent(context, ThemeSettingsActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
                 },
@@ -79,18 +98,15 @@ fun FunctionsPanel(
             )
             FunctionItem(
                 icon = Icons.Default.Language,
-                label = "Idioma",
+                label = if (isEn) "Language" else "Idioma",
                 onClick = {
-                    viewModel?.switchToNextLanguage()
-                },
-                onLongClick = {
-                    viewModel?.showLanguagePicker()
+                    viewModel?.setCurrentView("languages", context)
                 },
                 theme = theme
             )
             FunctionItem(
                 icon = Icons.Default.Key,
-                label = "Contraseñas",
+                label = if (isEn) "Passwords" else "Contraseñas",
                 onClick = {
                     viewModel?.setCurrentView("credentials", context)
                 },
@@ -113,6 +129,8 @@ fun FunctionItem(
     val iconColor = Color(theme.keyboardIconTint)
     val textColor = Color(theme.keyTextColor)
 
+    val borderStroke = rememberKeyBorderStroke(theme)
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -125,6 +143,7 @@ fun FunctionItem(
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = bgColor,
+            border = borderStroke,
             modifier = Modifier.size(56.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {

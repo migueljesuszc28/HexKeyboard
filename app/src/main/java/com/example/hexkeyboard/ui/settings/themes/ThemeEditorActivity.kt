@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -210,7 +211,7 @@ fun ThemeEditorScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.Default.Palette,
+                                    Icons.Outlined.Palette,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(16.dp)
@@ -276,7 +277,7 @@ fun ThemeEditorScreen(
                 }
 
                 // Section 2: Colors
-                EditorSectionHeader("Colores Principales", Icons.Default.Palette)
+                EditorSectionHeader("Colores Principales", Icons.Outlined.Palette)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()

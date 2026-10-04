@@ -1,5 +1,6 @@
 package com.example.hexkeyboard.ui.settings
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -9,7 +10,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.res.stringResource
+import androidx.core.os.LocaleListCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -44,7 +51,11 @@ import com.example.hexkeyboard.R
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : AppCompatActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(ThemeUtils.getAppLanguageContext(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +113,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 TopAppBar(
                     title = {
                         Text(
-                            "Ajustes",
+                            stringResource(R.string.settings_title),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -134,19 +145,75 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         ) {
             // --- SECCIÓN 1: Idioma y Distribución ---
-            item { CategoryHeader("Idioma y Distribución", Icons.Default.Language) }
+            item { CategoryHeader(stringResource(R.string.section_language_layout), Icons.Default.Language) }
             item {
                 SettingsCardContainer {
+                    val appLangValueFlow = remember { dataStore.data.map { it[ThemeUtils.APP_LANGUAGE] ?: "es" } }
+                    val appLangValue by appLangValueFlow.collectAsState("es")
+                    var showAppLangDialog by remember { mutableStateOf(false) }
+
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.setting_app_language), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = {
+                            Text(when(appLangValue) {
+                                "es" -> stringResource(R.string.lang_spanish)
+                                "en" -> stringResource(R.string.lang_english)
+                                else -> appLangValue
+                            })
+                        },
+                        leadingContent = { Icon(Icons.Default.Translate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable { showAppLangDialog = true }
+                    )
+
+                    if (showAppLangDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showAppLangDialog = false },
+                            title = { Text(stringResource(R.string.setting_app_language_title)) },
+                            text = {
+                                Column {
+                                    listOf("es" to stringResource(R.string.lang_spanish), "en" to stringResource(R.string.lang_english)).forEach { (value, label) ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    scope.launch {
+                                                        dataStore.edit { it[ThemeUtils.APP_LANGUAGE] = value }
+                                                        AppCompatDelegate.setApplicationLocales(
+                                                            LocaleListCompat.forLanguageTags(value)
+                                                        )
+                                                        (context as? Activity)?.recreate()
+                                                    }
+                                                    showAppLangDialog = false
+                                                }
+                                                .padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(selected = appLangValue == value, onClick = null)
+                                            Spacer(Modifier.width(16.dp))
+                                            Text(label)
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showAppLangDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
+                            }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
                     val langValueFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es" } }
                     val langValue by langValueFlow.collectAsState("es")
                     var showLangDialog by remember { mutableStateOf(false) }
 
                     ListItem(
-                        headlineContent = { Text("Idioma del Teclado", fontWeight = FontWeight.SemiBold) },
+                        headlineContent = { Text(stringResource(R.string.setting_keyboard_language), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
                             Text(when(langValue) {
-                                "es" -> "Español"
-                                "en" -> "English"
+                                "es" -> stringResource(R.string.lang_spanish)
+                                "en" -> stringResource(R.string.lang_english)
                                 else -> langValue
                             })
                         },
@@ -158,10 +225,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                     if (showLangDialog) {
                         AlertDialog(
                             onDismissRequest = { showLangDialog = false },
-                            title = { Text("Seleccionar idioma principal") },
+                            title = { Text(stringResource(R.string.setting_keyboard_language_title)) },
                             text = {
                                 Column {
-                                    listOf("es" to "Español", "en" to "English").forEach { (value, label) ->
+                                    listOf("es" to stringResource(R.string.lang_spanish), "en" to stringResource(R.string.lang_english)).forEach { (value, label) ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -182,7 +249,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 }
                             },
                             confirmButton = {
-                                TextButton(onClick = { showLangDialog = false }) { Text("Cancelar") }
+                                TextButton(onClick = { showLangDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
                             }
                         )
                     }
@@ -194,12 +261,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                     var showSecLangDialog by remember { mutableStateOf(false) }
 
                     ListItem(
-                        headlineContent = { Text("Idioma secundario (Bilingüe)", fontWeight = FontWeight.SemiBold) },
+                        headlineContent = { Text(stringResource(R.string.setting_secondary_language), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
                             Text(when(secLangValue) {
-                                "es" -> "Español"
-                                "en" -> "English"
-                                else -> "Desactivado"
+                                "es" -> stringResource(R.string.lang_spanish)
+                                "en" -> stringResource(R.string.lang_english)
+                                else -> stringResource(R.string.lang_disabled)
                             })
                         },
                         leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -210,10 +277,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                     if (showSecLangDialog) {
                         AlertDialog(
                             onDismissRequest = { showSecLangDialog = false },
-                            title = { Text("Seleccionar idioma secundario") },
+                            title = { Text(stringResource(R.string.setting_secondary_language_title)) },
                             text = {
                                 Column {
-                                    listOf("" to "Desactivado", "es" to "Español", "en" to "English").forEach { (value, label) ->
+                                    listOf("" to stringResource(R.string.lang_disabled), "es" to stringResource(R.string.lang_spanish), "en" to stringResource(R.string.lang_english)).forEach { (value, label) ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -237,7 +304,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 }
                             },
                             confirmButton = {
-                                TextButton(onClick = { showSecLangDialog = false }) { Text("Cancelar") }
+                                TextButton(onClick = { showSecLangDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
                             }
                         )
                     }
@@ -249,11 +316,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                     var showLayoutDialog by remember { mutableStateOf(false) }
 
                     ListItem(
-                        headlineContent = { Text("Distribución de Teclas", fontWeight = FontWeight.SemiBold) },
+                        headlineContent = { Text(stringResource(R.string.setting_layout_type), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
                             Text(when(layoutValue) {
-                                "default" -> "Predeterminada (Optimización Hexagonal)"
-                                "qwerty" -> "QWERTY (Clásica)"
+                                "default" -> stringResource(R.string.setting_layout_default)
+                                "qwerty" -> stringResource(R.string.setting_layout_qwerty)
                                 else -> layoutValue
                             })
                         },
@@ -265,10 +332,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                     if (showLayoutDialog) {
                         AlertDialog(
                             onDismissRequest = { showLayoutDialog = false },
-                            title = { Text("Seleccionar distribución") },
+                            title = { Text(stringResource(R.string.setting_layout_type)) },
                             text = {
                                 Column {
-                                    listOf("default" to "Predeterminada (Hexagonal)", "qwerty" to "QWERTY (Clásica)").forEach { (value, label) ->
+                                    listOf("default" to stringResource(R.string.setting_layout_default), "qwerty" to stringResource(R.string.setting_layout_qwerty)).forEach { (value, label) ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -289,7 +356,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 }
                             },
                             confirmButton = {
-                                TextButton(onClick = { showLayoutDialog = false }) { Text("Cancelar") }
+                                TextButton(onClick = { showLayoutDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
                             }
                         )
                     }
@@ -321,7 +388,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             // --- SECCIÓN 2: Tema y Apariencia ---
-            item { CategoryHeader("Tema y Apariencia", Icons.Default.Palette) }
+            item { CategoryHeader("Tema y Apariencia", Icons.Outlined.Palette) }
             item {
                 SettingsCardContainer {
                     val themeValueFlow = remember { dataStore.data.map { it[ThemeUtils.APP_THEME] ?: "system" } }
@@ -338,7 +405,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 else -> "Seguir sistema"
                             })
                         },
-                        leadingContent = { Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        leadingContent = { Icon(Icons.Outlined.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable { showThemeDialog = true }
                     )
@@ -537,7 +604,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         title = "Auto-corrección",
                         subtitle = "Corregir automáticamente palabras al presionar espacio",
                         key = ThemeUtils.AUTO_CORRECT,
-                        defaultValue = false,
+                        defaultValue = true,
                         icon = Icons.Default.Spellcheck,
                         context = context
                     )
@@ -631,7 +698,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             // --- SECCIÓN 7: Portapapeles ---
-            item { CategoryHeader("Portapapeles", Icons.Default.ContentPaste) }
+            item { CategoryHeader("Portapapeles", Icons.AutoMirrored.Outlined.Assignment) }
             item {
                 SettingsCardContainer {
                     SwitchPreference(
@@ -639,7 +706,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         subtitle = "Borrar clips no fijados automáticamente tras el tiempo límite",
                         key = ThemeUtils.CLIPBOARD_AUTO_DELETE,
                         defaultValue = true,
-                        icon = Icons.Default.ContentPaste,
+                        icon = Icons.AutoMirrored.Outlined.Assignment,
                         context = context
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -742,7 +809,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         Toast.makeText(context, "Ajustes restablecidos a valores predeterminados", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
                             ) {
                                 Text("Restablecer", fontWeight = FontWeight.Bold)
                             }

@@ -28,6 +28,7 @@ import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.ui.keyboard.panels.CredentialsPanel
+import com.example.hexkeyboard.ui.keyboard.panels.LanguagePanel
 import com.example.hexkeyboard.service.HexKeyboardService
 import com.example.hexkeyboard.ui.keyboard.panels.ClipboardPanel
 import com.example.hexkeyboard.ui.keyboard.panels.EmojiPanel
@@ -234,7 +235,10 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
                 },
                 onLongPress = { item -> viewModel.setClipboardItemWithOptions(item) },
                 onBack = { viewModel.setCurrentView("keyboard") },
-                theme = theme
+                theme = theme,
+                viewModel = viewModel,
+                bottomOffset = bottomOffset,
+                navBarBottomDp = navBarBottomDp
             )
             "functions" -> FunctionsPanel(
                 onBack = { viewModel.setCurrentView("keyboard") },
@@ -261,6 +265,13 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
                     navBarBottomDp = navBarBottomDp
                 )
             }
+            "languages" -> LanguagePanel(
+                onBack = { viewModel.setCurrentView("keyboard") },
+                theme = theme,
+                viewModel = viewModel,
+                bottomOffset = bottomOffset,
+                navBarBottomDp = navBarBottomDp
+            )
             else -> Box(modifier = Modifier.fillMaxSize())
         }
     }

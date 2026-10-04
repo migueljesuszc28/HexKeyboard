@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -306,22 +307,22 @@ class HexRenderer(private val context: Context) {
         val isDeleteWithText = key.type == HexLayoutEngine.KeyType.DELETE && overrideCx != null
 
         when (key.type) {
-            HexLayoutEngine.KeyType.SHIFT -> customLabel = "MAYUS"
+            HexLayoutEngine.KeyType.SHIFT -> customLabel = context.getKeyboardString(R.string.key_label_shift, language)
             HexLayoutEngine.KeyType.DELETE -> {
                 if (isDeleteWithText) {
-                    customLabel = "BORRAR"
+                    customLabel = context.getKeyboardString(R.string.key_label_delete, language)
                 }
             }
             HexLayoutEngine.KeyType.ENTER -> {
                 if (isEnterWithText) {
                     customLabel = when (currentImeAction) {
-                        EditorInfo.IME_ACTION_GO -> "IR"
-                        EditorInfo.IME_ACTION_SEARCH -> "BUSCAR"
-                        EditorInfo.IME_ACTION_SEND -> "ENVIAR"
-                        EditorInfo.IME_ACTION_NEXT -> "SIG."
-                        EditorInfo.IME_ACTION_DONE -> "HECHO"
-                        EditorInfo.IME_ACTION_PREVIOUS -> "ANT."
-                        else -> "INTRO"
+                        EditorInfo.IME_ACTION_GO -> context.getKeyboardString(R.string.key_action_go, language)
+                        EditorInfo.IME_ACTION_SEARCH -> context.getKeyboardString(R.string.key_action_search, language)
+                        EditorInfo.IME_ACTION_SEND -> context.getKeyboardString(R.string.key_action_send, language)
+                        EditorInfo.IME_ACTION_NEXT -> context.getKeyboardString(R.string.key_action_next, language)
+                        EditorInfo.IME_ACTION_DONE -> context.getKeyboardString(R.string.key_action_done, language)
+                        EditorInfo.IME_ACTION_PREVIOUS -> context.getKeyboardString(R.string.key_action_prev, language)
+                        else -> context.getKeyboardString(R.string.key_label_enter, language)
                     }
                 }
             }

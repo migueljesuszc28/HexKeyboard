@@ -66,28 +66,21 @@ object WordSanitizer {
 
     /**
      * Determina si una palabra es inmune a la autocorrección (evita alterar acrónimos,
-     * formatos especiales, números o palabras con puntuación explícita).
+     * formatos especiales, números o hashtags/mentions).
      */
     fun isAutocorrectImmune(rawToken: String, cleanWord: String): Boolean {
         if (cleanWord.length < 2) return true
 
-        // 1. Inmune si el usuario ya escribió signos de puntuación finales (ej. "hola,")
-        if (rawToken.endsWith(",") || rawToken.endsWith(".") || rawToken.endsWith("!") ||
-            rawToken.endsWith("?") || rawToken.endsWith(";") || rawToken.endsWith(":")
-        ) {
-            return true
-        }
-
-        // 2. Mentions y Hashtags (@usuario, #tema)
+        // 1. Mentions y Hashtags (@usuario, #tema)
         if (rawToken.startsWith("@") || rawToken.startsWith("#")) return true
 
-        // 3. Emails y URLs
+        // 2. Emails y URLs
         if (EMAIL_REGEX.matches(rawToken) || URL_REGEX.matches(rawToken)) return true
 
-        // 4. Números o palabras que contienen dígitos (ej. "iPhone13", "123")
+        // 3. Números o palabras que contienen dígitos (ej. "iPhone13", "123")
         if (cleanWord.any { it.isDigit() }) return true
 
-        // 5. Acrónimos y siglas en mayúsculas sostenidas de 2+ letras (ej. "GPS", "API", "USA", "JSON")
+        // 4. Acrónimos y siglas en mayúsculas sostenidas de 2+ letras (ej. "GPS", "API", "USA", "JSON")
         if (cleanWord.all { it.isUpperCase() }) return true
 
         return false

@@ -3,6 +3,8 @@ package com.example.hexkeyboard.data.repository
 import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
+import androidx.annotation.StringRes
+import java.util.Locale
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -21,6 +23,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.GlassStyle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -77,6 +80,7 @@ object ThemeUtils {
 
     // Keys
     val APP_THEME = stringPreferencesKey("app_theme")
+    val APP_LANGUAGE = stringPreferencesKey("app_language")
     val KEYBOARD_THEME = stringPreferencesKey("keyboard_theme")
     val CUSTOM_THEMES = stringPreferencesKey("custom_themes")
     
@@ -213,32 +217,40 @@ object ThemeUtils {
                 keyStrokeWidth = 2.0f,
                 keyTextColor = Color.BLACK,
                 keyboardIconTint = Color.BLACK,
-                keyShiftActiveColor = "#2196F3".toColorInt(),
+                keyShiftActiveColor = Color.BLACK,
                 keyShiftInactiveColor = Color.WHITE,
                 deletePressedIconColor = Color.RED,
                 popupBackgroundColor = Color.WHITE,
                 popupTextColor = Color.BLACK,
                 popupSelectedBackgroundColor = Color.BLACK,
                 popupSelectedTextColor = Color.WHITE,
+                individualKeyColors = mapOf(
+                    "ENTER" to "#2196F3".toColorInt(),
+                    "DELETE" to Color.RED
+                )
             )
             "dark" -> KeyboardTheme(
                 id = "dark",
                 name = "Oscuro",
-                backgroundColor = "#000000".toColorInt(),
-                keyBackgroundColor = "#000000".toColorInt(), //"#1A1A1A"
-                keyBackgroundPressedColor = "#000000".toColorInt(),
-                keyBackgroundSpecialColor = "#000000".toColorInt(),
-                keyStrokeColor = "#FFFFFF".toColorInt(),
+                backgroundColor = Color.BLACK,
+                keyBackgroundColor = Color.BLACK, //"#1A1A1A"
+                keyBackgroundPressedColor = Color.BLACK,
+                keyBackgroundSpecialColor = Color.BLACK,
+                keyStrokeColor = Color.WHITE,
                 keyStrokeWidth = 2.0f,
                 keyTextColor = Color.WHITE,
                 keyboardIconTint = Color.WHITE,
-                keyShiftActiveColor = "#2196F3".toColorInt(),
-                keyShiftInactiveColor = "#000000".toColorInt(),
+                keyShiftActiveColor = Color.WHITE,
+                keyShiftInactiveColor = Color.BLACK,
                 deletePressedIconColor = Color.RED,
-                popupBackgroundColor = "#000000".toColorInt(),
+                popupBackgroundColor = Color.BLACK,
                 popupTextColor = Color.WHITE,
                 popupSelectedBackgroundColor = Color.WHITE,
                 popupSelectedTextColor = Color.BLACK,
+                individualKeyColors = mapOf(
+                    "ENTER" to "#1976D2".toColorInt(),
+                    "DELETE" to "#E31212".toColorInt()
+                )
             )
             "glass" -> {
                 val isDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -840,7 +852,7 @@ object ThemeUtils {
         val vibrancy = prefs[GLASS_VIBRANCY] ?: 1.2f
         val lensHeight = prefs[GLASS_LENS_HEIGHT] ?: 0.4f
         val lensAmount = prefs[GLASS_LENS_AMOUNT] ?: 0.6f
-        val surfaceOpacity = prefs[GLASS_SURFACE_OPACITY] ?: 0.9f
+        val surfaceOpacity = prefs[GLASS_SURFACE_OPACITY] ?: 0.8f
         val depthEffect = prefs[GLASS_DEPTH_EFFECT] ?: false
         val chromaticAberration = prefs[GLASS_CHROMATIC_ABERRATION] ?: false
 
@@ -888,6 +900,7 @@ object ThemeUtils {
     suspend fun resetAllSettings(context: Context) {
         context.dataStore.edit { prefs ->
             prefs.remove(APP_THEME)
+            prefs.remove(APP_LANGUAGE)
             prefs.remove(KEYBOARD_THEME)
             prefs.remove(KEYBOARD_LANGUAGE)
             prefs.remove(SECONDARY_LANGUAGE)
@@ -927,5 +940,23 @@ object ThemeUtils {
             prefs.remove(GLASS_CHROMATIC_ABERRATION)
             prefs.remove(CUSTOM_FONT_PATH)
         }
+    }
+
+    fun Context.getKeyboardString(@StringRes id: Int, langCode: String): String {
+        val config = Configuration(resources.configuration)
+        config.setLocale(Locale.forLanguageTag(langCode.ifEmpty { "es" }))
+        val localizedContext = createConfigurationContext(config)
+        return localizedContext.getString(id)
+    }
+
+    fun getAppLanguageContext(context: Context): Context {
+        val prefs = runBlocking { getDataStore(context).data.first() }
+        val lang = prefs[APP_LANGUAGE] ?: "es"
+        if (lang.isEmpty()) return context
+        val config = Configuration(context.resources.configuration)
+        val locale = Locale.forLanguageTag(lang)
+        Locale.setDefault(locale)
+        config.setLocale(locale)
+        return context.createConfigurationContext(config)
     }
 }

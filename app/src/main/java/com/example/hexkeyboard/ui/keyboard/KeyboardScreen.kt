@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -34,7 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.preference.PreferenceManager
+import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.ThemeUtils
+import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.service.HexKeyboardService
@@ -128,7 +131,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
     val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
     val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
-    val isFullPanel = currentView == "emoji" || currentView == "credentials"
+    val isFullPanel = currentView == "emoji" || currentView == "credentials" || currentView == "languages" || currentView == "clipboard"
     val clipboardItemWithOptions by viewModel.clipboardItemWithOptions.collectAsState()
 
     val glassShape = remember { RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) }
@@ -253,7 +256,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         }
                     }
 
-                    // Capa 2: Panel de Emojis a pantalla completa con Animación Material 3 Expressive y Shadow Mask
+                    // Capa 2: Panel de Emojis/Credenciales/Idioma a pantalla completa con Animación Material 3 Expressive y Shadow Mask
                     AnimatedContent(
                         targetState = isFullPanel && !isSearchActive,
                         transitionSpec = {
@@ -289,44 +292,44 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         modifier = Modifier.matchParentSize()
                     ) { showEmojiPanel ->
                         if (showEmojiPanel) {
-                        val baseThemeColor = Color(keyboardTheme.backgroundColor)
+                            val baseThemeColor = Color(keyboardTheme.backgroundColor)
 
-                        val bottomShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
-                            Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.0f to Color.Transparent,
-                                    0.3f to baseThemeColor.copy(alpha = 0.40f),
-                                    1.0f to baseThemeColor.copy(alpha = 0.82f)
+                            val bottomShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
+                                Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0.0f to Color.Transparent,
+                                        0.3f to baseThemeColor.copy(alpha = 0.40f),
+                                        1.0f to baseThemeColor.copy(alpha = 0.82f)
+                                    )
                                 )
-                            )
-                        }
+                            }
 
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                        ) {
-                            // 1. El Panel de Emojis ocupa la altura total de la capa base
-                            PanelsSection(viewModel, keyboardTheme, bottomOffset, navBarBottomDp)
-
-                            // 2. Margen Inferior Flotante con Máscara de Sombra (Bloquea toques hacia los emojis)
-                            val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
-                        if (totalBottomHazeHeight > 0) {
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .height(totalBottomHazeHeight.dp)
-                                    .background(bottomShadowMaskBrush)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) { /* Absorbe toques para evitar seleccionar emojis detrás del margen */ }
-                            )
+                                    .matchParentSize()
+                                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                            ) {
+                                // 1. El Panel ocupa la altura total de la capa base
+                                PanelsSection(viewModel, keyboardTheme, bottomOffset, navBarBottomDp)
+
+                                // 2. Margen Inferior Flotante con Máscara de Sombra (Bloquea toques hacia el fondo)
+                                val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
+                                if (totalBottomHazeHeight > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .height(totalBottomHazeHeight.dp)
+                                            .background(bottomShadowMaskBrush)
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null
+                                            ) { /* Absorbe toques */ }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-            }
         }
     }
 
@@ -363,12 +366,14 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         tonalElevation = 8.dp,
                         shadowElevation = 16.dp
                     ) {
+                        val currentLocale by viewModel.currentLocale.collectAsState()
+
                         Column(
                             modifier = Modifier.padding(vertical = 8.dp)
                         ) {
                             ClipboardMenuRow(
-                                icon = Icons.Default.ContentPaste,
-                                label = "Pegar",
+                                icon = Icons.AutoMirrored.Outlined.Assignment,
+                                label = context.getKeyboardString(R.string.menu_paste, currentLocale),
                                 tint = Color(keyboardTheme.keyTextColor)
                             ) {
                                 FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
@@ -378,7 +383,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
 
                             ClipboardMenuRow(
                                 icon = if (item.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                label = if (item.isPinned) "Desfijar" else "Fijar",
+                                label = if (item.isPinned) context.getKeyboardString(R.string.menu_unpin, currentLocale) else context.getKeyboardString(R.string.menu_pin, currentLocale),
                                 tint = Color(keyboardTheme.keyTextColor)
                             ) {
                                 FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
@@ -392,7 +397,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                             if (!item.isImage) {
                                 ClipboardMenuRow(
                                     icon = Icons.Default.Edit,
-                                    label = "Editar",
+                                    label = context.getKeyboardString(R.string.menu_edit, currentLocale),
                                     tint = Color(keyboardTheme.keyTextColor)
                                 ) {
                                     FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
@@ -411,8 +416,8 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
 
                             ClipboardMenuRow(
                                 icon = Icons.Default.Delete,
-                                label = "Borrar",
-                                tint = MaterialTheme.colorScheme.error
+                                label = context.getKeyboardString(R.string.menu_delete, currentLocale),
+                                tint = Color.Red
                             ) {
                                 FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
                                 scope.launch {

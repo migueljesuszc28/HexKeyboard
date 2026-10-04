@@ -95,6 +95,10 @@ import java.util.concurrent.ConcurrentHashMap
 class HexKeyboardService : InputMethodService(),
     LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
+    companion object {
+        private const val CLIPBOARD_SUGGESTION_MAX_AGE_MS = 15 * 60 * 1000L // 15 minutos
+    }
+
     @Inject lateinit var dataStore: DataStore<Preferences>
     @Inject lateinit var predictionEngine: PredictionEngine
     @Inject lateinit var feedbackManager: FeedbackManager
@@ -191,7 +195,7 @@ class HexKeyboardService : InputMethodService(),
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var autoCapitalize = true
-    private var autoCorrect = false
+    private var autoCorrect = true
     private var doubleSpacePeriod = true
     private var undoCorrectionOnBackspace = true
 
@@ -311,7 +315,7 @@ class HexKeyboardService : InputMethodService(),
                 val layoutType = prefs[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default"
                 
                 autoCapitalize = prefs[ThemeUtils.AUTO_CAPITALIZE] ?: true
-                autoCorrect = prefs[ThemeUtils.AUTO_CORRECT] ?: false
+                autoCorrect = prefs[ThemeUtils.AUTO_CORRECT] ?: true
                 doubleSpacePeriod = prefs[ThemeUtils.DOUBLE_SPACE_PERIOD] ?: true
                 undoCorrectionOnBackspace = prefs[ThemeUtils.UNDO_CORRECTION_ON_BACKSPACE] ?: true
 
@@ -587,9 +591,13 @@ class HexKeyboardService : InputMethodService(),
 
         serviceScope.launch(Dispatchers.Default) {
             val history = viewModel.clipboardHistory.value
-            val topHistoryText = history.firstOrNull()?.text?.trim()
+            val topHistoryItem = history.firstOrNull()
+            val topHistoryText = topHistoryItem?.text?.trim()
+            val now = System.currentTimeMillis()
+            val isRecentClip = topHistoryItem != null && (now - topHistoryItem.timestamp) < CLIPBOARD_SUGGESTION_MAX_AGE_MS
 
             val clipToSuggest = if (!topHistoryText.isNullOrEmpty() &&
+                isRecentClip &&
                 topHistoryText != lastUsedClipboardText?.trim()
             ) {
                 topHistoryText
@@ -612,7 +620,7 @@ class HexKeyboardService : InputMethodService(),
             val localSuggestions = mutableListOf<String>()
 
             if (cleanLastWord.isNotEmpty()) {
-                if (sanitizedLast.hasTrailingPunctuation || WordSanitizer.isAutocorrectImmune(rawLastToken, cleanLastWord)) {
+                if (WordSanitizer.isAutocorrectImmune(rawLastToken, cleanLastWord)) {
                     localSuggestions.add(cleanLastWord)
                     val nextWordPredictions = predictionEngine.getSuggestions("", previousWord = cleanLastWord, prev2 = prev1, limit = 2).map { it.text }
                     localSuggestions.addAll(nextWordPredictions)
@@ -723,8 +731,67 @@ class HexKeyboardService : InputMethodService(),
         } else if (text != " ") {
             lastSwipedWord = null
         }
-        
-        if ((text == " " || text in listOf(".", ",", "!", "?", ";", ":")) && !lastKeyWasSpace) {
+
+        if (text == " " && lastKeyWasSpace && (System.currentTimeMillis() - lastKeyTime < 500)) {
+            if (doubleSpacePeriod) {
+                ic.deleteSurroundingText(1, 0)
+                ic.commitText(". ", 1)
+                lastKeyWasSpace = false
+                lastAutoCorrection = null
+                ic.endBatchEdit()
+                updateShiftState()
+                updateSuggestions()
+                return
+            }
+        }
+
+        val isPunctuation = text in listOf(".", ",", "!", "?", ";", ":")
+        val isSeparator = text == " " || isPunctuation
+
+        var performedAutocorrect = false
+
+        if (isSeparator && autoCorrect && !lastKeyWasSpace) {
+            val textBefore = ic.getTextBeforeCursor(50, 0) ?: ""
+            val rawTokens = textBefore.toString().split(" ", "\n", "\t").filter { it.isNotEmpty() }
+            val rawOriginalToken = rawTokens.lastOrNull() ?: ""
+            val prev1Raw = rawTokens.getOrNull(rawTokens.size - 2)
+            val prev2Raw = rawTokens.getOrNull(rawTokens.size - 3)
+
+            val prev1Clean = WordSanitizer.sanitizeToken(prev1Raw ?: "").cleanWord
+            val prev2Clean = WordSanitizer.sanitizeToken(prev2Raw ?: "").cleanWord
+
+            if (rawOriginalToken.isNotEmpty()) {
+                if (rawOriginalToken == lastUndoneCorrection) {
+                    lastUndoneCorrection = null
+                } else {
+                    val correction = predictionEngine.getAutocorrection(
+                        typedWord = rawOriginalToken,
+                        previousWord = prev1Clean,
+                        prev2 = prev2Clean
+                    )
+
+                    if (correction != null && correction.text.lowercase() != rawOriginalToken.lowercase()) {
+                        val replacement = if (text == " ") correction.text + " " else correction.text
+                        replaceLastWord(replacement)
+                        lastAutoCorrection = LastCorrection(rawOriginalToken, correction.text)
+                        lastUndoneCorrection = null
+                        predictionEngine.learnFromInput(correction.text, prev1Clean, prev2Clean)
+                        performedAutocorrect = true
+
+                        if (text == " ") {
+                            ic.endBatchEdit()
+                            lastKeyTime = System.currentTimeMillis()
+                            lastKeyWasSpace = true
+                            updateShiftState()
+                            updateSuggestions()
+                            return
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isSeparator && !performedAutocorrect && !lastKeyWasSpace) {
             val before = ic.getTextBeforeCursor(60, 0) ?: ""
             val rawTokens = before.split(" ", "\n", "\t").filter { it.isNotEmpty() }
             if (rawTokens.isNotEmpty()) {
@@ -741,41 +808,6 @@ class HexKeyboardService : InputMethodService(),
                     predictionEngine.addUserWord(currentRaw)
                 } else if (currentClean.isNotEmpty()) {
                     predictionEngine.learnFromInput(currentClean, prev1Clean, prev2Clean)
-                }
-            }
-        }
-
-        if (text == " " && lastKeyWasSpace && (System.currentTimeMillis() - lastKeyTime < 500)) {
-            if (doubleSpacePeriod) {
-                ic.deleteSurroundingText(1, 0)
-                ic.commitText(". ", 1)
-                lastKeyWasSpace = false
-                lastAutoCorrection = null
-                ic.endBatchEdit()
-                updateShiftState()
-                updateSuggestions()
-                return
-            }
-        }
-
-        if (text == " " && autoCorrect) {
-            val suggestions = viewModel.suggestions.value
-            if (suggestions.isNotEmpty() && !suggestions[0].contains(" ")) {
-                val textBefore = ic.getTextBeforeCursor(30, 0) ?: ""
-                val rawOriginalToken = textBefore.toString().split(" ", "\n").lastOrNull() ?: ""
-                val sanitizedOriginal = WordSanitizer.sanitizeToken(rawOriginalToken)
-
-                if (!WordSanitizer.isAutocorrectImmune(rawOriginalToken, sanitizedOriginal.cleanWord)) {
-                    if (rawOriginalToken.isNotEmpty() && rawOriginalToken == lastUndoneCorrection) {
-                        lastUndoneCorrection = null
-                    } else if (sanitizedOriginal.cleanWord.isNotEmpty() &&
-                        sanitizedOriginal.cleanWord.lowercase() != suggestions[0].lowercase()) {
-                        replaceLastWord(suggestions[0] + " ")
-                        lastAutoCorrection = LastCorrection(rawOriginalToken, suggestions[0])
-                        lastUndoneCorrection = null
-                        ic.endBatchEdit()
-                        return
-                    }
                 }
             }
         }

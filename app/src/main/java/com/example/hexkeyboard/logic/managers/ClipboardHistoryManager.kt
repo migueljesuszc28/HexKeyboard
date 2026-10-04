@@ -111,11 +111,13 @@ object ClipboardHistoryManager {
     suspend fun addItem(context: Context, text: String) {
         if (text.isBlank()) return
         val currentHistory = getHistory(context).toMutableList()
-        
+        val existingIndex = currentHistory.indexOfFirst { !it.isImage && it.text == text }
+        val wasPinned = if (existingIndex != -1) currentHistory[existingIndex].isPinned else false
+
         // Remove existing to move to top
         currentHistory.removeAll { !it.isImage && it.text == text }
         
-        currentHistory.add(0, ClipboardItem(text = text))
+        currentHistory.add(0, ClipboardItem(text = text, isPinned = wasPinned))
         
         // Limit history size (e.g., 50 items)
         val limitedHistory = currentHistory.take(50)
@@ -128,6 +130,8 @@ object ClipboardHistoryManager {
     suspend fun addImageItem(context: Context, imageUri: Uri, mimeType: String, caption: String = "") {
         val currentHistory = getHistory(context).toMutableList()
         val uriString = imageUri.toString()
+        val existingIndex = currentHistory.indexOfFirst { it.imageUri == uriString }
+        val wasPinned = if (existingIndex != -1) currentHistory[existingIndex].isPinned else false
         
         if (currentHistory.firstOrNull()?.imageUri == uriString) return
         
@@ -136,7 +140,8 @@ object ClipboardHistoryManager {
         val newItem = ClipboardItem(
             text = caption,
             imageUri = uriString,
-            mimeType = mimeType
+            mimeType = mimeType,
+            isPinned = wasPinned
         )
         currentHistory.add(0, newItem)
         

@@ -48,6 +48,7 @@ class PredictionEngine(private val context: Context) {
         // Pesos de scoring
         private const val USER_WORD_BOOST = 2.6
         private const val EXACT_PREFIX_BOOST = 1.35
+        private const val EXACT_MATCH_BOOST = 3.5
         private const val ACCENT_MATCH_BOOST = 1.45
         private const val LEARNED_WORD_BOOST_STEP = 0.05
         private const val LEARNED_WORD_BOOST_CAP = 10
@@ -803,11 +804,13 @@ class PredictionEngine(private val context: Context) {
         val candidates = getSuggestions(cleaned, previousWord = previousWord, prev2 = prev2, limit = 5)
 
         // 1. Promover versión acentuada oficial equivalente si el usuario escribió la palabra sin tilde
-        val bestAccentMatch = candidates.find {
-            stripAccents(it.text.lowercase()) == normCleaned && it.text.lowercase() != cleaned.lowercase()
-        }
-        if (bestAccentMatch != null) {
-            return bestAccentMatch
+        if (cleaned.lowercase() == normCleaned) {
+            val bestAccentMatch = candidates.find {
+                stripAccents(it.text.lowercase()) == normCleaned && it.text.lowercase() != normCleaned
+            }
+            if (bestAccentMatch != null) {
+                return bestAccentMatch
+            }
         }
 
         if (isKnownWord(cleaned)) return null
@@ -828,7 +831,7 @@ class PredictionEngine(private val context: Context) {
             current = current?.children?.get(char)
             if (current == null) break
         }
-        current?.let { node -> collectAllFromNode(node, prefix, result) }
+        current?.let { node -> collectAllFromNode(node, prefix, prefix, result) }
 
         // 2. Buscar en los buffers binarios activos (diccionarios base)
         for (langBuf in activeLanguageBuffers) {
@@ -839,13 +842,16 @@ class PredictionEngine(private val context: Context) {
         }
     }
 
-    private fun collectAllFromNode(node: TrieNode, word: String, result: MutableList<Suggestion>) {
+    private fun collectAllFromNode(node: TrieNode, word: String, target: String, result: MutableList<Suggestion>) {
         if (node.isWord) {
-            val score = calculateScore(node.frequency, node.isUserWord, 1.0, isPrefix = true, word = word)
-            result.add(Suggestion(word, score, confidence = 0.9f))
+            val isExact = stripAccents(word.lowercase()) == stripAccents(target.lowercase())
+            val exactBoost = if (isExact) EXACT_MATCH_BOOST else 1.0
+            val isCorrection = word.lowercase() != target.lowercase()
+            val score = calculateScore(node.frequency, node.isUserWord, 1.0, isPrefix = true, word = word) * exactBoost
+            result.add(Suggestion(word, score, isCorrection = isCorrection, confidence = if (isExact) 1.0f else 0.9f))
         }
         if (result.size > MAX_INTERNAL_RESULTS) return
-        node.children.forEach { (char, child) -> collectAllFromNode(child, word + char, result) }
+        node.children.forEach { (char, child) -> collectAllFromNode(child, word + char, target, result) }
     }
 
     private fun searchPrefixInBinary(
@@ -866,10 +872,13 @@ class PredictionEngine(private val context: Context) {
 
             if (normNodeWord.startsWith(normTarget) || normTarget.startsWith(normNodeWord)) {
                 if (node.isTerminal && normNodeWord.startsWith(normTarget)) {
+                    val isExactMatch = normNodeWord == normTarget
+                    val exactBoost = if (isExactMatch) EXACT_MATCH_BOOST else 1.0
                     val hasAccentInDict = node.word.lowercase() != normNodeWord
                     val accentBoost = if (hasAccentInDict && target.lowercase() == normTarget) ACCENT_MATCH_BOOST else 1.0
-                    val score = calculateScore(node.frequency, false, 1.0, isPrefix = true, word = node.word) * langWeight * accentBoost
-                    result.add(Suggestion(node.word, score, confidence = (0.95f * langWeight).toFloat()))
+                    val isCorrection = node.word.lowercase() != target.lowercase()
+                    val score = calculateScore(node.frequency, false, 1.0, isPrefix = true, word = node.word) * langWeight * exactBoost * accentBoost
+                    result.add(Suggestion(node.word, score, isCorrection = isCorrection, confidence = ((if (isExactMatch) 1.0f else 0.85f) * langWeight).toFloat()))
                 }
                 if (node.childrenAddr != null) {
                     val savedPos = buffer.position()
@@ -1049,26 +1058,62 @@ class PredictionEngine(private val context: Context) {
         wordCounts.clear()
     }
 
+    fun getAccentedBaseWord(word: String): String? {
+        val norm = stripAccents(word.lowercase())
+        if (norm.isEmpty()) return null
+        for (langBuf in activeLanguageBuffers) {
+            val buffer = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
+            buffer.position(langBuf.headerSize)
+            val match = findAccentedWordInBinaryRecursive(buffer, norm, "")
+            if (match != null) return match
+        }
+        return null
+    }
+
+    private fun findAccentedWordInBinaryRecursive(buffer: ByteBuffer, targetNorm: String, prefix: String): String? {
+        val count = try { readPtNodeCount(buffer) } catch (_: Exception) { 0 }
+        repeat(count) {
+            val node = parseNextNode(buffer, prefix)
+            val nodeNorm = stripAccents(node.word.lowercase())
+
+            if (node.isTerminal && nodeNorm == targetNorm && node.word.lowercase() != targetNorm) {
+                return node.word
+            }
+
+            if (targetNorm.startsWith(nodeNorm) && node.childrenAddr != null) {
+                val savedPos = buffer.position()
+                buffer.position(node.addressBase + node.childrenAddr)
+                val res = findAccentedWordInBinaryRecursive(buffer, targetNorm, node.word)
+                if (res != null) return res
+                buffer.position(savedPos)
+            }
+        }
+        return null
+    }
+
     fun learnFromInput(word: String, prev1: String? = null, prev2: String? = null) {
         val sanitized = WordSanitizer.sanitizeToken(word)
         val w = sanitized.cleanWord.lowercase().trim()
         if (w.length < 2 || w.any { !it.isLetter() }) return
 
-        patternLearningManager.recordSequence(prev2, prev1, w)
+        val accentedVersion = getAccentedBaseWord(w)
+        val targetWord = accentedVersion ?: w
 
-        if (isKnownWord(w)) {
-            wordCounts[w] = (wordCounts[w] ?: 0) + 1
+        patternLearningManager.recordSequence(prev2, prev1, targetWord)
+
+        if (isKnownWord(targetWord)) {
+            wordCounts[targetWord] = (wordCounts[targetWord] ?: 0) + 1
             synchronized(predictionCache) { predictionCache.evictAll() }
             return
         }
 
-        val count = (wordCounts[w] ?: 0) + 1
-        wordCounts[w] = count
+        val count = (wordCounts[targetWord] ?: 0) + 1
+        wordCounts[targetWord] = count
 
-        if (count >= MIN_LEARN_COUNT || userDictionary.contains(w)) {
-            if (!userDictionary.contains(w)) {
-                insert(w, 200, isUser = true)
-                userDictionary.add(w)
+        if (count >= MIN_LEARN_COUNT || userDictionary.contains(targetWord)) {
+            if (!userDictionary.contains(targetWord)) {
+                insert(targetWord, 200, isUser = true)
+                userDictionary.add(targetWord)
                 saveUserDictionary()
             }
         }

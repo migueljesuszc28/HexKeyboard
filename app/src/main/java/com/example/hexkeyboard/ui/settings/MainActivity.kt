@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -187,7 +188,7 @@ fun MainScreen(
                 SetupStepButton(
                     stepNumber = "3",
                     text = "Personalizar y Ajustes",
-                    icon = Icons.Default.Palette,
+                    icon = Icons.Outlined.Palette,
                     onClick = onSettingsClick,
                     isTonal = false
                 )

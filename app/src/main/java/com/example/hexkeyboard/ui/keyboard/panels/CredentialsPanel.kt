@@ -20,9 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.model.CredentialItem
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
+import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.LocalAppBackdrop
@@ -42,6 +44,9 @@ fun CredentialsPanel(
     navBarBottomDp: Int = 0
 ) {
     val context = LocalContext.current
+    val currentLocaleFlow = remember(viewModel) { viewModel?.currentLocale ?: MutableStateFlow("es") }
+    val currentLocale by currentLocaleFlow.collectAsState("es")
+
     val searchQuery by (viewModel?.credentialsSearchQuery ?: MutableStateFlow("")).collectAsState()
     val isCredentialsSearchActive by (viewModel?.isCredentialsSearchActive ?: MutableStateFlow(false)).collectAsState()
 
@@ -105,7 +110,11 @@ fun CredentialsPanel(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "No se encontraron contraseñas." else "No hay credenciales. Añádelas desde Ajustes.",
+                            text = if (searchQuery.isNotEmpty()) {
+                                context.getKeyboardString(R.string.cred_search_empty, currentLocale)
+                            } else {
+                                context.getKeyboardString(R.string.cred_empty, currentLocale)
+                            },
                             color = Color(theme.keyTextColor).copy(alpha = 0.7f),
                             style = MaterialTheme.typography.bodyMedium
                         )

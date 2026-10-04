@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hex Keyboard</string>
+
+    <string name="test_keyboard_hint">Test the keyboard here...</string>
+    <string name="emoji_button_description">Switch to emojis</string>
+    <string name="functions_button_description">More features</string>
+    <string name="functions_panel_description">Functions panel</string>
+    <string name="keyboard_view_description">Hexagonal keyboard</string>
+
+    <string name="settings_title">Keyboard Settings</string>
+
+    <string name="enable_keyboard_title">Enable Keyboard</string>
+    <string name="enable_keyboard_summary">Enable Hex Keyboard in system settings</string>
+
+    <string name="select_keyboard_title">Select Keyboard</string>
+    <string name="select_keyboard_summary">Choose Hex Keyboard as your active input method</string>
+
+    <string name="keyboard_service_name">Hex Keyboard</string>
+    <string name="keyboard_service_description">Optimized hexagonal keyboard with suggestions and gestures</string>
+    <string name="themes_title">Themes</string>
+    <string name="create_theme">Create Theme</string>
+    <string name="edit_theme">Edit Theme</string>
+    <string name="preview_theme">Preview</string>
+    <string name="theme_name_hint">Theme name</string>
+    <string name="colors_label">Colors</string>
+    <string name="bg_color_label">Background color</string>
+    <string name="key_bg_color_label">Keys color</string>
+    <string name="key_text_color_label">Text color</string>
+    <string name="key_stroke_color_label">Border color</string>
+    <string name="key_press_color_label">Pressed color</string>
+    <string name="icon_tint_label">Icons color</string>
+    <string name="edit_individual_keys">Edit Individual Keys</string>
+    <string name="save_theme">Save Theme</string>
+    <string name="shift_active_label">Shift Active</string>
+    <string name="delete_pressed_label">Delete Pressed</string>
+    <string name="toggle_borders_label">Borders On/Off</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+
+    <!-- Special Key Labels -->
+    <string name="key_label_shift">SHIFT</string>
+    <string name="key_label_delete">DELETE</string>
+    <string name="key_label_enter">ENTER</string>
+    <string name="key_action_go">GO</string>
+    <string name="key_action_search">SEARCH</string>
+    <string name="key_action_send">SEND</string>
+    <string name="key_action_next">NEXT</string>
+    <string name="key_action_done">DONE</string>
+    <string name="key_action_prev">PREV</string>
+
+    <!-- Keyboard Panel Titles -->
+    <string name="panel_title_clipboard">Clipboard</string>
+    <string name="panel_title_functions">Functions</string>
+    <string name="panel_title_credentials">Passwords</string>
+    <string name="panel_title_languages">Language</string>
+
+    <!-- Functions Panel Shortcuts -->
+    <string name="fn_settings">Settings</string>
+    <string name="fn_clipboard">Clipboard</string>
+    <string name="fn_themes">Themes</string>
+    <string name="fn_language">Language</string>
+    <string name="fn_passwords">Passwords</string>
+
+    <!-- Language Names & Options -->
+    <string name="lang_primary">PRIMARY LANGUAGE</string>
+    <string name="lang_secondary">SECONDARY LANGUAGE (BILINGUAL PREDICTION)</string>
+    <string name="lang_disabled">Disabled</string>
+    <string name="lang_spanish">Spanish</string>
+    <string name="lang_english">English</string>
+
+    <!-- App & Keyboard Language Settings -->
+    <string name="section_language_layout">Language &amp; Layout</string>
+    <string name="setting_app_language">App Language</string>
+    <string name="setting_app_language_title">Select App Language</string>
+    <string name="setting_keyboard_language">Keyboard Language</string>
+    <string name="setting_keyboard_language_title">Select Primary Language</string>
+    <string name="setting_secondary_language">Secondary Language (Bilingual)</string>
+    <string name="setting_secondary_language_title">Select Secondary Language</string>
+    <string name="setting_layout_type">Key Layout</string>
+    <string name="setting_layout_default">Default (Hexagonal Optimization)</string>
+    <string name="setting_layout_qwerty">QWERTY (Classic)</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- Empty States & Floating Menus -->
+    <string name="clip_empty">Clipboard is empty</string>
+    <string name="cred_empty">No credentials. Add them from Settings.</string>
+    <string name="cred_search_empty">No passwords found.</string>
+    <string name="voice_listening">Listening...</string>
+    <string name="menu_paste">Paste</string>
+    <string name="menu_pin">Pin</string>
+    <string name="menu_unpin">Unpin</string>
+    <string name="menu_edit">Edit</string>
+    <string name="menu_delete">Delete</string>
+</resources>

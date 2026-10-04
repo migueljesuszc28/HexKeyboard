@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -139,7 +140,7 @@ fun ThemeSettingsScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        Icons.Default.Palette,
+                                        Icons.Outlined.Palette,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                         modifier = Modifier.size(16.dp)
@@ -173,7 +174,7 @@ fun ThemeSettingsScreen(
             ) {
                 // System Themes
                 item {
-                    ThemeSectionHeader("Temas Predeterminados", Icons.Default.Palette)
+                    ThemeSectionHeader("Temas Predeterminados", Icons.Outlined.Palette)
                 }
 
                 items(

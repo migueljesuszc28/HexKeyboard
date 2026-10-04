@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +44,18 @@ import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.launch
 
 val LocalKeyBounceEnabled = staticCompositionLocalOf { true }
+
+@Composable
+fun rememberKeyBorderStroke(theme: KeyboardTheme): BorderStroke? {
+    val strokeColor = Color(theme.keyStrokeColor)
+    val hasBorder = strokeColor != Color.Transparent && strokeColor.alpha > 0f && theme.keyStrokeWidth > 0f
+    if (!hasBorder) return null
+    val density = LocalDensity.current.density
+    val strokeWidthDp = (theme.keyStrokeWidth / density).dp
+    return remember(theme.keyStrokeColor, theme.keyStrokeWidth, density) {
+        BorderStroke(strokeWidthDp, strokeColor)
+    }
+}
 
 @Composable
 fun rememberKeyBounceEnabled(): Boolean {

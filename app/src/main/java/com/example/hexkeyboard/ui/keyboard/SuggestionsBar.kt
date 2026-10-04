@@ -4,11 +4,15 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,7 +27,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.KeyboardTheme
+import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.logic.managers.FeedbackManager
@@ -32,6 +38,7 @@ import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
+import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBorderStroke
 import com.example.hexkeyboard.ui.settings.PermissionActivity
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
@@ -44,6 +51,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
     val emojiSearchQuery by viewModel.emojiSearchQuery.collectAsState()
     val context = LocalContext.current
     val service = context as? HexKeyboardService
+    val currentLocale by viewModel.currentLocale.collectAsState()
 
     Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {
         AnimatedVisibility(
@@ -60,6 +68,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 
                 val isListening by isListeningFlow.collectAsState()
                 val partialVoiceResult by partialVoiceResultFlow.collectAsState()
+                val isEn = currentLocale == "en"
 
                 // Botón Izquierdo: Funciones
                 Box(
@@ -90,7 +99,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 ) {
                     if (isListening) {
                         Text(
-                            text = partialVoiceResult.ifEmpty { "Escuchando..." },
+                            text = partialVoiceResult.ifEmpty { context.getKeyboardString(R.string.voice_listening, currentLocale) },
                             color = Color(theme.keyboardIconTint),
                             fontSize = 14.sp
                         )
@@ -158,8 +167,8 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                         ) {
                             // Cápsula 1: Temas
                             ShortcutIconCapsule(
-                                icon = Icons.Default.Palette,
-                                contentDescription = "Temas",
+                                icon = Icons.Outlined.Palette,
+                                contentDescription = context.getKeyboardString(R.string.fn_themes, currentLocale),
                                 theme = theme,
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -171,8 +180,8 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
 
                             // Cápsula 2: Portapapeles (Papelera)
                             ShortcutIconCapsule(
-                                icon = Icons.Default.ContentPaste,
-                                contentDescription = "Portapapeles",
+                                icon = Icons.AutoMirrored.Outlined.Assignment,
+                                contentDescription = context.getKeyboardString(R.string.fn_clipboard, currentLocale),
                                 theme = theme,
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -183,7 +192,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                             // Cápsula 3: Contraseñas
                             ShortcutIconCapsule(
                                 icon = Icons.Default.Key,
-                                contentDescription = "Contraseñas",
+                                contentDescription = context.getKeyboardString(R.string.fn_passwords, currentLocale),
                                 theme = theme,
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -273,9 +282,10 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
             enter = fadeIn(), exit = fadeOut()
         ) {
             val title = when(currentView) {
-                "clipboard" -> "Portapapeles"
-                "functions" -> "Funciones"
-                "credentials" -> "Contraseñas"
+                "clipboard" -> context.getKeyboardString(R.string.panel_title_clipboard, currentLocale)
+                "functions" -> context.getKeyboardString(R.string.panel_title_functions, currentLocale)
+                "credentials" -> context.getKeyboardString(R.string.panel_title_credentials, currentLocale)
+                "languages" -> context.getKeyboardString(R.string.panel_title_languages, currentLocale)
                 else -> currentView
             }
             PanelHeader(
@@ -304,11 +314,15 @@ fun GboardCapsule(
         return
     }
 
-    val bgColor = if (isCenterPrimary) {
-        Color(theme.keyBackgroundColor).copy(alpha = 0.95f)
+    val baseColor = Color(theme.keyBackgroundColor)
+    val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
+        Color.Transparent
     } else {
-        Color(theme.keyBackgroundColor).copy(alpha = 0.65f)
+        val factor = if (isCenterPrimary) 0.95f else 0.65f
+        baseColor.copy(alpha = baseColor.alpha * factor)
     }
+
+    val borderStroke = rememberKeyBorderStroke(theme)
 
     val textColor = Color(theme.keyTextColor)
     val fontWeight = if (isCenterPrimary) FontWeight.Bold else FontWeight.Medium
@@ -321,7 +335,8 @@ fun GboardCapsule(
                 onClick = onClick
             ),
         color = bgColor,
-        shape = CircleShape
+        shape = CircleShape,
+        border = borderStroke
     ) {
         Box(
             modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
@@ -350,15 +365,22 @@ fun ShortcutIconCapsule(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val bgColor = Color(theme.keyBackgroundColor).copy(alpha = 0.75f)
+    val baseColor = Color(theme.keyBackgroundColor)
+    val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
+        Color.Transparent
+    } else {
+        baseColor.copy(alpha = baseColor.alpha * 0.75f)
+    }
     val iconColor = Color(theme.keyboardIconTint)
+    val borderStroke = rememberKeyBorderStroke(theme)
 
     Surface(
         modifier = modifier
             .height(34.dp)
             .bounceClick(onClick = onClick),
         color = bgColor,
-        shape = CircleShape
+        shape = CircleShape,
+        border = borderStroke
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -379,6 +401,14 @@ fun ShortcutIconCapsule(
  */
 @Composable
 fun ClipboardSuggestionChip(clipText: String, theme: KeyboardTheme, onClick: () -> Unit) {
+    val borderStroke = rememberKeyBorderStroke(theme)
+    val baseColor = Color(theme.keyBackgroundColor)
+    val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
+        Color.Transparent
+    } else {
+        baseColor.copy(alpha = baseColor.alpha * 0.95f)
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -386,8 +416,9 @@ fun ClipboardSuggestionChip(clipText: String, theme: KeyboardTheme, onClick: () 
             .bounceClick(
                 onClick = onClick
             ),
-        color = Color(theme.keyBackgroundColor).copy(alpha = 0.95f),
-        shape = CircleShape
+        color = bgColor,
+        shape = CircleShape,
+        border = borderStroke
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -395,7 +426,7 @@ fun ClipboardSuggestionChip(clipText: String, theme: KeyboardTheme, onClick: () 
             horizontalArrangement = Arrangement.Center
         ) {
             Icon(
-                imageVector = Icons.Default.ContentPaste,
+                imageVector = Icons.AutoMirrored.Outlined.Assignment,
                 contentDescription = "Portapapeles",
                 tint = Color(theme.keyboardIconTint),
                 modifier = Modifier.size(16.dp)

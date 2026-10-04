@@ -37,4 +37,59 @@
     <string name="toggle_borders_label">Bordes On/Off</string>
     <string name="delete">Eliminar</string>
     <string name="edit">Editar</string>
+
+    <!-- Etiquetas de teclas especiales -->
+    <string name="key_label_shift">MAYUS</string>
+    <string name="key_label_delete">BORRAR</string>
+    <string name="key_label_enter">INTRO</string>
+    <string name="key_action_go">IR</string>
+    <string name="key_action_search">BUSCAR</string>
+    <string name="key_action_send">ENVIAR</string>
+    <string name="key_action_next">SIG.</string>
+    <string name="key_action_done">HECHO</string>
+    <string name="key_action_prev">ANT.</string>
+
+    <!-- Títulos de Paneles del Teclado -->
+    <string name="panel_title_clipboard">Portapapeles</string>
+    <string name="panel_title_functions">Funciones</string>
+    <string name="panel_title_credentials">Contraseñas</string>
+    <string name="panel_title_languages">Idioma</string>
+
+    <!-- Accesos Rápidos del Panel de Funciones -->
+    <string name="fn_settings">Ajustes</string>
+    <string name="fn_clipboard">Portapapeles</string>
+    <string name="fn_themes">Temas</string>
+    <string name="fn_language">Idioma</string>
+    <string name="fn_passwords">Contraseñas</string>
+
+    <!-- Nombres de Idiomas y Opciones -->
+    <string name="lang_primary">IDIOMA PRINCIPAL</string>
+    <string name="lang_secondary">IDIOMA SECUNDARIO (PREDICCIÓN BILINGÜE)</string>
+    <string name="lang_disabled">Desactivado</string>
+    <string name="lang_spanish">Español</string>
+    <string name="lang_english">English</string>
+
+    <!-- Ajustes de Idioma de la App y Teclado -->
+    <string name="section_language_layout">Idioma y Distribución</string>
+    <string name="setting_app_language">Idioma de la aplicación</string>
+    <string name="setting_app_language_title">Seleccionar idioma de la aplicación</string>
+    <string name="setting_keyboard_language">Idioma del Teclado</string>
+    <string name="setting_keyboard_language_title">Seleccionar idioma principal</string>
+    <string name="setting_secondary_language">Idioma secundario (Bilingüe)</string>
+    <string name="setting_secondary_language_title">Seleccionar idioma secundario</string>
+    <string name="setting_layout_type">Distribución de Teclas</string>
+    <string name="setting_layout_default">Predeterminada (Optimización Hexagonal)</string>
+    <string name="setting_layout_qwerty">QWERTY (Clásica)</string>
+    <string name="btn_cancel">Cancelar</string>
+
+    <!-- Estados Vacíos y Menús Flotantes -->
+    <string name="clip_empty">El portapapeles está vacío</string>
+    <string name="cred_empty">No hay credenciales. Añádelas desde Ajustes.</string>
+    <string name="cred_search_empty">No se encontraron contraseñas.</string>
+    <string name="voice_listening">Escuchando...</string>
+    <string name="menu_paste">Pegar</string>
+    <string name="menu_pin">Fijar</string>
+    <string name="menu_unpin">Desfijar</string>
+    <string name="menu_edit">Editar</string>
+    <string name="menu_delete">Borrar</string>
 </resources>
