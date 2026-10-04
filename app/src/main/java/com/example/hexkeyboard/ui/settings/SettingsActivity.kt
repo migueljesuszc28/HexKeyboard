@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -157,7 +158,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     if (showLangDialog) {
                         AlertDialog(
                             onDismissRequest = { showLangDialog = false },
-                            title = { Text("Seleccionar idioma") },
+                            title = { Text("Seleccionar idioma principal") },
                             text = {
                                 Column {
                                     listOf("es" to "Español", "en" to "English").forEach { (value, label) ->
@@ -182,6 +183,61 @@ fun SettingsScreen(onBack: () -> Unit) {
                             },
                             confirmButton = {
                                 TextButton(onClick = { showLangDialog = false }) { Text("Cancelar") }
+                            }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    val secLangValueFlow = remember { dataStore.data.map { it[ThemeUtils.SECONDARY_LANGUAGE] ?: "" } }
+                    val secLangValue by secLangValueFlow.collectAsState("")
+                    var showSecLangDialog by remember { mutableStateOf(false) }
+
+                    ListItem(
+                        headlineContent = { Text("Idioma secundario (Bilingüe)", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = {
+                            Text(when(secLangValue) {
+                                "es" -> "Español"
+                                "en" -> "English"
+                                else -> "Desactivado"
+                            })
+                        },
+                        leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable { showSecLangDialog = true }
+                    )
+
+                    if (showSecLangDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showSecLangDialog = false },
+                            title = { Text("Seleccionar idioma secundario") },
+                            text = {
+                                Column {
+                                    listOf("" to "Desactivado", "es" to "Español", "en" to "English").forEach { (value, label) ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    scope.launch {
+                                                        dataStore.edit {
+                                                            it[ThemeUtils.SECONDARY_LANGUAGE] = value
+                                                            it[ThemeUtils.MULTILINGUAL_ENABLED] = value.isNotEmpty()
+                                                        }
+                                                    }
+                                                    showSecLangDialog = false
+                                                }
+                                                .padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(selected = secLangValue == value, onClick = null)
+                                            Spacer(Modifier.width(16.dp))
+                                            Text(label)
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showSecLangDialog = false }) { Text("Cancelar") }
                             }
                         )
                     }
@@ -649,6 +705,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             // --- RESTABLECER AJUSTES ---
             item {
                 Spacer(modifier = Modifier.height(24.dp))
+                var showResetDialog by remember { mutableStateOf(false) }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -656,15 +714,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     contentAlignment = Alignment.Center
                 ) {
                     OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                dataStore.edit { it.clear() }
-                                applyAppTheme("system")
-                                val intent = Intent(context, SettingsActivity::class.java)
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                context.startActivity(intent)
-                            }
-                        },
+                        onClick = { showResetDialog = true },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(16.dp)
@@ -673,6 +723,36 @@ fun SettingsScreen(onBack: () -> Unit) {
                         Spacer(Modifier.width(8.dp))
                         Text("Restablecer todos los ajustes", fontWeight = FontWeight.Bold)
                     }
+                }
+
+                if (showResetDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showResetDialog = false },
+                        title = { Text("Restablecer ajustes", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text("¿Estás seguro de que deseas restablecer la configuración del teclado a sus valores predeterminados? Tus temas personalizados, palabras aprendidas e historial del portapapeles no se borrarán.")
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showResetDialog = false
+                                    scope.launch {
+                                        ThemeUtils.resetAllSettings(context)
+                                        applyAppTheme("system")
+                                        Toast.makeText(context, "Ajustes restablecidos a valores predeterminados", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Restablecer", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showResetDialog = false }) {
+                                Text("Cancelar")
+                            }
+                        }
+                    )
                 }
             }
         }

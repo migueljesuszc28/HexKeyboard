@@ -50,6 +50,7 @@ import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.engine.PredictionEngine
+import com.example.hexkeyboard.logic.engine.WordSanitizer
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.FeedbackManager
@@ -304,6 +305,9 @@ class HexKeyboardService : InputMethodService(),
         serviceScope.launch {
             dataStore.data.collectLatest { prefs ->
                 val lang = prefs[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es"
+                val secLang = prefs[ThemeUtils.SECONDARY_LANGUAGE] ?: ""
+                val multilingualEnabled = prefs[ThemeUtils.MULTILINGUAL_ENABLED] ?: true
+                val secondaryLangs = if (multilingualEnabled && secLang.isNotBlank() && secLang != lang) listOf(secLang) else emptyList()
                 val layoutType = prefs[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default"
                 
                 autoCapitalize = prefs[ThemeUtils.AUTO_CAPITALIZE] ?: true
@@ -315,7 +319,7 @@ class HexKeyboardService : InputMethodService(),
                 viewModel.setSkinTone(prefs[ThemeUtils.SELECTED_SKIN_TONE] ?: "")
                 viewModel.setGenderIndex(prefs[ThemeUtils.SELECTED_GENDER_INDEX] ?: 0)
                 
-                predictionEngine.initialize(lang)
+                predictionEngine.initialize(lang = lang, secondaryLangs = secondaryLangs)
                 predictionEngine.setLayoutType(layoutType)
                 
                 withContext(Dispatchers.Main) {
@@ -547,12 +551,16 @@ class HexKeyboardService : InputMethodService(),
         updateShiftState()
 
         serviceScope.launch {
-            val lang = ThemeUtils.getDataStore(this@HexKeyboardService).data.first()[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es"
+            val prefs = ThemeUtils.getDataStore(this@HexKeyboardService).data.first()
+            val lang = prefs[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es"
+            val secLang = prefs[ThemeUtils.SECONDARY_LANGUAGE] ?: ""
+            val multilingualEnabled = prefs[ThemeUtils.MULTILINGUAL_ENABLED] ?: true
+            val secondaryLangs = if (multilingualEnabled && secLang.isNotBlank() && secLang != lang) listOf(secLang) else emptyList()
             
             withContext(Dispatchers.Main) {
                 viewModel.updateCurrentLocale(lang)
                 serviceScope.launch(Dispatchers.IO) {
-                    predictionEngine.initialize(lang, forceUserDictReload = true)
+                    predictionEngine.initialize(lang = lang, secondaryLangs = secondaryLangs, forceUserDictReload = true)
                 }
                 switchToLanguage(lang)
 
@@ -587,54 +595,68 @@ class HexKeyboardService : InputMethodService(),
                 topHistoryText
             } else null
 
-            val allWords = textBefore.trim().split(" ", "\n", "\t").filter { it.isNotEmpty() }
-            val lastWord = if (textBefore.isNotEmpty() && !textBefore.endsWith(" ")) {
-                allWords.lastOrNull() ?: ""
+            val rawTokens = textBefore.trim().split(" ", "\n", "\t").filter { it.isNotEmpty() }
+            val rawLastToken = if (textBefore.isNotEmpty() && !textBefore.endsWith(" ")) {
+                rawTokens.lastOrNull() ?: ""
             } else ""
-            val prevWord = if (lastWord.isEmpty()) allWords.lastOrNull() else allWords.getOrNull(allWords.size - 2)
+
+            val sanitizedLast = WordSanitizer.sanitizeToken(rawLastToken)
+            val cleanLastWord = sanitizedLast.cleanWord
+
+            val prev1Token = if (cleanLastWord.isEmpty()) rawTokens.lastOrNull() else rawTokens.getOrNull(rawTokens.size - 2)
+            val prev2Token = if (cleanLastWord.isEmpty()) rawTokens.getOrNull(rawTokens.size - 2) else rawTokens.getOrNull(rawTokens.size - 3)
+
+            val prev1 = WordSanitizer.sanitizeToken(prev1Token ?: "").cleanWord
+            val prev2 = WordSanitizer.sanitizeToken(prev2Token ?: "").cleanWord
 
             val localSuggestions = mutableListOf<String>()
 
-            if (lastWord.isNotEmpty()) {
-                val rawPredictions = predictionEngine.getSuggestions(lastWord, prevWord, limit = 10)
-                var rawCandidates = rawPredictions.map { it.text }.distinct()
-
-                if (shouldCapitalize) {
-                    rawCandidates = rawCandidates.map { word ->
-                        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-                    }.distinct()
-                }
-
-                if (rawCandidates.isNotEmpty()) {
-                    val primaryCandidate = rawCandidates.first()
-
-                    val fallbackCandidate = if (lastWord.lowercase() != primaryCandidate.lowercase()) {
-                        lastWord
-                    } else {
-                        rawCandidates.getOrNull(1) ?: lastWord
-                    }
-
-                    val alternativeCandidate = rawCandidates.find { 
-                        it.lowercase() != primaryCandidate.lowercase() && it.lowercase() != fallbackCandidate.lowercase()
-                    } ?: rawCandidates.getOrNull(2)
-
-                    localSuggestions.add(primaryCandidate)
-                    if (fallbackCandidate.isNotEmpty()) {
-                        localSuggestions.add(fallbackCandidate)
-                    }
-                    if (alternativeCandidate != null && alternativeCandidate.isNotEmpty()) {
-                        localSuggestions.add(alternativeCandidate)
-                    }
+            if (cleanLastWord.isNotEmpty()) {
+                if (sanitizedLast.hasTrailingPunctuation || WordSanitizer.isAutocorrectImmune(rawLastToken, cleanLastWord)) {
+                    localSuggestions.add(cleanLastWord)
+                    val nextWordPredictions = predictionEngine.getSuggestions("", previousWord = cleanLastWord, prev2 = prev1, limit = 2).map { it.text }
+                    localSuggestions.addAll(nextWordPredictions)
                 } else {
-                    localSuggestions.add(lastWord)
-                }
+                    val rawPredictions = predictionEngine.getSuggestions(cleanLastWord, previousWord = prev1, prev2 = prev2, limit = 10)
+                    var rawCandidates = rawPredictions.map { it.text }.distinct()
 
-                spellCheckerManager.fetchSuggestions(lastWord)
+                    if (shouldCapitalize) {
+                        rawCandidates = rawCandidates.map { word ->
+                            word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                        }.distinct()
+                    }
+
+                    if (rawCandidates.isNotEmpty()) {
+                        val primaryCandidate = rawCandidates.first()
+
+                        val fallbackCandidate = if (cleanLastWord.lowercase() != primaryCandidate.lowercase()) {
+                            cleanLastWord
+                        } else {
+                            rawCandidates.getOrNull(1) ?: cleanLastWord
+                        }
+
+                        val alternativeCandidate = rawCandidates.find { 
+                            it.lowercase() != primaryCandidate.lowercase() && it.lowercase() != fallbackCandidate.lowercase()
+                        } ?: rawCandidates.getOrNull(2)
+
+                        localSuggestions.add(primaryCandidate)
+                        if (fallbackCandidate.isNotEmpty()) {
+                            localSuggestions.add(fallbackCandidate)
+                        }
+                        if (alternativeCandidate != null && alternativeCandidate.isNotEmpty()) {
+                            localSuggestions.add(alternativeCandidate)
+                        }
+                    } else {
+                        localSuggestions.add(cleanLastWord)
+                    }
+
+                    spellCheckerManager.fetchSuggestions(cleanLastWord)
+                }
             } else {
                 if (clipToSuggest != null) {
                     localSuggestions.add("CLIPBOARD:$clipToSuggest")
                 } else {
-                    val nextWordPredictions = predictionEngine.getSuggestions("", prevWord, limit = 3).map { it.text }.distinct()
+                    val nextWordPredictions = predictionEngine.getSuggestions("", previousWord = prev1, prev2 = prev2, limit = 3).map { it.text }.distinct()
                     localSuggestions.addAll(nextWordPredictions.take(3))
                 }
             }
@@ -702,17 +724,23 @@ class HexKeyboardService : InputMethodService(),
             lastSwipedWord = null
         }
         
-        if ((text == " " || text == "." || text == "," || text == "!") && !lastKeyWasSpace) {
-            val before = ic.getTextBeforeCursor(40, 0) ?: ""
-            val words = before.split(" ", "\n", "\t").filter { it.isNotEmpty() }
-            if (words.isNotEmpty()) {
-                val currentWord = words.last()
-                val previousWord = if (words.size > 1) words[words.size - 2] else null
+        if ((text == " " || text in listOf(".", ",", "!", "?", ";", ":")) && !lastKeyWasSpace) {
+            val before = ic.getTextBeforeCursor(60, 0) ?: ""
+            val rawTokens = before.split(" ", "\n", "\t").filter { it.isNotEmpty() }
+            if (rawTokens.isNotEmpty()) {
+                val currentRaw = rawTokens.last()
+                val prev1Raw = rawTokens.getOrNull(rawTokens.size - 2)
+                val prev2Raw = rawTokens.getOrNull(rawTokens.size - 3)
+
+                val currentClean = WordSanitizer.sanitizeToken(currentRaw).cleanWord
+                val prev1Clean = WordSanitizer.sanitizeToken(prev1Raw ?: "").cleanWord
+                val prev2Clean = WordSanitizer.sanitizeToken(prev2Raw ?: "").cleanWord
+
                 val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
-                if (emailRegex.matches(currentWord)) {
-                    predictionEngine.addUserWord(currentWord)
-                } else {
-                    predictionEngine.learnFromInput(currentWord, previousWord)
+                if (emailRegex.matches(currentRaw)) {
+                    predictionEngine.addUserWord(currentRaw)
+                } else if (currentClean.isNotEmpty()) {
+                    predictionEngine.learnFromInput(currentClean, prev1Clean, prev2Clean)
                 }
             }
         }
@@ -734,16 +762,20 @@ class HexKeyboardService : InputMethodService(),
             val suggestions = viewModel.suggestions.value
             if (suggestions.isNotEmpty() && !suggestions[0].contains(" ")) {
                 val textBefore = ic.getTextBeforeCursor(30, 0) ?: ""
-                val originalWord = textBefore.toString().split(" ", "\n").lastOrNull() ?: ""
-                
-                if (originalWord.isNotEmpty() && originalWord == lastUndoneCorrection) {
-                    lastUndoneCorrection = null
-                } else if (originalWord.isNotEmpty() && originalWord.lowercase() != suggestions[0].lowercase()) {
-                    replaceLastWord(suggestions[0] + " ")
-                    lastAutoCorrection = LastCorrection(originalWord, suggestions[0])
-                    lastUndoneCorrection = null
-                    ic.endBatchEdit()
-                    return
+                val rawOriginalToken = textBefore.toString().split(" ", "\n").lastOrNull() ?: ""
+                val sanitizedOriginal = WordSanitizer.sanitizeToken(rawOriginalToken)
+
+                if (!WordSanitizer.isAutocorrectImmune(rawOriginalToken, sanitizedOriginal.cleanWord)) {
+                    if (rawOriginalToken.isNotEmpty() && rawOriginalToken == lastUndoneCorrection) {
+                        lastUndoneCorrection = null
+                    } else if (sanitizedOriginal.cleanWord.isNotEmpty() &&
+                        sanitizedOriginal.cleanWord.lowercase() != suggestions[0].lowercase()) {
+                        replaceLastWord(suggestions[0] + " ")
+                        lastAutoCorrection = LastCorrection(rawOriginalToken, suggestions[0])
+                        lastUndoneCorrection = null
+                        ic.endBatchEdit()
+                        return
+                    }
                 }
             }
         }
@@ -977,11 +1009,21 @@ class HexKeyboardService : InputMethodService(),
 
         ic.beginBatchEdit()
         val textBefore = ic.getTextBeforeCursor(30, 0)
+        var trailingPunctuation = ""
         if (!textBefore.isNullOrEmpty() && !textBefore.endsWith(" ")) {
-            val lastWord = textBefore.toString().split(" ", "\n").last()
-            ic.deleteSurroundingText(lastWord.length, 0)
+            val lastToken = textBefore.toString().split(" ", "\n").last()
+            val sanitized = WordSanitizer.sanitizeToken(lastToken)
+            trailingPunctuation = sanitized.trailingPunctuation
+            ic.deleteSurroundingText(lastToken.length, 0)
         }
-        ic.commitText(newWord, 1)
+
+        val replacementText = if (trailingPunctuation.isNotEmpty()) {
+            newWord.trimEnd() + trailingPunctuation + " "
+        } else {
+            newWord
+        }
+
+        ic.commitText(replacementText, 1)
         ic.endBatchEdit()
         updateShiftState()
         updateSuggestions()

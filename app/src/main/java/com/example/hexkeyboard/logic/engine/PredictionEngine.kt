@@ -48,6 +48,7 @@ class PredictionEngine(private val context: Context) {
         // Pesos de scoring
         private const val USER_WORD_BOOST = 2.6
         private const val EXACT_PREFIX_BOOST = 1.35
+        private const val ACCENT_MATCH_BOOST = 1.45
         private const val LEARNED_WORD_BOOST_STEP = 0.05
         private const val LEARNED_WORD_BOOST_CAP = 10
 
@@ -63,10 +64,16 @@ class PredictionEngine(private val context: Context) {
         private const val NO_EXPECTED_CHAR_PENALTY = 0.85
     }
 
+    data class LanguageBuffer(
+        val langCode: String,
+        val buffer: ByteBuffer,
+        val headerSize: Int,
+        val isPrimary: Boolean
+    )
+
     private val trie = TrieNode() // Diccionario de usuario + palabras aprendidas
-    private var baseDictBuffer: ByteBuffer? = null
-    private var baseDictHeaderSize: Int = 0
-    private val bigrams = mutableMapOf<String, MutableMap<String, Int>>()
+    private val activeLanguageBuffers = mutableListOf<LanguageBuffer>()
+    private val patternLearningManager = PatternLearningManager(context)
     private val userDictionary = mutableSetOf<String>()
     private val wordCounts = mutableMapOf<String, Int>() // Aprendizaje gradual estilo Gboard
     private val predictionCache = LruCache<String, List<Suggestion>>(CACHE_SIZE)
@@ -147,6 +154,20 @@ class PredictionEngine(private val context: Context) {
         'ü' to 'u', 'ñ' to 'n'
     )
 
+    private fun stripAccents(str: String): String {
+        if (str.isEmpty()) return str
+        val sb = java.lang.StringBuilder(str.length)
+        for (c in str) {
+            val mapped = accentMap[c]
+            if (mapped != null && c != 'ñ') {
+                sb.append(mapped)
+            } else {
+                sb.append(c)
+            }
+        }
+        return sb.toString()
+    }
+
     data class Suggestion(
         val text: String,
         val score: Double,
@@ -178,8 +199,24 @@ class PredictionEngine(private val context: Context) {
     // Inicialización / carga
     // ------------------------------------------------------------------
 
-    suspend fun initialize(lang: String = "es", forceUserDictReload: Boolean = false, includeBase: Boolean = true) {
-        if (!forceUserDictReload && isUserLoaded && isBaseLoaded && currentLanguage == lang) return
+    suspend fun initialize(
+        lang: String = currentLanguage,
+        secondaryLangs: List<String> = emptyList(),
+        forceUserDictReload: Boolean = false,
+        includeBase: Boolean = true
+    ) {
+        val targetLangs = if (secondaryLangs.isNotEmpty()) {
+            listOf(lang) + secondaryLangs.filter { it != lang }
+        } else {
+            listOf(lang)
+        }
+
+        val currentLoadedLangs = activeLanguageBuffers.map { it.langCode }
+        val primaryChanged = currentLanguage != lang
+        val languagesChanged = currentLoadedLangs != targetLangs
+
+        if (!forceUserDictReload && isUserLoaded && isBaseLoaded && !primaryChanged && !languagesChanged) return
+
         currentLanguage = lang
         synchronized(predictionCache) { predictionCache.evictAll() }
 
@@ -189,15 +226,29 @@ class PredictionEngine(private val context: Context) {
                 loadUserDictionary()
                 isUserLoaded = true
             }
-            if (includeBase && (!isBaseLoaded || currentLanguage != lang)) {
-                loadBaseDictionary(lang)
-                isBaseLoaded = true
+            if (includeBase && (!isBaseLoaded || primaryChanged || languagesChanged)) {
+                loadBaseDictionaries(lang, secondaryLangs)
+                isBaseLoaded = activeLanguageBuffers.isNotEmpty()
             }
             loadBigrams()
         }
     }
 
-    private fun loadBaseDictionary(lang: String) {
+    private fun loadBaseDictionaries(primaryLang: String, secondaryLangs: List<String>) {
+        activeLanguageBuffers.clear()
+
+        loadBaseDictionary(primaryLang, isPrimary = true)?.let {
+            activeLanguageBuffers.add(it)
+        }
+
+        secondaryLangs.filter { it != primaryLang }.forEach { secLang ->
+            loadBaseDictionary(secLang, isPrimary = false)?.let {
+                activeLanguageBuffers.add(it)
+            }
+        }
+    }
+
+    private fun loadBaseDictionary(lang: String, isPrimary: Boolean): LanguageBuffer? {
         try {
             val fileName = "main_$lang.dict"
             val bytes = context.assets.open(fileName).use { it.readBytes() }
@@ -205,18 +256,24 @@ class PredictionEngine(private val context: Context) {
             val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             val magic = buffer.int
             if (magic != 0x9BC13AFE.toInt()) {
-                Log.e("PredictionEngine", "Magic inválido: ${Integer.toHexString(magic)}")
-                return
+                Log.e("PredictionEngine", "Magic inválido para '$lang': ${Integer.toHexString(magic)}")
+                return null
             }
 
             buffer.short // version
             buffer.short // flags
-            baseDictHeaderSize = buffer.int
-            baseDictBuffer = buffer
+            val headerSize = buffer.int
 
-            Log.d("PredictionEngine", "Diccionario base '$lang' cargado en buffer binario")
+            Log.d("PredictionEngine", "Diccionario base '$lang' (primario=$isPrimary) cargado en buffer binario")
+            return LanguageBuffer(
+                langCode = lang,
+                buffer = buffer,
+                headerSize = headerSize,
+                isPrimary = isPrimary
+            )
         } catch (e: Exception) {
-            Log.e("PredictionEngine", "Error cargando diccionario base: ${e.message}")
+            Log.e("PredictionEngine", "Error cargando diccionario base '$lang': ${e.message}")
+            return null
         }
     }
 
@@ -242,18 +299,7 @@ class PredictionEngine(private val context: Context) {
     }
 
     private fun loadBigrams() {
-        if (bigrams.isEmpty()) {
-            addBigram("muchas", "gracias")
-            addBigram("buenos", "días")
-            addBigram("buenas", "noches")
-            addBigram("hola", "cómo")
-            addBigram("cómo", "estás")
-            addBigram("estoy", "bien")
-            addBigram("por", "favor")
-            addBigram("de", "nada")
-            addBigram("nos", "vemos")
-            addBigram("hasta", "luego")
-        }
+        // Carga gestionada por PatternLearningManager
     }
 
     private fun insert(word: String, freq: Int, isUser: Boolean = false) {
@@ -264,17 +310,6 @@ class PredictionEngine(private val context: Context) {
         current.isWord = true
         current.isUserWord = isUser
         current.frequency = freq
-    }
-
-    private fun addBigram(w1: String, w2: String) {
-        val lowW1 = w1.lowercase()
-        val lowW2 = w2.lowercase()
-        val nextWords = bigrams.getOrPut(lowW1) { mutableMapOf() }
-        nextWords[lowW2] = (nextWords[lowW2] ?: 0) + 1
-
-        if (bigrams.size > BIGRAM_LIMIT) {
-            bigrams.remove(bigrams.keys.first())
-        }
     }
 
     // ------------------------------------------------------------------
@@ -373,9 +408,12 @@ class PredictionEngine(private val context: Context) {
     }
 
     private fun isKnownWordInBinary(target: String): Boolean {
-        val buffer = baseDictBuffer?.duplicate()?.order(ByteOrder.BIG_ENDIAN) ?: return false
-        buffer.position(baseDictHeaderSize)
-        return isKnownWordInBinaryRecursive(buffer, target, "")
+        for (langBuf in activeLanguageBuffers) {
+            val buffer = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
+            buffer.position(langBuf.headerSize)
+            if (isKnownWordInBinaryRecursive(buffer, target, "")) return true
+        }
+        return false
     }
 
     private fun isKnownWordInBinaryRecursive(buffer: ByteBuffer, target: String, prefix: String): Boolean {
@@ -399,30 +437,35 @@ class PredictionEngine(private val context: Context) {
     // Sugerencias
     // ------------------------------------------------------------------
 
-    fun getSuggestions(currentWord: String, previousWord: String? = null, limit: Int = 5): List<Suggestion> {
+    fun getSuggestions(
+        currentWord: String,
+        previousWord: String? = null,
+        prev2: String? = null,
+        limit: Int = 5
+    ): List<Suggestion> {
         if (!isBaseLoaded) return emptyList()
 
-        val lowPrefix = currentWord.lowercase()
-        val cacheKey = "curr:${lowPrefix}_prev:${previousWord}_lang:$currentLanguage"
+        val sanitized = WordSanitizer.sanitizeToken(currentWord)
+        val lowPrefix = sanitized.cleanWord.lowercase()
+
+        val cacheKey = "curr:${lowPrefix}_p1:${previousWord}_p2:${prev2}_lang:$currentLanguage"
         synchronized(predictionCache) {
             predictionCache.get(cacheKey)
         }?.let { cached ->
-            return cached.map { it.copy(text = matchCase(currentWord, it.text)) }
+            return cached.map { it.copy(text = matchCase(sanitized.cleanWord, it.text)) }
         }
 
         val result = mutableListOf<Suggestion>()
 
-        // 1. Predicción de siguiente palabra basada en contexto (bigramas)
-        if (currentWord.isEmpty() && previousWord != null) {
-            bigrams[previousWord.lowercase()]?.entries
-                ?.sortedByDescending { it.value }
-                ?.take(limit)
-                ?.forEach {
-                    result.add(Suggestion(it.key, it.value.toDouble() * 100.0, isNextWord = true, confidence = 0.8f))
-                }
+        // 1. Predicción N-Gramas de siguiente palabra (Trigramas + Bigramas)
+        if (lowPrefix.isEmpty() && previousWord != null) {
+            val predictions = patternLearningManager.predictNextWords(prev2, previousWord, limit = limit)
+            predictions.forEach { (nextWord, score) ->
+                result.add(Suggestion(nextWord, score, isNextWord = true, confidence = 0.85f))
+            }
         }
 
-        if (currentWord.isNotEmpty()) {
+        if (lowPrefix.isNotEmpty()) {
             // 2. Coincidencias de prefijo (siempre las de mayor confianza)
             findPrefixMatches(lowPrefix, result)
 
@@ -435,22 +478,12 @@ class PredictionEngine(private val context: Context) {
             result.addAll(findFuzzyMatches(lowPrefix, fuzzyMaxDist))
         }
 
-        // 4. Ranking final integrando contexto de bigramas
+        // 4. Ranking final
         val finalResult = result
             .distinctBy { it.text.lowercase() }
-            .map { sug ->
-                var finalScore = sug.score
-                if (previousWord != null) {
-                    val bigramFreq = bigrams[previousWord.lowercase()]?.get(sug.text.lowercase()) ?: 0
-                    if (bigramFreq > 0) {
-                        finalScore *= (1.5 + (bigramFreq * 0.5))
-                    }
-                }
-                sug.copy(score = finalScore)
-            }
             .sortedByDescending { it.score }
             .take(limit)
-            .map { it.copy(text = matchCase(currentWord, it.text)) }
+            .map { it.copy(text = matchCase(sanitized.cleanWord, it.text)) }
 
         synchronized(predictionCache) {
             predictionCache.put(cacheKey, finalResult)
@@ -488,11 +521,12 @@ class PredictionEngine(private val context: Context) {
         // 1. Buscar en memoria
         searchGestureInMemory(trie, "", resampledPoints, cornerPoints, keyMap, results, hexRadius, 0, startChars, endChars)
 
-        // 2. Buscar en binario
-        baseDictBuffer?.let { buffer ->
-            val dup = buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
-            dup.position(baseDictHeaderSize)
-            searchGestureInBinary(dup, "", resampledPoints, cornerPoints, keyMap, results, hexRadius, 0, startChars, endChars)
+        // 2. Buscar en los buffers binarios activos
+        for (langBuf in activeLanguageBuffers) {
+            val dup = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
+            dup.position(langBuf.headerSize)
+            val langWeight = if (langBuf.isPrimary) 1.0 else 0.85
+            searchGestureInBinary(dup, "", resampledPoints, cornerPoints, keyMap, results, hexRadius, 0, startChars, endChars, langWeight)
         }
 
         return results
@@ -635,7 +669,8 @@ class PredictionEngine(private val context: Context) {
         hexRadius: Float,
         lastPointIndex: Int,
         startChars: Set<Char>,
-        endChars: Set<Char>
+        endChars: Set<Char>,
+        langWeight: Double = 1.0
     ) {
         if (results.size > 120) return
 
@@ -660,16 +695,16 @@ class PredictionEngine(private val context: Context) {
 
             if (possible) {
                 if (node.isTerminal && node.word.length >= 2) {
-                    val score = calculateGestureScore(node.word, resampledPoints, cornerPoints, keyMap, node.frequency, hexRadius, endChars)
+                    val score = calculateGestureScore(node.word, resampledPoints, cornerPoints, keyMap, node.frequency, hexRadius, endChars) * langWeight
                     if (score > 0) {
-                        val confidence = (score / 350.0).toFloat().coerceIn(0f, 1f)
+                        val confidence = ((score / 350.0) * langWeight).toFloat().coerceIn(0f, 1f)
                         results.add(Suggestion(node.word, score, isGesture = true, confidence = confidence))
                     }
                 }
                 if (node.childrenAddr != null) {
                     val savedPos = buffer.position()
                     buffer.position(node.addressBase + node.childrenAddr)
-                    searchGestureInBinary(buffer, node.word, resampledPoints, cornerPoints, keyMap, results, hexRadius, currIndex, startChars, endChars)
+                    searchGestureInBinary(buffer, node.word, resampledPoints, cornerPoints, keyMap, results, hexRadius, currIndex, startChars, endChars, langWeight)
                     buffer.position(savedPos)
                 }
             }
@@ -754,12 +789,29 @@ class PredictionEngine(private val context: Context) {
      * candidato tiene confianza suficiente. Evita "corregir" palabras raras
      * pero legítimas (nombres propios cortos, jerga ya aprendida, etc.).
      */
-    fun getAutocorrection(typedWord: String, previousWord: String? = null): Suggestion? {
-        val cleaned = typedWord.trim()
+    fun getAutocorrection(
+        typedWord: String,
+        previousWord: String? = null,
+        prev2: String? = null
+    ): Suggestion? {
+        val sanitized = WordSanitizer.sanitizeToken(typedWord)
+        val cleaned = sanitized.cleanWord
         if (cleaned.length < AUTOCORRECT_MIN_WORD_LEN) return null
+        if (WordSanitizer.isAutocorrectImmune(typedWord, cleaned)) return null
+
+        val normCleaned = stripAccents(cleaned.lowercase())
+        val candidates = getSuggestions(cleaned, previousWord = previousWord, prev2 = prev2, limit = 5)
+
+        // 1. Promover versión acentuada oficial equivalente si el usuario escribió la palabra sin tilde
+        val bestAccentMatch = candidates.find {
+            stripAccents(it.text.lowercase()) == normCleaned && it.text.lowercase() != cleaned.lowercase()
+        }
+        if (bestAccentMatch != null) {
+            return bestAccentMatch
+        }
+
         if (isKnownWord(cleaned)) return null
 
-        val candidates = getSuggestions(cleaned, previousWord, limit = 3)
         val best = candidates.filter { it.isCorrection }.maxByOrNull { it.score } ?: return null
 
         val dist = weightedDistance(cleaned.lowercase(), best.text.lowercase())
@@ -778,11 +830,12 @@ class PredictionEngine(private val context: Context) {
         }
         current?.let { node -> collectAllFromNode(node, prefix, result) }
 
-        // 2. Buscar en el buffer binario (diccionario base)
-        baseDictBuffer?.let { buffer ->
-            val dup = buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
-            dup.position(baseDictHeaderSize)
-            searchPrefixInBinary(dup, prefix, "", result)
+        // 2. Buscar en los buffers binarios activos (diccionarios base)
+        for (langBuf in activeLanguageBuffers) {
+            val dup = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
+            dup.position(langBuf.headerSize)
+            val langWeight = if (langBuf.isPrimary) 1.0 else 0.85
+            searchPrefixInBinary(dup, prefix, "", result, langWeight)
         }
     }
 
@@ -795,27 +848,36 @@ class PredictionEngine(private val context: Context) {
         node.children.forEach { (char, child) -> collectAllFromNode(child, word + char, result) }
     }
 
-    private fun searchPrefixInBinary(buffer: ByteBuffer, target: String, prefix: String, result: MutableList<Suggestion>) {
+    private fun searchPrefixInBinary(
+        buffer: ByteBuffer,
+        target: String,
+        prefix: String,
+        result: MutableList<Suggestion>,
+        langWeight: Double = 1.0
+    ) {
         if (result.size > MAX_INTERNAL_RESULTS) return
 
+        val normTarget = stripAccents(target.lowercase())
         val count = readPtNodeCount(buffer)
+
         repeat(count) {
             val node = parseNextNode(buffer, prefix)
+            val normNodeWord = stripAccents(node.word.lowercase())
 
-            if (node.word.startsWith(target) || target.startsWith(node.word)) {
-                if (node.isTerminal && node.word.startsWith(target)) {
-                    val score = calculateScore(node.frequency, false, 1.0, isPrefix = true, word = node.word)
-                    result.add(Suggestion(node.word, score, confidence = 0.9f))
+            if (normNodeWord.startsWith(normTarget) || normTarget.startsWith(normNodeWord)) {
+                if (node.isTerminal && normNodeWord.startsWith(normTarget)) {
+                    val hasAccentInDict = node.word.lowercase() != normNodeWord
+                    val accentBoost = if (hasAccentInDict && target.lowercase() == normTarget) ACCENT_MATCH_BOOST else 1.0
+                    val score = calculateScore(node.frequency, false, 1.0, isPrefix = true, word = node.word) * langWeight * accentBoost
+                    result.add(Suggestion(node.word, score, confidence = (0.95f * langWeight).toFloat()))
                 }
                 if (node.childrenAddr != null) {
                     val savedPos = buffer.position()
                     buffer.position(node.addressBase + node.childrenAddr)
-                    searchPrefixInBinary(buffer, target, node.word, result)
+                    searchPrefixInBinary(buffer, target, node.word, result, langWeight)
                     buffer.position(savedPos)
                 }
             }
-            // Si no es prefijo compatible, simplemente no se desciende: el
-            // cursor del buffer ya quedó posicionado en el siguiente hermano.
         }
     }
 
@@ -847,10 +909,11 @@ class PredictionEngine(private val context: Context) {
         val fuzzyResults = mutableListOf<Suggestion>()
         searchFuzzyInMemory(trie, "", target, 0.0, maxDist, fuzzyResults)
 
-        baseDictBuffer?.let { buffer ->
-            val dup = buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
-            dup.position(baseDictHeaderSize)
-            searchFuzzyInBinary(dup, "", target, 0.0, maxDist, fuzzyResults)
+        for (langBuf in activeLanguageBuffers) {
+            val dup = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
+            dup.position(langBuf.headerSize)
+            val langWeight = if (langBuf.isPrimary) 1.0 else 0.85
+            searchFuzzyInBinary(dup, "", target, 0.0, maxDist, fuzzyResults, langWeight)
         }
 
         return fuzzyResults
@@ -896,7 +959,8 @@ class PredictionEngine(private val context: Context) {
         target: String,
         distSoFar: Double,
         maxDist: Double,
-        results: MutableList<Suggestion>
+        results: MutableList<Suggestion>,
+        langWeight: Double = 1.0
     ) {
         if (distSoFar > maxDist || results.size > MAX_INTERNAL_RESULTS) return
 
@@ -911,15 +975,15 @@ class PredictionEngine(private val context: Context) {
                 val finalDist = newDist + missing * LENGTH_MISMATCH_PENALTY
                 if (finalDist <= maxDist) {
                     val proximityBonus = 1.0 / (finalDist + 1.0)
-                    val score = calculateScore(node.frequency, false, proximityBonus, isPrefix = false, word = node.word)
-                    results.add(Suggestion(node.word, score, isCorrection = true, confidence = proximityBonus.toFloat()))
+                    val score = calculateScore(node.frequency, false, proximityBonus, isPrefix = false, word = node.word) * langWeight
+                    results.add(Suggestion(node.word, score, isCorrection = true, confidence = (proximityBonus * langWeight).toFloat()))
                 }
             }
 
             if (node.childrenAddr != null && newDist <= maxDist) {
                 val savedPos = buffer.position()
                 buffer.position(node.addressBase + node.childrenAddr)
-                searchFuzzyInBinary(buffer, node.word, target, newDist, maxDist, results)
+                searchFuzzyInBinary(buffer, node.word, target, newDist, maxDist, results, langWeight)
                 buffer.position(savedPos)
             }
         }
@@ -985,19 +1049,19 @@ class PredictionEngine(private val context: Context) {
         wordCounts.clear()
     }
 
-    fun learnFromInput(word: String, prev: String?) {
-        val w = word.lowercase().trim()
+    fun learnFromInput(word: String, prev1: String? = null, prev2: String? = null) {
+        val sanitized = WordSanitizer.sanitizeToken(word)
+        val w = sanitized.cleanWord.lowercase().trim()
         if (w.length < 2 || w.any { !it.isLetter() }) return
 
-        // 1. Si ya es una palabra conocida, solo reforzamos el bigrama
+        patternLearningManager.recordSequence(prev2, prev1, w)
+
         if (isKnownWord(w)) {
-            if (prev != null) addBigram(prev, w)
             wordCounts[w] = (wordCounts[w] ?: 0) + 1
             synchronized(predictionCache) { predictionCache.evictAll() }
             return
         }
 
-        // 2. Conteo estilo Gboard para evitar aprender typos accidentales
         val count = (wordCounts[w] ?: 0) + 1
         wordCounts[w] = count
 
@@ -1007,7 +1071,6 @@ class PredictionEngine(private val context: Context) {
                 userDictionary.add(w)
                 saveUserDictionary()
             }
-            if (prev != null) addBigram(prev, w)
         }
         synchronized(predictionCache) { predictionCache.evictAll() }
     }
