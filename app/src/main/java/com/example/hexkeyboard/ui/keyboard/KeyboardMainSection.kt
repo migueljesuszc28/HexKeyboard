@@ -256,7 +256,6 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
                     onInsertText = { text ->
                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                         viewModel.onActionRequested?.invoke(KeyboardViewModel.Action.InsertText(text))
-                        viewModel.setCurrentView("keyboard")
                     },
                     onBack = { viewModel.setCurrentView("keyboard") },
                     theme = theme,

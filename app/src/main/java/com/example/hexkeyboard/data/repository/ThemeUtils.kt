@@ -106,6 +106,7 @@ object ThemeUtils {
     
     val CLIPBOARD_AUTO_DELETE = booleanPreferencesKey("clipboard_auto_delete")
     val CLIPBOARD_EXPIRY_HOURS = stringPreferencesKey("clipboard_expiry_hours")
+    val AUTO_COPY_SCREENSHOTS = booleanPreferencesKey("auto_copy_screenshots")
 
     val AUTO_CAPITALIZE = booleanPreferencesKey("auto_capitalize")
     val AUTO_CORRECT = booleanPreferencesKey("auto_correct")

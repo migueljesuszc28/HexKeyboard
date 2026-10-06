@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.*
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
+import com.example.hexkeyboard.service.HexKeyboardService
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.example.hexkeyboard.ui.settings.fontselector.FontSelectorActivity
@@ -429,7 +430,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                                                     scope.launch {
                                                         ThemeUtils.saveAppTheme(context, value)
                                                     }
-                                                    applyAppTheme(value)
                                                     showThemeDialog = false
                                                 }
                                                 .padding(16.dp),
@@ -702,6 +702,21 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SettingsCardContainer {
                     SwitchPreference(
+                        title = "Guardar capturas de pantalla",
+                        subtitle = "Detecta capturas de pantalla recientes y las guarda en el historial",
+                        key = ThemeUtils.AUTO_COPY_SCREENSHOTS,
+                        defaultValue = true,
+                        icon = Icons.Default.CameraAlt,
+                        context = context,
+                        onCheckedChange = { enabled ->
+                            if (enabled && !HexKeyboardService.hasMediaPermission(context)) {
+                                HexKeyboardService.requestMediaPermission(context)
+                            }
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    SwitchPreference(
                         title = "Eliminación automática",
                         subtitle = "Borrar clips no fijados automáticamente tras el tiempo límite",
                         key = ThemeUtils.CLIPBOARD_AUTO_DELETE,
@@ -805,7 +820,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     showResetDialog = false
                                     scope.launch {
                                         ThemeUtils.resetAllSettings(context)
-                                        applyAppTheme("system")
                                         Toast.makeText(context, "Ajustes restablecidos a valores predeterminados", Toast.LENGTH_SHORT).show()
                                     }
                                 },
@@ -1016,14 +1030,6 @@ fun SwitchPreference(
             }
         }
     )
-}
-
-fun applyAppTheme(themeValue: String) {
-    when (themeValue) {
-        "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-        "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-    }
 }
 
 @Preview(name = "Light Mode", showBackground = true, showSystemUi = true)

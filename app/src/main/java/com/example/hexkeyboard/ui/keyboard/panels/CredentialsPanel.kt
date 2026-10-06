@@ -1,12 +1,17 @@
 package com.example.hexkeyboard.ui.keyboard.panels
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +27,7 @@ import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.model.CredentialItem
+import com.example.hexkeyboard.data.repository.CredentialsManager
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
@@ -30,6 +36,7 @@ import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
+import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -87,6 +94,18 @@ fun CredentialsPanel(
         )
     }
 
+    val requireBiometricKeyboard by CredentialsManager.getRequireBiometricKeyboardFlow(context).collectAsState(initial = false)
+    val isKeyboardUnlocked by CredentialsManager.isKeyboardUnlocked.collectAsState()
+    val isLocked = requireBiometricKeyboard && !isKeyboardUnlocked
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(filteredCredentials, isLocked) {
+        if (!isLocked && filteredCredentials.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
+    }
+
     CompositionLocalProvider(
         LocalAppBackdrop provides backdrop,
         LocalGlassEffectConfig provides glassConfig
@@ -102,7 +121,70 @@ fun CredentialsPanel(
                     .fillMaxSize()
                     .layerBackdrop(backdrop)
             ) {
-                if (filteredCredentials.isEmpty()) {
+                if (isLocked) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 44.dp, bottom = (bottomOffset + navBarBottomDp + 8).dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(theme.keyTextColor).copy(alpha = 0.12f),
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = Color(theme.keyTextColor),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "Contraseñas bloqueadas",
+                                color = Color(theme.keyTextColor),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Requiere autenticación para ver credenciales",
+                                color = Color(theme.keyTextColor).copy(alpha = 0.7f),
+                                fontSize = 12.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    val intent = Intent(context, com.example.hexkeyboard.ui.settings.BiometricAuthActivity::class.java).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(theme.keyTextColor).copy(alpha = 0.18f),
+                                    contentColor = Color(theme.keyTextColor)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Desbloquear", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else if (filteredCredentials.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -124,6 +206,7 @@ fun CredentialsPanel(
                     val bottomPadding = if (isCredentialsSearchActive) 8.dp else (70 + bottomOffset + navBarBottomDp).dp
 
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             start = 12.dp,
@@ -150,18 +233,29 @@ fun CredentialsPanel(
                 )
             }
 
-            // Encabezado flotante con la barra de búsqueda Liquid Glass
-            // Difumina dinámicamente las tarjetas de credenciales que se desplazan por debajo al hacer scroll
+            // Encabezado flotante: PanelHeader al estar bloqueado, CredentialsSearchBar al estar desbloqueado
             if (viewModel != null && !isCredentialsSearchActive) {
-                CredentialsSearchBar(
-                    viewModel = viewModel,
-                    theme = theme,
-                    query = searchQuery,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(start = 8.dp, end = 8.dp, top = 4.dp),
-                    glassConfig = glassConfig
-                )
+                if (isLocked) {
+                    PanelHeader(
+                        title = context.getKeyboardString(R.string.panel_title_credentials, currentLocale),
+                        theme = theme,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                        glassConfig = glassConfig,
+                        onBack = { viewModel.setCurrentView("keyboard") }
+                    )
+                } else {
+                    CredentialsSearchBar(
+                        viewModel = viewModel,
+                        theme = theme,
+                        query = searchQuery,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                        glassConfig = glassConfig
+                    )
+                }
             }
         }
     }

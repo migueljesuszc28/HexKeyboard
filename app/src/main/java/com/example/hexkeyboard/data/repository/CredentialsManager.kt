@@ -6,10 +6,17 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.hexkeyboard.data.model.CredentialItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
@@ -83,7 +90,7 @@ object CredentialsManager {
                     null
                 }
             }
-            .sortedByDescending { it.timestamp }
+            .sortedWith(compareBy({ it.title.lowercase() }, { it.username.lowercase() }))
     }
 
     private fun parseCsvLine(line: String): List<String> {
@@ -115,9 +122,33 @@ object CredentialsManager {
         }
     }
 
+    private val REQUIRE_BIOMETRIC_KEYBOARD_KEY = booleanPreferencesKey("require_biometric_keyboard")
+
+    private val _isKeyboardUnlocked = MutableStateFlow(false)
+    val isKeyboardUnlocked: StateFlow<Boolean> = _isKeyboardUnlocked.asStateFlow()
+
+    fun setKeyboardUnlocked(unlocked: Boolean) {
+        _isKeyboardUnlocked.value = unlocked
+    }
+
+    fun getRequireBiometricKeyboardFlow(context: Context): Flow<Boolean> {
+        val dataStore = ThemeUtils.getDataStore(context)
+        return dataStore.data.map { it[REQUIRE_BIOMETRIC_KEYBOARD_KEY] ?: false }
+    }
+
+    suspend fun setRequireBiometricKeyboard(context: Context, enabled: Boolean) {
+        val dataStore = ThemeUtils.getDataStore(context)
+        dataStore.edit { it[REQUIRE_BIOMETRIC_KEYBOARD_KEY] = enabled }
+    }
+
     suspend fun importFromCsv(context: Context, uri: Uri): Result<Int> = withContext(Dispatchers.IO) {
         try {
             var importedCount = 0
+            val existingList = getAllCredentials(context)
+            val existingKeys = existingList.map {
+                "${it.title.lowercase().trim()}|${it.username.lowercase().trim()}"
+            }.toMutableSet()
+
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 BufferedReader(InputStreamReader(inputStream)).use { reader ->
                     val lines = reader.readLines()
@@ -130,42 +161,54 @@ object CredentialsManager {
                         startIndex = 1
                     }
 
-                    for (i in startIndex until lines.size) {
-                        val line = lines[i]
-                        if (line.isBlank()) continue
+                    val prefs = getPrefs(context)
+                    prefs.edit {
+                        for (i in startIndex until lines.size) {
+                            val line = lines[i]
+                            if (line.isBlank()) continue
 
-                        val parts = parseCsvLine(line)
+                            val parts = parseCsvLine(line)
 
-                        // Google Chrome format: name, url, username, password (4 columns)
-                        // Generic format: title, username, password (3 columns)
-                        val title: String
-                        val username: String
-                        val password: String
+                            // Google Chrome format: name, url, username, password (4 columns)
+                            // Generic format: title, username, password (3 columns)
+                            val title: String
+                            val username: String
+                            val password: String
 
-                        if (parts.size >= 4) {
-                            val rawName = parts[0].ifBlank { extractDomain(parts[1]) }
-                            title = rawName.ifBlank { "Sitio web" }
-                            username = parts[2]
-                            password = parts[3]
-                        } else if (parts.size >= 3) {
-                            title = parts[0]
-                            username = parts[1]
-                            password = parts[2]
-                        } else {
-                            continue
+                            if (parts.size >= 4) {
+                                val rawName = parts[0].ifBlank { extractDomain(parts[1]) }
+                                title = rawName.ifBlank { "Sitio web" }
+                                username = parts[2]
+                                password = parts[3]
+                            } else if (parts.size >= 3) {
+                                title = parts[0]
+                                username = parts[1]
+                                password = parts[2]
+                            } else {
+                                continue
+                            }
+
+                            if (title.isEmpty() && username.isEmpty() && password.isEmpty()) continue
+
+                            val normTitle = title.trim()
+                            val normUsername = username.trim()
+                            val lookupKey = "${normTitle.lowercase()}|${normUsername.lowercase()}"
+
+                            if (existingKeys.contains(lookupKey)) {
+                                // Omitir duplicado
+                                continue
+                            }
+                            existingKeys.add(lookupKey)
+
+                            val item = CredentialItem(
+                                title = normTitle,
+                                username = normUsername,
+                                password = password
+                            )
+
+                            putString(item.id, Json.encodeToString(item))
+                            importedCount++
                         }
-
-                        if (title.isEmpty() && username.isEmpty() && password.isEmpty()) continue
-
-                        val item = CredentialItem(
-                            title = title,
-                            username = username,
-                            password = password
-                        )
-
-                        val prefs = getPrefs(context)
-                        prefs.edit { putString(item.id, Json.encodeToString(item)) }
-                        importedCount++
                     }
                 }
             }

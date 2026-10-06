@@ -11,12 +11,12 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.cozu2806.hexkeyboard"
+        applicationId = "dev.cozu0628.hexkeyboard"
         minSdk = 26
         //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 1
-        versionName = "10.5.0"
+        versionName = "10.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -29,6 +29,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -65,6 +66,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.material)
     implementation(libs.androidx.preference)

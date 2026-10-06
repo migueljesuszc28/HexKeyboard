@@ -54,6 +54,13 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     private val _currentView = MutableStateFlow("keyboard")
     val currentView: StateFlow<String> = _currentView.asStateFlow()
 
+    private val _pendingView = MutableStateFlow<String?>(null)
+    val pendingView: StateFlow<String?> = _pendingView.asStateFlow()
+
+    fun setPendingView(view: String?) {
+        _pendingView.value = view
+    }
+
     private val _currentLocale = MutableStateFlow("es")
     val currentLocale: StateFlow<String> = _currentLocale.asStateFlow()
 
@@ -124,6 +131,7 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     fun setCurrentView(view: String, context: Context? = null) {
         _currentView.value = view
+        _clipboardItemWithOptions.value = null
         if (view == "clipboard") {
             onActionRequested?.invoke(Action.RefreshClipboard)
         }
@@ -137,6 +145,8 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
         if (view != "credentials") {
             _credentialsSearchQuery.value = ""
             _isCredentialsSearchActive.value = false
+            CredentialsManager.setKeyboardUnlocked(false)
+            _pendingView.value = null
         }
     }
 

@@ -125,18 +125,25 @@ fun UserDictionaryScreen(
                         },
                         actions = {
                             if (uiState.words.isNotEmpty()) {
-                                IconButton(onClick = { showDeleteAllConfirm = true }) {
+                                FilledTonalIconButton(
+                                    onClick = { showDeleteAllConfirm = true },
+                                    shape = CircleShape
+                                ) {
                                     Icon(
                                         Icons.Default.DeleteForever,
                                         contentDescription = "Borrar todo",
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                 }
+                                Spacer(Modifier.width(8.dp))
                             }
-                            IconButton(onClick = {
-                                isSearchActive = !isSearchActive
-                                if (!isSearchActive) viewModel.onSearchQueryChange("")
-                            }) {
+                            FilledTonalIconButton(
+                                onClick = {
+                                    isSearchActive = !isSearchActive
+                                    if (!isSearchActive) viewModel.onSearchQueryChange("")
+                                },
+                                shape = CircleShape
+                            ) {
                                 Icon(
                                     if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
                                     contentDescription = "Buscar"

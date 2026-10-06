@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,18 +36,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.hexkeyboard.data.model.CredentialItem
 import com.example.hexkeyboard.data.repository.CredentialsManager
 import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
+import com.example.hexkeyboard.ui.component.ExpressiveLoadingScreen
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
-class CredentialsSettingsActivity : ComponentActivity() {
+class CredentialsSettingsActivity : FragmentActivity() {
 
     private lateinit var importCsvLauncher: ActivityResultLauncher<Array<String>>
     private var credentialsState = mutableStateOf<List<CredentialItem>>(emptyList())
+    private var isLoadingState = mutableStateOf(false)
+    private var isAuthenticatedState = mutableStateOf(false)
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,23 +68,27 @@ class CredentialsSettingsActivity : ComponentActivity() {
         )
 
         importCsvLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-            uri?.let {
+            if (uri != null) {
+                isLoadingState.value = true
                 lifecycleScope.launch {
-                    val result = CredentialsManager.importFromCsv(this@CredentialsSettingsActivity, it)
+                    val result = CredentialsManager.importFromCsv(this@CredentialsSettingsActivity, uri)
                     result.fold(
                         onSuccess = { count ->
                             Toast.makeText(this@CredentialsSettingsActivity, "Se importaron $count credenciales", Toast.LENGTH_SHORT).show()
-                            loadCredentials()
                         },
                         onFailure = { err ->
                             Toast.makeText(this@CredentialsSettingsActivity, "Error al importar: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
                         }
                     )
+                    val list = CredentialsManager.getAllCredentials(this@CredentialsSettingsActivity)
+                    credentialsState.value = list
+                    isLoadingState.value = false
                 }
             }
         }
 
         loadCredentials()
+        checkAndAuthenticate()
 
         setContent {
             HexKeyboardTheme {
@@ -107,6 +121,7 @@ class CredentialsSettingsActivity : ComponentActivity() {
                 }
 
                 val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+                val isAuthenticated = isAuthenticatedState.value
                 val list = credentialsState.value
                 val filteredList = remember(list, searchQuery) {
                     if (searchQuery.isBlank()) list
@@ -135,19 +150,28 @@ class CredentialsSettingsActivity : ComponentActivity() {
                                         }
                                     },
                                     actions = {
-                                        IconButton(onClick = {
-                                            importCsvLauncher.launch(arrayOf("text/comma-separated-values", "text/csv", "application/csv", "text/plain"))
-                                        }) {
-                                            Icon(Icons.Default.UploadFile, contentDescription = "Importar CSV Google")
-                                        }
-                                        IconButton(onClick = {
-                                            isSearchActive = !isSearchActive
-                                            if (!isSearchActive) searchQuery = ""
-                                        }) {
-                                            Icon(
-                                                if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                                                contentDescription = "Buscar"
-                                            )
+                                        if (isAuthenticated) {
+                                            FilledTonalIconButton(
+                                                onClick = {
+                                                    importCsvLauncher.launch(arrayOf("text/comma-separated-values", "text/csv", "application/csv", "text/plain"))
+                                                },
+                                                shape = CircleShape
+                                            ) {
+                                                Icon(Icons.Default.UploadFile, contentDescription = "Importar CSV Google")
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            FilledTonalIconButton(
+                                                onClick = {
+                                                    isSearchActive = !isSearchActive
+                                                    if (!isSearchActive) searchQuery = ""
+                                                },
+                                                shape = CircleShape
+                                            ) {
+                                                Icon(
+                                                    if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                                                    contentDescription = "Buscar"
+                                                )
+                                            }
                                         }
                                     },
                                     colors = TopAppBarDefaults.topAppBarColors(
@@ -158,7 +182,7 @@ class CredentialsSettingsActivity : ComponentActivity() {
                                 )
 
                                 AnimatedVisibility(
-                                    visible = isSearchActive,
+                                    visible = isAuthenticated && isSearchActive,
                                     enter = expandVertically() + fadeIn(),
                                     exit = shrinkVertically() + fadeOut()
                                 ) {
@@ -191,62 +215,192 @@ class CredentialsSettingsActivity : ComponentActivity() {
                         }
                     },
                     floatingActionButton = {
-                        FloatingActionButton(
-                            onClick = { showAddDialog = true },
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            shape = CircleShape
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Añadir credencial")
+                        if (isAuthenticated) {
+                            FloatingActionButton(
+                                onClick = { showAddDialog = true },
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                shape = CircleShape
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Añadir credencial")
+                            }
                         }
                     }
                 ) { padding ->
-                    if (list.isEmpty()) {
+                    val requireBiometricKeyboard by CredentialsManager.getRequireBiometricKeyboardFlow(LocalContext.current).collectAsState(initial = false)
+
+                    if (!isAuthenticated) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(padding),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
-                                Spacer(Modifier.height(12.dp))
-                                Text("No hay credenciales guardadas", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline)
-                                Spacer(Modifier.height(4.dp))
-                                Text("Importa un archivo CSV de Google o añade una nueva", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(24.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.size(72.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Lock,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                                Text(
+                                    text = "Acceso Protegido",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = "Autentícate con tu huella dactilar, rostro o PIN para ver tus contraseñas",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(Modifier.height(24.dp))
+                                Button(
+                                    onClick = { checkAndAuthenticate() },
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Desbloquear")
+                                }
                             }
                         }
-                    } else if (filteredList.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(padding),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("No se encontraron resultados para \"$searchQuery\"", color = MaterialTheme.colorScheme.outline)
-                        }
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = padding.calculateTopPadding() + 8.dp,
-                                bottom = padding.calculateBottomPadding() + 80.dp
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(filteredList, key = { it.id }) { item ->
-                                CredentialCard(
-                                    item = item,
-                                    onEdit = { editingCredential = item },
-                                    onDelete = {
-                                        lifecycleScope.launch {
-                                            CredentialsManager.deleteCredential(this@CredentialsSettingsActivity, item.id)
-                                            loadCredentials()
+                        val isLoading = isLoadingState.value
+
+                        AnimatedContent(
+                            targetState = isLoading,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                            },
+                            label = "credentials_loading_transition"
+                        ) { loading ->
+                            if (loading) {
+                                ExpressiveLoadingScreen(
+                                    title = "Cargando contraseñas",
+                                    subtitle = "Desencriptando credenciales de forma segura...",
+                                    icon = Icons.Default.Key,
+                                    modifier = Modifier.padding(padding)
+                                )
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = padding.calculateTopPadding() + 8.dp,
+                                        bottom = padding.calculateBottomPadding() + 80.dp
+                                    ),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    item {
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                            tonalElevation = 1.dp
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            Icons.Default.Fingerprint,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Requerir biometría en el teclado",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = "Solicita huella o PIN al abrir las contraseñas en el teclado",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Switch(
+                                                    checked = requireBiometricKeyboard,
+                                                    onCheckedChange = { enabled ->
+                                                        lifecycleScope.launch {
+                                                            CredentialsManager.setRequireBiometricKeyboard(this@CredentialsSettingsActivity, enabled)
+                                                        }
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
-                                )
+
+                                    if (list.isEmpty()) {
+                                        item {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 48.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
+                                                    Spacer(Modifier.height(12.dp))
+                                                    Text("No hay credenciales guardadas", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline)
+                                                    Spacer(Modifier.height(4.dp))
+                                                    Text("Importa un archivo CSV de Google o añade una nueva", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
+                                                }
+                                            }
+                                        }
+                                    } else if (filteredList.isEmpty()) {
+                                        item {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 32.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("No se encontraron resultados para \"$searchQuery\"", color = MaterialTheme.colorScheme.outline)
+                                            }
+                                        }
+                                    } else {
+                                        items(filteredList, key = { it.id }) { item ->
+                                            CredentialCard(
+                                                item = item,
+                                                onEdit = { editingCredential = item },
+                                                onDelete = {
+                                                    lifecycleScope.launch {
+                                                        CredentialsManager.deleteCredential(this@CredentialsSettingsActivity, item.id)
+                                                        loadCredentials()
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -273,10 +427,58 @@ class CredentialsSettingsActivity : ComponentActivity() {
         }
     }
 
+    private fun checkAndAuthenticate() {
+        val biometricManager = BiometricManager.from(this)
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+        if (biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
+            showBiometricPrompt()
+        } else {
+            isAuthenticatedState.value = true
+        }
+    }
+
+    private fun showBiometricPrompt() {
+        val executor = ContextCompat.getMainExecutor(this)
+        val biometricPrompt = BiometricPrompt(
+            this,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    isAuthenticatedState.value = true
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    isAuthenticatedState.value = false
+                }
+            }
+        )
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Acceso a Contraseñas")
+            .setSubtitle("Autentícate para ver tus credenciales")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
+
     private fun loadCredentials() {
         lifecycleScope.launch {
+            var isCompleted = false
+            val loadingJob = launch {
+                delay(150.milliseconds)
+                if (!isCompleted) {
+                    isLoadingState.value = true
+                }
+            }
             val list = CredentialsManager.getAllCredentials(this@CredentialsSettingsActivity)
+            isCompleted = true
+            loadingJob.cancel()
             credentialsState.value = list
+            isLoadingState.value = false
         }
     }
 }

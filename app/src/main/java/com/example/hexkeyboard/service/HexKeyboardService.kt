@@ -4,15 +4,21 @@ import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.database.ContentObserver
 import android.graphics.Color
 import android.graphics.PointF
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import android.provider.Settings
 import android.text.InputType
 import android.text.TextUtils
@@ -25,6 +31,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
@@ -33,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.ComposeView
+import com.example.hexkeyboard.data.repository.CredentialsManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -97,6 +105,28 @@ class HexKeyboardService : InputMethodService(),
 
     companion object {
         private const val CLIPBOARD_SUGGESTION_MAX_AGE_MS = 15 * 60 * 1000L // 15 minutos
+
+        fun hasMediaPermission(context: Context): Boolean {
+            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                android.Manifest.permission.READ_MEDIA_IMAGES
+            } else {
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        }
+
+        fun requestMediaPermission(context: Context) {
+            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                android.Manifest.permission.READ_MEDIA_IMAGES
+            } else {
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            val intent = Intent(context, PermissionActivity::class.java).apply {
+                putExtra("request_permission", permission)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
     }
 
     @Inject lateinit var dataStore: DataStore<Preferences>
@@ -125,10 +155,31 @@ class HexKeyboardService : InputMethodService(),
             val uri = item.uri
             val text = item.text?.toString() ?: ""
             val desc = clip.description
-            val mimeType = desc?.let { d ->
+            var mimeType = desc?.let { d ->
                 (0 until d.mimeTypeCount)
                     .map { d.getMimeType(it) }
                     .find { it.startsWith("image/") }
+            }
+
+            if (mimeType == null && uri != null) {
+                try {
+                    val resolverType = contentResolver.getType(uri)
+                    if (resolverType != null && resolverType.startsWith("image/")) {
+                        mimeType = resolverType
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (mimeType == null && uri != null) {
+                val path = uri.toString().lowercase()
+                if (path.contains("png") || path.contains("jpg") || path.contains("jpeg") || path.contains("webp") || path.contains("gif")) {
+                    mimeType = when {
+                        path.contains("png") -> "image/png"
+                        path.contains("webp") -> "image/webp"
+                        path.contains("gif") -> "image/gif"
+                        else -> "image/jpeg"
+                    }
+                }
             }
 
             if (uri != null && mimeType != null) {
@@ -153,6 +204,100 @@ class HexKeyboardService : InputMethodService(),
         } else {
             lastUsedClipboardText = null
             refreshClipboardHistory(triggerSuggestionsUpdate = true)
+        }
+    }
+
+    private var screenshotObserver: ContentObserver? = null
+
+    private fun registerScreenshotObserver() {
+        if (screenshotObserver != null) return
+        val handler = Handler(Looper.getMainLooper())
+        screenshotObserver = object : ContentObserver(handler) {
+            private var lastProcessedUriString: String? = null
+
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                super.onChange(selfChange, uri)
+                checkLatestScreenshot()
+            }
+
+            private fun checkLatestScreenshot() {
+                if (!hasMediaPermission(this@HexKeyboardService)) return
+
+                serviceScope.launch(Dispatchers.IO) {
+                    try {
+                        val enabled = ThemeUtils.getDataStore(this@HexKeyboardService).data.first()[ThemeUtils.AUTO_COPY_SCREENSHOTS] ?: true
+                        if (!enabled) return@launch
+
+                        val projection = arrayOf(
+                            MediaStore.Images.Media._ID,
+                            MediaStore.Images.Media.DISPLAY_NAME,
+                            MediaStore.Images.Media.DATE_ADDED,
+                            MediaStore.Images.Media.MIME_TYPE
+                        )
+                        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+
+                        contentResolver.query(
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                            projection,
+                            null,
+                            null,
+                            sortOrder
+                        )?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val idColumn = cursor.getColumnIndex(MediaStore.Images.Media._ID)
+                                val nameColumn = cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
+                                val dateColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATE_ADDED)
+                                val mimeColumn = cursor.getColumnIndex(MediaStore.Images.Media.MIME_TYPE)
+
+                                if (idColumn != -1) {
+                                    val id = cursor.getLong(idColumn)
+                                    val name = if (nameColumn != -1) cursor.getString(nameColumn) ?: "" else ""
+                                    val dateAdded = if (dateColumn != -1) cursor.getLong(dateColumn) else 0L
+                                    val mimeType = if (mimeColumn != -1) cursor.getString(mimeColumn) ?: "image/png" else "image/png"
+
+                                    val currentTimeSeconds = System.currentTimeMillis() / 1000
+                                    val isRecent = (currentTimeSeconds - dateAdded) < 15
+                                    val isScreenshot = name.contains("screenshot", ignoreCase = true) ||
+                                                       name.contains("captura", ignoreCase = true) ||
+                                                       name.contains("screen", ignoreCase = true)
+
+                                    val contentUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+
+                                    if (isRecent && isScreenshot && contentUri.toString() != lastProcessedUriString) {
+                                        lastProcessedUriString = contentUri.toString()
+                                        val cachedUri = ClipboardHistoryManager.saveImageToCache(this@HexKeyboardService, contentUri, mimeType)
+                                        if (cachedUri != null) {
+                                            ClipboardHistoryManager.addImageItem(this@HexKeyboardService, cachedUri, mimeType, "Captura de pantalla")
+                                            refreshClipboardHistory(triggerSuggestionsUpdate = true)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
+        try {
+            contentResolver.registerContentObserver(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                true,
+                screenshotObserver!!
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun unregisterScreenshotObserver() {
+        screenshotObserver?.let {
+            try {
+                contentResolver.unregisterContentObserver(it)
+            } catch (_: Exception) {}
+            screenshotObserver = null
         }
     }
 
@@ -296,6 +441,7 @@ class HexKeyboardService : InputMethodService(),
         super.onCreate()
         viewModel = ViewModelProvider(this)[KeyboardViewModel::class.java]
         setupViewModelCallbacks()
+        registerScreenshotObserver()
 
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         registerReceiver(wallpaperReceiver, filter)
@@ -432,6 +578,7 @@ class HexKeyboardService : InputMethodService(),
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterScreenshotObserver()
         try {
             unregisterReceiver(wallpaperReceiver)
         } catch (_: Exception) {}
@@ -515,8 +662,9 @@ class HexKeyboardService : InputMethodService(),
         super.onFinishInputView(finishingInput)
         serviceScope.launch {
             val resetOnClose = ThemeUtils.getDataStore(this@HexKeyboardService).data.first()[ThemeUtils.RESET_ON_CLOSE] ?: true
-            if (resetOnClose) {
-                withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
+                viewModel.setClipboardItemWithOptions(null)
+                if (resetOnClose && finishingInput && !viewModel.isCredentialsSearchActive.value) {
                     viewModel.setCurrentView("keyboard")
                     mHexKeyboardView?.resetState()
                 }
@@ -553,6 +701,10 @@ class HexKeyboardService : InputMethodService(),
         }
         
         updateShiftState()
+
+        if (CredentialsManager.isKeyboardUnlocked.value) {
+            viewModel.setCurrentView("credentials", this)
+        }
 
         serviceScope.launch {
             val prefs = ThemeUtils.getDataStore(this@HexKeyboardService).data.first()

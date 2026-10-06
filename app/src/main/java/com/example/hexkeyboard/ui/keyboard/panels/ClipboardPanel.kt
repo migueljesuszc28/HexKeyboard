@@ -10,9 +10,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
@@ -137,8 +139,8 @@ fun ClipboardPanel(
                         )
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                    LazyVerticalStaggeredGrid(
+                        columns = StaggeredGridCells.Fixed(2),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             start = 12.dp,
@@ -147,12 +149,13 @@ fun ClipboardPanel(
                             bottom = bottomPadding
                         ),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalItemSpacing = 8.dp
                     ) {
-                        items(history) { item ->
+                        items(history, key = { "${it.timestamp}_${it.text.hashCode()}" }) { item ->
                             Surface(
                                 modifier = Modifier
-                                    .heightIn(min = 48.dp)
+                                    .fillMaxWidth()
+                                    .wrapContentHeight()
                                     .combinedClickable(
                                         onClick = { 
                                             FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
@@ -166,35 +169,41 @@ fun ClipboardPanel(
                                         indication = null
                                     ),
                                 color = cardColor,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 border = borderStroke,
                                 tonalElevation = cardElevation
                             ) {
-                                Box(Modifier.padding(8.dp)) {
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        if (item.isImage && !item.imageUri.isNullOrEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    if (item.isImage && !item.imageUri.isNullOrEmpty()) {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
                                             ClipboardImageThumbnail(
                                                 imageUriString = item.imageUri,
-                                                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                                modifier = Modifier.clip(RoundedCornerShape(10.dp))
                                             )
                                             if (item.text.isNotBlank()) {
-                                                Spacer(Modifier.height(4.dp))
+                                                Spacer(Modifier.height(6.dp))
                                                 Text(
                                                     text = item.text,
-                                                    maxLines = 1,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
                                                     color = Color(theme.keyTextColor),
                                                     style = MaterialTheme.typography.bodySmall
                                                 )
                                             }
-                                        } else {
-                                            Text(
-                                                text = item.text,
-                                                maxLines = 2,
-                                                color = Color(theme.keyTextColor),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                modifier = Modifier.padding(end = if (item.isPinned) 18.dp else 0.dp)
-                                            )
                                         }
+                                    } else {
+                                        Text(
+                                            text = item.text,
+                                            maxLines = 6,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = Color(theme.keyTextColor),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(end = if (item.isPinned) 16.dp else 0.dp)
+                                        )
                                     }
 
                                     if (item.isPinned) {
