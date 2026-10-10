@@ -1,8 +1,5 @@
 package com.example.hexkeyboard.ui.keyboard
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import androidx.compose.animation.*
@@ -12,6 +9,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,7 +35,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.preference.PreferenceManager
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
@@ -69,8 +66,6 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val keyboardThemeOpt by viewModel.keyboardTheme.collectAsState()
     val keyboardTheme = keyboardThemeOpt ?: return
 
-    val parallaxOffsetState = viewModel.parallaxOffset.collectAsState()
-
     val keyboardBackdrop = rememberLayerBackdrop()
     val glassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
     val savedGlassConfig by glassConfigFlow.collectAsState(initial = GlassEffectConfig())
@@ -80,8 +75,14 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
         } else {
             Color(keyboardTheme.keyBackgroundColor)
         }
+        val targetOpacity = if (keyboardTheme.keysOpacity >= 0.95f) {
+            1.0f
+        } else {
+            (savedGlassConfig.surfaceOpacity * keyboardTheme.keysOpacity).coerceIn(0.15f, 1.0f)
+        }
         savedGlassConfig.copy(
             surfaceTintColor = glassTint,
+            surfaceOpacity = targetOpacity,
             textColor = Color(keyboardTheme.keyTextColor)
         )
     }
@@ -93,10 +94,11 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     var blurredBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(keyboardTheme.backgroundImageUri, keyboardTheme.backgroundBlur) {
-        if (keyboardTheme.backgroundImageUri != null) {
+        val bgUri = keyboardTheme.backgroundImageUri
+        if (bgUri != null) {
             val newBitmap = withContext(Dispatchers.IO) {
-                ThemeUtils.loadBitmapFromUri(context, keyboardTheme.backgroundImageUri!!)
-            } as Bitmap?
+                ThemeUtils.loadBitmapFromUri(context, bgUri)
+            }
             if (newBitmap != null) {
                 val oldBg = backgroundBitmap
                 val oldBlur = blurredBitmap
@@ -105,7 +107,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                 blurredBitmap = if (keyboardTheme.backgroundBlur > 0) {
                     withContext(Dispatchers.IO) {
                         ThemeUtils.blurBitmap(newBitmap, keyboardTheme.backgroundBlur)
-                    } as Bitmap?
+                    }
                 } else {
                     null
                 }
@@ -135,7 +137,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
     val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
     val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
-    val isFullPanel = currentView == "emoji" || currentView == "credentials" || currentView == "languages" || currentView == "clipboard"
+    val isFullPanel = currentView == "emoji" || currentView == "credentials" || currentView == "languages" || currentView == "clipboard" || currentView == "functions"
     val clipboardItemWithOptions by viewModel.clipboardItemWithOptions.collectAsState()
 
     val glassShape = remember { RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) }
@@ -165,21 +167,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxSize()
-                            .alpha(keyboardTheme.backgroundOpacity)
-                            .graphicsLayer {
-                                if (keyboardTheme.parallaxEffect) {
-                                    val parallaxLimit = 0.10f
-                                    val scale = 1.0f + parallaxLimit
-                                    val maxShiftX = (size.width * parallaxLimit) / 2f
-                                    val maxShiftY = (size.height * parallaxLimit) / 2f
-
-                                    val offset = parallaxOffsetState.value
-                                    translationX = offset.x * maxShiftX
-                                    translationY = offset.y * maxShiftY
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                            },
+                            .alpha(keyboardTheme.backgroundOpacity),
                         contentScale = ContentScale.Crop
                     )
                 } else {
@@ -248,7 +236,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                                 .wrapContentHeight(),
                             contentAlignment = Alignment.TopCenter
                         ) {
-                            KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage) { _, _ -> }
+                            KeyboardMainSection(viewModel, keyboardTheme, hasBackgroundImage)
                             if (!isFullPanel || isSearchActive) {
                                 PanelsSection(viewModel, keyboardTheme, bottomOffset, navBarBottomDp)
                             }
@@ -342,6 +330,12 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             val item = clipboardItemWithOptions!!
             val currentLocale by viewModel.currentLocale.collectAsState()
 
+            val menuBgColor = if (keyboardTheme.keysOpacity >= 0.95f) {
+                Color(keyboardTheme.keyBackgroundColor).copy(alpha = 1.0f)
+            } else {
+                Color(keyboardTheme.keyBackgroundColor).copy(alpha = keyboardTheme.keysOpacity.coerceAtLeast(0.85f))
+            }
+
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -355,13 +349,16 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                 AnimatedVisibility(
                     visible = true,
                     enter = scaleIn(
-                        initialScale = 0.85f,
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
-                    ) + fadeIn(animationSpec = tween(200)),
+                        initialScale = 0.80f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
                     exit = scaleOut(
-                        targetScale = 0.9f,
-                        animationSpec = tween(150)
-                    ) + fadeOut(animationSpec = tween(150))
+                        targetScale = 0.85f,
+                        animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                    ) + fadeOut(animationSpec = tween(120))
                 ) {
                     Box(
                         modifier = Modifier
@@ -370,19 +367,19 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                             .clickable(enabled = false) {},
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(195.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Columna Izquierda: Menú de Acciones estilo Gboard
-                            Surface(
+                            Row(
                                 modifier = Modifier
-                                    .width(145.dp)
-                                    .fillMaxHeight(),
-                                shape = RoundedCornerShape(18.dp),
-                                color = Color(keyboardTheme.backgroundColor),
+                                    .fillMaxWidth()
+                                    .height(195.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Columna Izquierda: Menú de Acciones estilo Gboard
+                                Surface(
+                                    modifier = Modifier
+                                        .width(145.dp)
+                                        .fillMaxHeight(),
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = menuBgColor,
                                 tonalElevation = 6.dp,
                                 shadowElevation = 12.dp,
                                 border = BorderStroke(1.dp, Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
@@ -467,7 +464,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                                     .weight(1f)
                                     .fillMaxHeight(),
                                 shape = RoundedCornerShape(18.dp),
-                                color = Color(keyboardTheme.backgroundColor),
+                                color = menuBgColor,
                                 tonalElevation = 6.dp,
                                 shadowElevation = 12.dp,
                                 border = BorderStroke(1.dp, Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
@@ -516,11 +513,32 @@ fun ClipboardMenuRow(
     tint: Color,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.93f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "expressive_menu_row_bounce"
+    )
+    val rowBgColor by animateColorAsState(
+        targetValue = if (isPressed) tint.copy(alpha = 0.15f) else Color.Transparent,
+        animationSpec = tween(120),
+        label = "expressive_menu_row_bg"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .background(rowBgColor, shape = RoundedCornerShape(8.dp))
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )

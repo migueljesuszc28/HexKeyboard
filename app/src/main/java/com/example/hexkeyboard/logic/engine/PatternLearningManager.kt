@@ -106,9 +106,43 @@ class PatternLearningManager(private val context: Context) {
         addBigramInternal("nos", "vemos", 8)
         addBigramInternal("hasta", "luego", 8)
 
+        // Semilla de contexto diacrítico (el vs él)
+        addBigramInternal("en", "el", 12)
+        addBigramInternal("para", "el", 12)
+        addBigramInternal("por", "el", 12)
+        addBigramInternal("con", "él", 15)
+        addBigramInternal("para", "él", 15)
+        addBigramInternal("sin", "él", 15)
+        addBigramInternal("él", "dijo", 12)
+        addBigramInternal("él", "es", 12)
+
+        // Semilla de contexto diacrítico (esta vs está)
+        addBigramInternal("esta", "casa", 12)
+        addBigramInternal("esta", "tarde", 12)
+        addBigramInternal("esta", "noche", 12)
+        addBigramInternal("esta", "semana", 12)
+        addBigramInternal("está", "bien", 15)
+        addBigramInternal("está", "listo", 15)
+        addBigramInternal("ya", "está", "15".toIntOrNull() ?: 15)
+
+        // Semilla de contexto diacrítico (si vs sí)
+        addBigramInternal("si", "vienes", 12)
+        addBigramInternal("si", "quieres", 12)
+        addBigramInternal("por", "si", 12)
+        addBigramInternal("que", "sí", 15)
+        addBigramInternal("sí", "quiero", 15)
+
+        // Semilla de contexto diacrítico (tu vs tú)
+        addBigramInternal("tu", "casa", 12)
+        addBigramInternal("tu", "amigo", 12)
+        addBigramInternal("tú", "eres", 15)
+        addBigramInternal("tú", "sabes", 15)
+
         addTrigramInternal("hola", "cómo", "estás", 8)
         addTrigramInternal("espero", "que", "estés", 8)
         addTrigramInternal("que", "estés", "bien", 8)
+        addTrigramInternal("que", "está", "bien", 12)
+        addTrigramInternal("dijo", "que", "sí", 15)
     }
 
     private fun scheduleSave() {
@@ -220,5 +254,34 @@ class PatternLearningManager(private val context: Context) {
             .sortedByDescending { it.value }
             .take(limit)
             .map { Pair(it.key, it.value) }
+    }
+
+    /**
+     * Calcula la puntuación del modelo de lenguaje (Backoff N-grama: Trigrama -> Bigrama -> Unigrama)
+     * para una palabra dada en el contexto de hasta dos palabras anteriores.
+     */
+    fun calculateContextScore(word: String, prev1: String?, prev2: String?): Double {
+        val cleanWord = word.lowercase()
+        val c1 = prev1?.let { WordSanitizer.sanitizeToken(it).cleanWord.lowercase() }
+        val c2 = prev2?.let { WordSanitizer.sanitizeToken(it).cleanWord.lowercase() }
+
+        var score = 1.0
+
+        if (!c2.isNullOrEmpty() && !c1.isNullOrEmpty()) {
+            val triKey = "${c2}_$c1"
+            val triCount = trigrams[triKey]?.get(cleanWord) ?: 0
+            if (triCount > 0) {
+                score += triCount * 3.5
+            }
+        }
+
+        if (!c1.isNullOrEmpty()) {
+            val biCount = bigrams[c1]?.get(cleanWord) ?: 0
+            if (biCount > 0) {
+                score += biCount * 2.0
+            }
+        }
+
+        return score
     }
 }

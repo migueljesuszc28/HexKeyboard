@@ -61,7 +61,7 @@ data class KeyboardTheme(
     val backgroundOpacity: Float = 1.0f,
     val backgroundBlur: Float = 0f,
     val keysBlur: Float = 0f,
-    val parallaxEffect: Boolean = false,
+    val keysOpacity: Float = 1.0f,
     val isKeyTextColorCustom: Boolean = false,
 )
 

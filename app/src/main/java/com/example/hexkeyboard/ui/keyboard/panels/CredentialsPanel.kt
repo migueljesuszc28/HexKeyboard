@@ -270,9 +270,20 @@ fun CredentialKeyboardCard(
     val context = LocalContext.current
     var showPassword by remember { mutableStateOf(false) }
 
+    val cardBgColor = if (theme.keysOpacity >= 0.95f) {
+        Color(theme.keyBackgroundColor).copy(alpha = 1.0f)
+    } else {
+        Color(theme.keyBackgroundColor).copy(alpha = theme.keysOpacity)
+    }
+    val buttonBgColor = if (theme.keysOpacity >= 0.95f) {
+        Color(theme.backgroundColor)
+    } else {
+        Color(theme.keyTextColor).copy(alpha = 0.12f)
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(theme.keyBackgroundColor),
+        color = cardBgColor,
         shape = RoundedCornerShape(12.dp),
         tonalElevation = if (theme.id == "glass") 0.dp else 2.dp
     ) {
@@ -302,7 +313,7 @@ fun CredentialKeyboardCard(
                         .weight(1f)
                         .height(32.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(theme.keyTextColor).copy(alpha = 0.1f),
+                        containerColor = buttonBgColor,
                         contentColor = Color(theme.keyTextColor)
                     ),
                     contentPadding = PaddingValues(horizontal = 8.dp)
@@ -322,7 +333,7 @@ fun CredentialKeyboardCard(
                         .weight(1f)
                         .height(32.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(theme.keyTextColor).copy(alpha = 0.15f),
+                        containerColor = buttonBgColor,
                         contentColor = Color(theme.keyTextColor)
                     ),
                     contentPadding = PaddingValues(horizontal = 8.dp)

@@ -10,11 +10,13 @@ import android.view.inputmethod.EditorInfo
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.VectorNode
-import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.VectorGroup
+import androidx.compose.ui.graphics.vector.VectorNode
+import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -56,25 +58,70 @@ class HexRenderer(private val context: Context) {
         val canvas = Canvas(bitmap)
 
         val path = Path()
+        var curX = 0f
+        var curY = 0f
+        var subpathStartX = 0f
+        var subpathStartY = 0f
+
         fun addNodes(nodes: Iterable<VectorNode>) {
             for (node in nodes) {
                 when (node) {
                     is VectorPath -> {
+                        path.fillType = if (node.pathFillType == PathFillType.EvenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
                         for (cmd in node.pathData) {
                             when (cmd) {
-                                is PathNode.MoveTo -> path.moveTo(cmd.x, cmd.y)
-                                is PathNode.RelativeMoveTo -> path.rMoveTo(cmd.dx, cmd.dy)
-                                is PathNode.LineTo -> path.lineTo(cmd.x, cmd.y)
-                                is PathNode.RelativeLineTo -> path.rLineTo(cmd.dx, cmd.dy)
-                                is PathNode.HorizontalTo -> path.lineTo(cmd.x, 0f)
-                                is PathNode.RelativeHorizontalTo -> path.rLineTo(cmd.dx, 0f)
-                                is PathNode.VerticalTo -> path.lineTo(0f, cmd.y)
-                                is PathNode.RelativeVerticalTo -> path.rLineTo(0f, cmd.dy)
-                                is PathNode.CurveTo -> path.cubicTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x3, cmd.y3)
-                                is PathNode.RelativeCurveTo -> path.rCubicTo(cmd.dx1, cmd.dy1, cmd.dx2, cmd.dy2, cmd.dx3, cmd.dy3)
-                                is PathNode.QuadTo -> path.quadTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2)
-                                is PathNode.RelativeQuadTo -> path.rQuadTo(cmd.dx1, cmd.dy1, cmd.dx2, cmd.dy2)
-                                is PathNode.Close -> path.close()
+                                is PathNode.MoveTo -> {
+                                    path.moveTo(cmd.x, cmd.y)
+                                    curX = cmd.x; curY = cmd.y; subpathStartX = cmd.x; subpathStartY = cmd.y
+                                }
+                                is PathNode.RelativeMoveTo -> {
+                                    path.rMoveTo(cmd.dx, cmd.dy)
+                                    curX += cmd.dx; curY += cmd.dy; subpathStartX = curX; subpathStartY = curY
+                                }
+                                is PathNode.LineTo -> {
+                                    path.lineTo(cmd.x, cmd.y)
+                                    curX = cmd.x; curY = cmd.y
+                                }
+                                is PathNode.RelativeLineTo -> {
+                                    path.rLineTo(cmd.dx, cmd.dy)
+                                    curX += cmd.dx; curY += cmd.dy
+                                }
+                                is PathNode.HorizontalTo -> {
+                                    path.lineTo(cmd.x, curY)
+                                    curX = cmd.x
+                                }
+                                is PathNode.RelativeHorizontalTo -> {
+                                    path.rLineTo(cmd.dx, 0f)
+                                    curX += cmd.dx
+                                }
+                                is PathNode.VerticalTo -> {
+                                    path.lineTo(curX, cmd.y)
+                                    curY = cmd.y
+                                }
+                                is PathNode.RelativeVerticalTo -> {
+                                    path.rLineTo(0f, cmd.dy)
+                                    curY += cmd.dy
+                                }
+                                is PathNode.CurveTo -> {
+                                    path.cubicTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x3, cmd.y3)
+                                    curX = cmd.x3; curY = cmd.y3
+                                }
+                                is PathNode.RelativeCurveTo -> {
+                                    path.rCubicTo(cmd.dx1, cmd.dy1, cmd.dx2, cmd.dy2, cmd.dx3, cmd.dy3)
+                                    curX += cmd.dx3; curY += cmd.dy3
+                                }
+                                is PathNode.QuadTo -> {
+                                    path.quadTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2)
+                                    curX = cmd.x2; curY = cmd.y2
+                                }
+                                is PathNode.RelativeQuadTo -> {
+                                    path.rQuadTo(cmd.dx1, cmd.dy1, cmd.dx2, cmd.dy2)
+                                    curX += cmd.dx2; curY += cmd.dy2
+                                }
+                                is PathNode.Close -> {
+                                    path.close()
+                                    curX = subpathStartX; curY = subpathStartY
+                                }
                                 else -> {}
                             }
                         }
@@ -101,9 +148,6 @@ class HexRenderer(private val context: Context) {
     }
 
     // Icons
-    val iconShift: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_shift) }
-    val iconShiftActive: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_shift_active) }
-    val iconShiftFilled: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_shift_filled) }
     val iconDelete: Drawable? by lazy { imageVectorToDrawable(Icons.AutoMirrored.Outlined.Backspace) }
     val iconDeleteFilled: Drawable? by lazy { imageVectorToDrawable(Icons.AutoMirrored.Filled.Backspace) }
     val iconEnter: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_enter) }
@@ -111,12 +155,9 @@ class HexRenderer(private val context: Context) {
     val iconSearch: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_search) }
     val iconDone: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_done) }
     val iconGo: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_go) }
-    val iconSymbols: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_symbols) }
     val iconEmoji: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_emoji) }
     val iconEmojiFilled: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_emoji_filled) }
-    val iconClipboard: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_clipboard) }
-    val iconClipboardFilled: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_clipboard_filled) }
-    val iconPuzzle: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_puzzle) }
+    val iconPuzzle: Drawable? by lazy { imageVectorToDrawable(Icons.Outlined.Extension) }
     val iconLanguage: Drawable? by lazy { ContextCompat.getDrawable(context, android.R.drawable.ic_menu_mapmode) }
 
     // Colors
@@ -138,9 +179,6 @@ class HexRenderer(private val context: Context) {
     var isKeyTextColorCustom = false
 
     // Caches
-    val emojiProcessedCache = object : LinkedHashMap<String, CharSequence>(200, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<String, CharSequence>?): Boolean = size > 200
-    }
     val staticLayoutCache = object : LinkedHashMap<String, StaticLayout>(100, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, StaticLayout>?): Boolean = size > 100
     }
@@ -157,7 +195,6 @@ class HexRenderer(private val context: Context) {
         }
 
     fun clearCaches() {
-        emojiProcessedCache.clear()
         staticLayoutCache.clear()
     }
 
@@ -188,6 +225,11 @@ class HexRenderer(private val context: Context) {
         pPopupText.color = colorPopupText
         pPopupBg.color = colorPopupBg
 
+        val baseAlpha = (theme.keysOpacity * 255).toInt().coerceIn(0, 255)
+        pFill.alpha = baseAlpha
+        pSpec.alpha = baseAlpha
+        pPress.alpha = 255
+
         if (theme.keysBlur > 0.1f) {
             view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             val radius = theme.keysBlur.coerceAtLeast(0.1f)
@@ -196,36 +238,25 @@ class HexRenderer(private val context: Context) {
             pSpec.maskFilter = filter
             pPress.maskFilter = filter
             pStroke.maskFilter = filter
-            pFill.alpha = 180
-            pSpec.alpha = 180
-            pPress.alpha = 180
         } else {
             view.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             pFill.maskFilter = null
             pSpec.maskFilter = null
             pPress.maskFilter = null
             pStroke.maskFilter = null
-            pFill.alpha = 255
-            pSpec.alpha = 255
-            pPress.alpha = 255
         }
     }
 
-    fun drawBackground(canvas: Canvas, theme: KeyboardTheme, backgroundImage: Bitmap?, backgroundBlurImage: Bitmap?, parallaxX: Float, parallaxY: Float, width: Int, height: Int) {
+    fun drawBackground(canvas: Canvas, theme: KeyboardTheme, backgroundImage: Bitmap?, backgroundBlurImage: Bitmap?, width: Int, height: Int) {
         val img = backgroundBlurImage ?: backgroundImage
         if (img != null && !img.isRecycled) {
             pBackground.alpha = (theme.backgroundOpacity * 255).toInt()
-            val baseScale = max(width.toFloat() / img.width, height.toFloat() / img.height)
-            val parallaxLimit = 0.10f
-            val parallaxScale = if (theme.parallaxEffect) 1.0f + parallaxLimit else 1.0f
-            val finalScale = baseScale * parallaxScale
+            val finalScale = max(width.toFloat() / img.width, height.toFloat() / img.height)
             val dw = img.width * finalScale
             val dh = img.height * finalScale
             val baseDx = (width - dw) / 2f
             val baseDy = (height - dh) / 2f
-            val offsetX = if (theme.parallaxEffect) parallaxX * (dw - width) / 2f else 0f
-            val offsetY = if (theme.parallaxEffect) parallaxY * (dh - height) / 2f else 0f
-            rectF.set(baseDx + offsetX, baseDy + offsetY, baseDx + offsetX + dw, baseDy + offsetY + dh)
+            rectF.set(baseDx, baseDy, baseDx + dw, baseDy + dh)
             canvas.drawBitmap(img, null, rectF, pBackground)
         }
     }
@@ -247,54 +278,42 @@ class HexRenderer(private val context: Context) {
         overrideCx: Float? = null
     ) {
         val themeObj = theme ?: return
-        val floating = false
-
         val individualColor = themeObj.individualKeyColors[key.value]
-        var activeBgColor = colorFill
+        val activeBgColor: Int
 
-        if (!floating) {
-            val fill = when {
-                pressed -> { pPress.color = colorPress; pPress }
-                key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> { pFill.color = colorShiftActive; pFill }
-                key.type == HexLayoutEngine.KeyType.SHIFT && (!shifted && !capsLock) -> { pFill.color = colorShiftInactive; pFill }
-                individualColor != null -> { pFill.color = individualColor; pFill }
-                key.type in listOf(HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER, HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD, HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.SHIFT, HexLayoutEngine.KeyType.DELETE) -> { pSpec.color = colorSpec; pSpec }
-                else -> { pFill.color = colorFill; pFill }
-            }
-            activeBgColor = fill.color
+        val fill = when {
+            pressed -> { pPress.color = colorPress; pPress }
+            key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> { pFill.color = colorShiftActive; pFill }
+            key.type == HexLayoutEngine.KeyType.SHIFT -> { pFill.color = colorShiftInactive; pFill }
+            individualColor != null -> { pFill.color = individualColor; pFill }
+            key.type in listOf(
+                HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER,
+                HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI,
+                HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD,
+                HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.DELETE
+            ) -> { pSpec.color = colorSpec; pSpec }
+            else -> { pFill.color = colorFill; pFill }
+        }
+        activeBgColor = fill.color
+        val targetAlpha = (themeObj.keysOpacity * 255).toInt().coerceIn(0, 255)
+        fill.alpha = if (pressed) 255 else targetAlpha
 
-            if (!pressed) {
-                if (key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock)) {
-                    fill.color = colorShiftActive
-                } else if (key.type == HexLayoutEngine.KeyType.SHIFT && (!shifted && !capsLock)) {
-                    fill.color = colorShiftInactive
-                } else if (individualColor != null) {
-                    fill.color = individualColor
-                } else if (key.type in listOf(HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER, HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD, HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.SHIFT, HexLayoutEngine.KeyType.DELETE)) {
-                    fill.color = colorSpec
-                } else {
-                    fill.color = colorFill
-                }
-                if (themeObj.keysBlur > 0f) fill.alpha = 200
-            }
+        canvas.drawPath(key.path, fill)
 
-            canvas.drawPath(key.path, fill)
-
-            val isShiftCapsLock = key.type == HexLayoutEngine.KeyType.SHIFT && capsLock
-            if (isShiftCapsLock) {
-                val oldColor = pStroke.color
-                val oldWidth = pStroke.strokeWidth
-                pStroke.color = Color.rgb(227, 91, 18)
-                pStroke.strokeWidth = (2f * context.resources.displayMetrics.density) / appliedScale
-                canvas.drawPath(key.strokePath, pStroke)
-                pStroke.color = oldColor
-                pStroke.strokeWidth = oldWidth
-            } else if (strokeWidth > 0) {
-                val oldWidth = pStroke.strokeWidth
-                pStroke.strokeWidth = strokeWidth / appliedScale
-                canvas.drawPath(key.strokePath, pStroke)
-                pStroke.strokeWidth = oldWidth
-            }
+        val isShiftCapsLock = key.type == HexLayoutEngine.KeyType.SHIFT && capsLock
+        if (isShiftCapsLock) {
+            val oldColor = pStroke.color
+            val oldWidth = pStroke.strokeWidth
+            pStroke.color = Color.rgb(227, 91, 18)
+            pStroke.strokeWidth = (2f * context.resources.displayMetrics.density) / appliedScale
+            canvas.drawPath(key.strokePath, pStroke)
+            pStroke.color = oldColor
+            pStroke.strokeWidth = oldWidth
+        } else if (strokeWidth > 0) {
+            val oldWidth = pStroke.strokeWidth
+            pStroke.strokeWidth = strokeWidth / appliedScale
+            canvas.drawPath(key.strokePath, pStroke)
+            pStroke.strokeWidth = oldWidth
         }
 
         if (key.isHalfLeft || key.isHalfRight) return
@@ -329,12 +348,10 @@ class HexRenderer(private val context: Context) {
             else -> {}
         }
 
-        val sz = when {
-            customLabel != null && (key.type == HexLayoutEngine.KeyType.SHIFT || key.type == HexLayoutEngine.KeyType.DELETE || key.type == HexLayoutEngine.KeyType.ENTER) ->
-                min(key.rx, key.ry) * 0.45f
-            customLabel != null && customLabel.length <= 3 -> min(key.rx, key.ry) * 0.5f
-            customLabel != null -> min(key.rx, key.ry) * 0.35f
-            else -> min(key.rx, key.ry) * 0.62f
+        val sz = if (customLabel != null) {
+            min(key.rx, key.ry) * 0.45f
+        } else {
+            min(key.rx, key.ry) * 0.62f
         }
         pText.textSize = sz
         pText.isFakeBoldText = customLabel != null
@@ -359,53 +376,39 @@ class HexRenderer(private val context: Context) {
                         else -> iconEnter
                     }
                 }
-                HexLayoutEngine.KeyType.SYMBOL_PAGE -> iconSymbols
+                HexLayoutEngine.KeyType.SYMBOL_PAGE -> null
                 HexLayoutEngine.KeyType.FONT_PAGE -> null
                 HexLayoutEngine.KeyType.EMOJI -> if (themeObj.backgroundImageUri != null) iconEmojiFilled else iconEmoji
-                HexLayoutEngine.KeyType.CLIPBOARD -> if (themeObj.backgroundImageUri != null) iconClipboardFilled else iconClipboard
+                HexLayoutEngine.KeyType.CLIPBOARD -> null
                 HexLayoutEngine.KeyType.FUNCTIONS -> iconPuzzle
                 HexLayoutEngine.KeyType.LANGUAGE -> iconLanguage
                 else -> null
             }
         }
 
+        val isLightBg = ColorUtils.calculateLuminance(activeBgColor) > 0.5
+        val isLightText = ColorUtils.calculateLuminance(colorText) > 0.5
+        val textColorCalculated = if (isKeyTextColorCustom) {
+            colorText
+        } else if (isLightBg == isLightText) {
+            if (isLightBg) Color.BLACK else Color.WHITE
+        } else {
+            colorText
+        }
+
         if (dr != null) {
             val s = (min(key.rx, key.ry) * 1.0f).toInt()
-            dr.setBounds((drawCx - s/2).toInt(), (key.cy - s/2).toInt(), (drawCx + s/2).toInt(), (key.cy + s/2).toInt())
+            dr.setBounds((drawCx - s / 2).toInt(), (key.cy - s / 2).toInt(), (drawCx + s / 2).toInt(), (key.cy + s / 2).toInt())
             val tint = when {
-                (key.type == HexLayoutEngine.KeyType.ENTER || key.type == HexLayoutEngine.KeyType.DELETE) && individualColor != null -> Color.WHITE
-                floating -> colorIcon
-                else -> {
-                    if (isKeyTextColorCustom) {
-                        colorText
-                    } else {
-                        val isLightBg = ColorUtils.calculateLuminance(activeBgColor) > 0.5
-                        val isLightText = ColorUtils.calculateLuminance(colorText) > 0.5
-                        if (isLightBg == isLightText) {
-                            if (isLightBg) Color.BLACK else Color.WHITE
-                        } else {
-                            colorText
-                        }
-                    }
-                }
+                individualColor != null -> Color.WHITE
+                key.type in listOf(HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.LANGUAGE) -> colorIcon
+                else -> textColorCalculated
             }
-            dr.mutate().setTint(tint); dr.alpha = 255; dr.draw(canvas)
-        } else if (key.type == HexLayoutEngine.KeyType.SYMBOL_PAGE) {
-            val drawColor = if (isKeyTextColorCustom) colorIcon else {
-                val isLightBg = ColorUtils.calculateLuminance(activeBgColor) > 0.5
-                if (isLightBg) Color.BLACK else colorIcon
-            }
-            pText.color = drawColor; pText.textSize = sz * 0.8f
-            canvas.drawText("SYM", drawCx, ty, pText)
-            pText.color = colorText; pText.textSize = sz
+            dr.mutate().setTint(tint)
+            dr.alpha = 255
+            dr.draw(canvas)
         } else {
-            if (floating) pText.color = colorIcon else {
-                if (isKeyTextColorCustom) pText.color = colorText else {
-                    val isLightBg = ColorUtils.calculateLuminance(activeBgColor) > 0.5
-                    val isLightText = ColorUtils.calculateLuminance(colorText) > 0.5
-                    pText.color = if (isLightBg == isLightText) (if (isLightBg) Color.BLACK else Color.WHITE) else colorText
-                }
-            }
+            pText.color = textColorCalculated
             pText.alpha = 255
             var drawLabel = customLabel ?: label
             if (customLabel == null && themeObj.id == "default" && (key.type == HexLayoutEngine.KeyType.ENTER && layoutMode != HexLayoutEngine.LayoutMode.PURE_NUMERIC)) {
@@ -413,25 +416,18 @@ class HexRenderer(private val context: Context) {
             }
             if (drawLabel.isNotEmpty()) canvas.drawText(drawLabel, drawCx, ty, pText)
             if (showLongPressIndicators && key.alternatives.isNotEmpty()) {
-                val dotR = key.rx * 0.08f; val dx = key.cx + key.rx * 0.4f; val dy = key.cy - key.ry * 0.5f
-                pPopupBg.color = pText.color; pPopupBg.alpha = 150; canvas.drawCircle(dx, dy, dotR, pPopupBg); pPopupBg.alpha = 255
+                val dotR = key.rx * 0.08f
+                val dx = key.cx + key.rx * 0.4f
+                val dy = key.cy - key.ry * 0.5f
+                pPopupBg.color = pText.color
+                pPopupBg.alpha = 150
+                canvas.drawCircle(dx, dy, dotR, pPopupBg)
+                pPopupBg.alpha = 255
             }
             pText.alpha = 255
         }
     }
 
-    private fun getIconForKey(key: HexLayoutEngine.Key, pressed: Boolean): Drawable? {
-        return when (key.type) {
-            HexLayoutEngine.KeyType.DELETE -> if (pressed) iconDeleteFilled else iconDelete
-            HexLayoutEngine.KeyType.ENTER -> iconEnter
-            HexLayoutEngine.KeyType.SHIFT -> iconShift
-            HexLayoutEngine.KeyType.EMOJI -> if (pressed) iconEmojiFilled else iconEmoji
-            HexLayoutEngine.KeyType.CLIPBOARD -> if (pressed) iconClipboardFilled else iconClipboard
-            HexLayoutEngine.KeyType.LANGUAGE -> iconLanguage
-            else -> null
-        }
-    }
-    
     fun updateHexPath(path: Path, cx: Float, cy: Float, rx: Float, ry: Float) {
         val s32 = 0.8660254f
         val r = rx * s32

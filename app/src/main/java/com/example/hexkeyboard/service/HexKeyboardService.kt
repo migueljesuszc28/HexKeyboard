@@ -13,6 +13,7 @@ import android.content.res.Configuration
 import android.database.ContentObserver
 import android.graphics.Color
 import android.graphics.PointF
+import com.example.hexkeyboard.logic.engine.TouchPoint
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.os.Build
@@ -62,7 +63,6 @@ import com.example.hexkeyboard.logic.engine.WordSanitizer
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.ui.keyboard.components.LayoutRegistry
 import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
@@ -82,11 +82,13 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -133,7 +135,6 @@ class HexKeyboardService : InputMethodService(),
     @Inject lateinit var predictionEngine: PredictionEngine
     @Inject lateinit var feedbackManager: FeedbackManager
     @Inject lateinit var emojiProvider: EmojiProvider
-    @Inject lateinit var parallaxSensorManager: ParallaxSensorManager
     @Inject lateinit var spellCheckerManager: SpellCheckerManager
     @Inject lateinit var voiceRecognitionHelper: VoiceRecognitionHelper
 
@@ -334,6 +335,22 @@ class HexKeyboardService : InputMethodService(),
     private var lastUndoneCorrection: String? = null
     internal var symbolsTypedCount = 0
 
+    private val currentWordTouchPoints = mutableListOf<TouchPoint>()
+    private var autoCorrectForField = true
+
+    fun recordTouchPoint(text: String, x: Float, y: Float) {
+        if (text.isNotEmpty()) {
+            val char = text.first()
+            if (char.isLetter()) {
+                currentWordTouchPoints.add(TouchPoint(char = char, x = x, y = y))
+            }
+        }
+    }
+
+    fun updateKeyCenters(centers: Map<Char, PointF>) {
+        predictionEngine.updateKeyCenters(centers)
+    }
+
     data class LastCorrection(val original: String, val corrected: String)
     private var lastKeyTime: Long = 0
     private var lastKeyWasSpace: Boolean = false
@@ -445,12 +462,6 @@ class HexKeyboardService : InputMethodService(),
 
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         registerReceiver(wallpaperReceiver, filter)
-
-        serviceScope.launch {
-            parallaxSensorManager.parallaxOffset.collect {
-                viewModel.updateParallaxOffset(it)
-            }
-        }
         
         serviceScope.launch {
             dataStore.data.collectLatest { prefs ->
@@ -491,11 +502,6 @@ class HexKeyboardService : InputMethodService(),
         serviceScope.launch {
             ThemeUtils.getKeyboardThemeFlow(this@HexKeyboardService).collect { theme ->
                 viewModel.updateKeyboardTheme(theme)
-                if (theme.parallaxEffect) {
-                    parallaxSensorManager.start()
-                } else {
-                    parallaxSensorManager.stop()
-                }
             }
         }
 
@@ -587,7 +593,6 @@ class HexKeyboardService : InputMethodService(),
                 clipboardManager.removePrimaryClipChangedListener(clipboardListener)
             } catch (_: Exception) {}
         }
-        parallaxSensorManager.stop()
         spellCheckerManager.closeSession()
         voiceRecognitionHelper.destroy()
         serviceScope.cancel()
@@ -602,9 +607,6 @@ class HexKeyboardService : InputMethodService(),
     override fun onWindowShown() {
         super.onWindowShown()
         val theme = viewModel.keyboardTheme.value ?: return
-        if (theme.parallaxEffect) {
-            parallaxSensorManager.start()
-        }
 
         mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
@@ -637,7 +639,6 @@ class HexKeyboardService : InputMethodService(),
 
     override fun onWindowHidden() {
         super.onWindowHidden()
-        parallaxSensorManager.stop()
 
         symbolsTypedCount = 0
         serviceScope.launch {
@@ -686,9 +687,24 @@ class HexKeyboardService : InputMethodService(),
         val effectiveAction = getEffectiveImeAction(info)
         val inputType = info.inputType
         val classMask = inputType and InputType.TYPE_MASK_CLASS
+        val variation = inputType and InputType.TYPE_MASK_VARIATION
         val isMultiLine = (classMask == InputType.TYPE_CLASS_TEXT) &&
                 (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0) &&
                 (effectiveAction == EditorInfo.IME_ACTION_NONE || effectiveAction == EditorInfo.IME_ACTION_UNSPECIFIED)
+
+        val isPassword = variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+                classMask == InputType.TYPE_CLASS_NUMBER ||
+                classMask == InputType.TYPE_CLASS_PHONE ||
+                classMask == InputType.TYPE_CLASS_DATETIME
+
+        val isUrlOrEmail = variation == InputType.TYPE_TEXT_VARIATION_URI ||
+                variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+
+        autoCorrectForField = !isPassword && !isUrlOrEmail
+        currentWordTouchPoints.clear()
 
         mHexKeyboardView?.setImeAction(effectiveAction)
         mHexKeyboardView?.isMultiLine = isMultiLine
@@ -716,7 +732,7 @@ class HexKeyboardService : InputMethodService(),
             withContext(Dispatchers.Main) {
                 viewModel.updateCurrentLocale(lang)
                 serviceScope.launch(Dispatchers.IO) {
-                    predictionEngine.initialize(lang = lang, secondaryLangs = secondaryLangs, forceUserDictReload = true)
+                    predictionEngine.initialize(lang = lang, secondaryLangs = secondaryLangs, forceUserDictReload = false)
                 }
                 switchToLanguage(lang)
 
@@ -728,20 +744,26 @@ class HexKeyboardService : InputMethodService(),
     }
 
     private var lastProcessedTextBefore: String? = null
+    private var updateSuggestionsJob: Job? = null
 
     fun updateSuggestions() {
-        val ic = currentInputConnection ?: return
-        val textBeforeSequence = ic.getTextBeforeCursor(40, 0) ?: ""
-        val textBefore = textBeforeSequence.toString()
-        
-        val capsMode = ic.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS)
-        val isShifted = mHexKeyboardView?.shifted == true
-        val shouldCapitalize = (capsMode != 0) || isShifted
+        updateSuggestionsJob?.cancel()
+        updateSuggestionsJob = serviceScope.launch(Dispatchers.Default) {
+            delay(15)
+            val textBeforeSequence = withContext(Dispatchers.Main) {
+                currentInputConnection?.getTextBeforeCursor(40, 0) ?: ""
+            }
+            val textBefore = textBeforeSequence.toString()
 
-        if (textBefore == lastProcessedTextBefore) return
-        lastProcessedTextBefore = textBefore
+            val capsMode = withContext(Dispatchers.Main) {
+                currentInputConnection?.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS) ?: 0
+            }
+            val isShifted = mHexKeyboardView?.shifted == true
+            val shouldCapitalize = (capsMode != 0) || isShifted
 
-        serviceScope.launch(Dispatchers.Default) {
+            if (textBefore == lastProcessedTextBefore) return@launch
+            lastProcessedTextBefore = textBefore
+
             val history = viewModel.clipboardHistory.value
             val topHistoryItem = history.firstOrNull()
             val topHistoryText = topHistoryItem?.text?.trim()
@@ -777,7 +799,13 @@ class HexKeyboardService : InputMethodService(),
                     val nextWordPredictions = predictionEngine.getSuggestions("", previousWord = cleanLastWord, prev2 = prev1, limit = 2).map { it.text }
                     localSuggestions.addAll(nextWordPredictions)
                 } else {
-                    val rawPredictions = predictionEngine.getSuggestions(cleanLastWord, previousWord = prev1, prev2 = prev2, limit = 10)
+                    val rawPredictions = predictionEngine.getSuggestions(
+                        cleanLastWord,
+                        previousWord = prev1,
+                        prev2 = prev2,
+                        touchPoints = ArrayList(currentWordTouchPoints),
+                        limit = 10
+                    )
                     var rawCandidates = rawPredictions.map { it.text }.distinct()
 
                     if (shouldCapitalize) {
@@ -902,7 +930,7 @@ class HexKeyboardService : InputMethodService(),
 
         var performedAutocorrect = false
 
-        if (isSeparator && autoCorrect && !lastKeyWasSpace) {
+        if (isSeparator && autoCorrect && autoCorrectForField && !lastKeyWasSpace) {
             val textBefore = ic.getTextBeforeCursor(50, 0) ?: ""
             val rawTokens = textBefore.toString().split(" ", "\n", "\t").filter { it.isNotEmpty() }
             val rawOriginalToken = rawTokens.lastOrNull() ?: ""
@@ -919,7 +947,8 @@ class HexKeyboardService : InputMethodService(),
                     val correction = predictionEngine.getAutocorrection(
                         typedWord = rawOriginalToken,
                         previousWord = prev1Clean,
-                        prev2 = prev2Clean
+                        prev2 = prev2Clean,
+                        touchPoints = ArrayList(currentWordTouchPoints)
                     )
 
                     if (correction != null && correction.text.lowercase() != rawOriginalToken.lowercase()) {
@@ -928,6 +957,8 @@ class HexKeyboardService : InputMethodService(),
                         lastAutoCorrection = LastCorrection(rawOriginalToken, correction.text)
                         lastUndoneCorrection = null
                         predictionEngine.learnFromInput(correction.text, prev1Clean, prev2Clean)
+                        predictionEngine.registerConfirmedWordTouch(ArrayList(currentWordTouchPoints), correction.text)
+                        currentWordTouchPoints.clear()
                         performedAutocorrect = true
 
                         if (text == " ") {
@@ -941,6 +972,10 @@ class HexKeyboardService : InputMethodService(),
                     }
                 }
             }
+        }
+
+        if (isSeparator) {
+            currentWordTouchPoints.clear()
         }
 
         if (isSeparator && !performedAutocorrect && !lastKeyWasSpace) {
@@ -1029,6 +1064,7 @@ class HexKeyboardService : InputMethodService(),
         if (hasSelection || hasTextBefore) {
             mHexKeyboardView?.triggerVibration(FeedbackManager.HapticType.DELETE)
             mHexKeyboardView?.triggerSound()
+            if (currentWordTouchPoints.isNotEmpty()) currentWordTouchPoints.removeAt(currentWordTouchPoints.size - 1)
             if (symbolsTypedCount > 0) symbolsTypedCount--
         } else {
             return
@@ -1171,14 +1207,17 @@ class HexKeyboardService : InputMethodService(),
 
                         val textBefore = ic?.getTextBeforeCursor(40, 0) ?: ""
                         val words = textBefore.split(" ", "\n", "\t").filter { it.isNotEmpty() }
-                        val prevWord = if (words.size > 1) words[words.size - 2] else null
-                        predictionEngine.learnFromInput(textToCommit, prevWord)
+                        val prev1 = if (words.size > 1) words[words.size - 2] else null
+                        val prev2 = if (words.size > 2) words[words.size - 3] else null
+                        predictionEngine.learnFromInput(textToCommit, prev1, prev2)
+                        currentWordTouchPoints.clear()
 
                         if (mHexKeyboardView?.shifted == true && mHexKeyboardView?.capsLock == false) {
                             mHexKeyboardView?.shifted = false
                         }
+                        updateShiftState()
+                        updateSuggestions()
                     }
-                    viewModel.updateSuggestions(suggestions.map { it.text })
                 }
             }
         }

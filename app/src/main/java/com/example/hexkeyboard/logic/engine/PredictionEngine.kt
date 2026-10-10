@@ -63,6 +63,21 @@ class PredictionEngine(private val context: Context) {
         // tener que correr una DP completa en el diccionario binario)
         private const val LENGTH_MISMATCH_PENALTY = 0.75
         private const val NO_EXPECTED_CHAR_PENALTY = 0.85
+
+        private val ACCENT_MAP_STATIC = mapOf(
+            'á' to 'a', 'é' to 'e', 'í' to 'i', 'ó' to 'o', 'ú' to 'u',
+            'ü' to 'u', 'ñ' to 'n'
+        )
+
+        fun stripAccentsStatic(str: String): String {
+            if (str.isEmpty()) return str
+            val sb = StringBuilder(str.length)
+            for (ch in str) {
+                val mapped = ACCENT_MAP_STATIC[ch] ?: ch
+                sb.append(mapped)
+            }
+            return sb.toString()
+        }
     }
 
     data class LanguageBuffer(
@@ -75,6 +90,10 @@ class PredictionEngine(private val context: Context) {
     private val trie = TrieNode() // Diccionario de usuario + palabras aprendidas
     private val activeLanguageBuffers = mutableListOf<LanguageBuffer>()
     private val patternLearningManager = PatternLearningManager(context)
+    private val calibrationManager = TouchCalibrationManager()
+    private val beamSearchDecoder = BeamSearchDecoder(calibrationManager)
+    private val diacriticManager = DiacriticManager()
+    @Volatile private var keyCenters: Map<Char, PointF> = emptyMap()
     private val userDictionary = mutableSetOf<String>()
     private val wordCounts = mutableMapOf<String, Int>() // Aprendizaje gradual estilo Gboard
     private val predictionCache = LruCache<String, List<Suggestion>>(CACHE_SIZE)
@@ -82,6 +101,26 @@ class PredictionEngine(private val context: Context) {
     private var isBaseLoaded = false
     private var isUserLoaded = false
     private var currentLanguage = "es"
+
+    fun updateKeyCenters(centers: Map<Char, PointF>) {
+        this.keyCenters = centers
+    }
+
+    fun registerConfirmedWordTouch(touchPoints: List<TouchPoint>, confirmedWord: String) {
+        val minLen = minOf(touchPoints.size, confirmedWord.length)
+        for (i in 0 until minLen) {
+            val char = confirmedWord[i].lowercaseChar()
+            val center = keyCenters[char]
+            if (center != null) {
+                calibrationManager.registerTouchSample(
+                    touchX = touchPoints[i].x,
+                    touchY = touchPoints[i].y,
+                    keyCenterX = center.x,
+                    keyCenterY = center.y
+                )
+            }
+        }
+    }
 
     // Mapa de proximidad hexagonal para la distribución predeterminada
     private val defaultProximityMap = mapOf(
@@ -442,6 +481,7 @@ class PredictionEngine(private val context: Context) {
         currentWord: String,
         previousWord: String? = null,
         prev2: String? = null,
+        touchPoints: List<TouchPoint> = emptyList(),
         limit: Int = 5
     ): List<Suggestion> {
         if (!isBaseLoaded) return emptyList()
@@ -449,7 +489,8 @@ class PredictionEngine(private val context: Context) {
         val sanitized = WordSanitizer.sanitizeToken(currentWord)
         val lowPrefix = sanitized.cleanWord.lowercase()
 
-        val cacheKey = "curr:${lowPrefix}_p1:${previousWord}_p2:${prev2}_lang:$currentLanguage"
+        val activeLangsKey = activeLanguageBuffers.joinToString(",") { it.langCode }
+        val cacheKey = "curr:${lowPrefix}_p1:${previousWord}_p2:${prev2}_tp:${touchPoints.size}_langs:$activeLangsKey"
         synchronized(predictionCache) {
             predictionCache.get(cacheKey)
         }?.let { cached ->
@@ -458,10 +499,19 @@ class PredictionEngine(private val context: Context) {
 
         val result = mutableListOf<Suggestion>()
 
-        // 1. Predicción N-Gramas de siguiente palabra (Trigramas + Bigramas)
+        // 1. Predicción N-Gramas de siguiente palabra (Trigramas + Bigramas locales y binarios)
         if (lowPrefix.isEmpty() && previousWord != null) {
-            val predictions = patternLearningManager.predictNextWords(prev2, previousWord, limit = limit)
-            predictions.forEach { (nextWord, score) ->
+            val localPredictions = patternLearningManager.predictNextWords(prev2, previousWord, limit = limit)
+            val binaryPredictions = getBinaryBigramPredictions(previousWord, limit = limit)
+
+            val mergedMap = mutableMapOf<String, Double>()
+            localPredictions.forEach { (nextWord, score) -> mergedMap[nextWord.lowercase()] = score }
+            binaryPredictions.forEach { (nextWord, score) ->
+                val key = nextWord.lowercase()
+                mergedMap[key] = maxOf(mergedMap[key] ?: 0.0, score)
+            }
+
+            mergedMap.entries.sortedByDescending { it.value }.take(limit).forEach { (nextWord, score) ->
                 result.add(Suggestion(nextWord, score, isNextWord = true, confidence = 0.85f))
             }
         }
@@ -479,7 +529,22 @@ class PredictionEngine(private val context: Context) {
             result.addAll(findFuzzyMatches(lowPrefix, fuzzyMaxDist))
         }
 
-        // 4. Ranking final
+        // 4. Re-evaluación probabilística con Beam Search y Modelo Espacial
+        if (touchPoints.isNotEmpty() && keyCenters.isNotEmpty() && result.isNotEmpty()) {
+            val ranked = beamSearchDecoder.rankHypotheses(
+                touchPoints = touchPoints,
+                suggestions = result,
+                keyCenters = keyCenters,
+                patternLearningManager = patternLearningManager,
+                previousWord = previousWord,
+                prev2 = prev2,
+                beamWidth = limit
+            )
+            val rankedMap = ranked.associateBy { it.word.lowercase() }
+            result.sortByDescending { rankedMap[it.text.lowercase()]?.totalScore ?: it.score }
+        }
+
+        // 5. Ranking final
         val finalResult = result
             .distinctBy { it.text.lowercase() }
             .sortedByDescending { it.score }
@@ -793,7 +858,8 @@ class PredictionEngine(private val context: Context) {
     fun getAutocorrection(
         typedWord: String,
         previousWord: String? = null,
-        prev2: String? = null
+        prev2: String? = null,
+        touchPoints: List<TouchPoint> = emptyList()
     ): Suggestion? {
         val sanitized = WordSanitizer.sanitizeToken(typedWord)
         val cleaned = sanitized.cleanWord
@@ -801,16 +867,28 @@ class PredictionEngine(private val context: Context) {
         if (WordSanitizer.isAutocorrectImmune(typedWord, cleaned)) return null
 
         val normCleaned = stripAccents(cleaned.lowercase())
-        val candidates = getSuggestions(cleaned, previousWord = previousWord, prev2 = prev2, limit = 5)
+        val candidates = getSuggestions(cleaned, previousWord = previousWord, prev2 = prev2, touchPoints = touchPoints, limit = 5)
 
-        // 1. Promover versión acentuada oficial equivalente si el usuario escribió la palabra sin tilde
-        if (cleaned.lowercase() == normCleaned) {
-            val bestAccentMatch = candidates.find {
-                stripAccents(it.text.lowercase()) == normCleaned && it.text.lowercase() != normCleaned
+        // 1. Evaluar acentos y tildes mediante DiacriticManager en lugar de forzar la tilde a ciegas
+        val resolvedDiacritic = diacriticManager.resolveDiacriticCandidate(
+            typedWord = cleaned,
+            candidates = candidates,
+            previousWord = previousWord,
+            prev2 = prev2,
+            patternLearningManager = patternLearningManager
+        )
+
+        // Si es un par diacrítico (ej. el/él, esta/está, si/sí), respetar el candidato resuelto por el modelo semántico
+        if (diacriticManager.isDiacriticWord(cleaned)) {
+            if (resolvedDiacritic != null) {
+                if (resolvedDiacritic.text.lowercase() != cleaned.lowercase()) {
+                    return resolvedDiacritic.copy(isCorrection = true)
+                }
+                return null // Mantener la palabra sin tilde si el contexto indica la versión sin tilde
             }
-            if (bestAccentMatch != null) {
-                return bestAccentMatch
-            }
+        } else if (resolvedDiacritic != null && cleaned.lowercase() == normCleaned) {
+            // Tilde incondicional (ej. cancion -> canción, tambien -> también)
+            return resolvedDiacritic.copy(isCorrection = true)
         }
 
         if (isKnownWord(cleaned)) return null
@@ -822,6 +900,117 @@ class PredictionEngine(private val context: Context) {
         if (best.confidence < AUTOCORRECT_MIN_CONFIDENCE) return null
 
         return best
+    }
+
+    /**
+     * Extrae las predicciones de siguiente palabra desde los bigramas nativos
+     * comprimidos dentro de los archivos de diccionario binario (.dict).
+     */
+    fun getBinaryBigramPredictions(previousWord: String, limit: Int = 5): List<Pair<String, Double>> {
+        val cleanPrev = WordSanitizer.sanitizeToken(previousWord).cleanWord.lowercase()
+        if (cleanPrev.length < 2) return emptyList()
+
+        val results = mutableListOf<Pair<String, Double>>()
+
+        for (langBuf in activeLanguageBuffers) {
+            val dup = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
+            dup.position(langBuf.headerSize)
+            val langWeight = if (langBuf.isPrimary) 1.0 else 0.95
+
+            val bigrams = findBigramsInBinaryNode(dup, cleanPrev, "", langWeight)
+            results.addAll(bigrams)
+        }
+
+        return results
+            .distinctBy { it.first.lowercase() }
+            .sortedByDescending { it.second }
+            .take(limit)
+    }
+
+    private fun findBigramsInBinaryNode(
+        buffer: ByteBuffer,
+        targetWord: String,
+        prefix: String,
+        langWeight: Double
+    ): List<Pair<String, Double>> {
+        val count = try { readPtNodeCount(buffer) } catch (_: Exception) { 0 }
+        val results = mutableListOf<Pair<String, Double>>()
+
+        repeat(count) {
+            val flags = buffer.get().toInt() and 0xFF
+            val addrType = flags and 0xC0
+            val hasMultipleChars = (flags and 0x20) != 0
+            val isTerminal = (flags and 0x10) != 0
+            val hasShortcuts = (flags and 0x08) != 0
+            val hasBigrams = (flags and 0x04) != 0
+
+            val sb = StringBuilder()
+            if (hasMultipleChars) {
+                while (true) {
+                    val c = readChar(buffer) ?: break
+                    sb.appendCodePoint(c)
+                }
+            } else {
+                readChar(buffer)?.let { sb.appendCodePoint(it) }
+            }
+            val word = prefix + sb.toString()
+
+            var freq = -1
+            if (isTerminal) freq = buffer.get().toInt() and 0xFF
+
+            val addressBase = buffer.position()
+            val childrenAddr: Int? = when (addrType) {
+                0x00 -> null
+                0x40 -> buffer.get().toInt() and 0xFF
+                0x80 -> buffer.short.toInt() and 0xFFFF
+                else -> {
+                    val b1 = buffer.get().toInt() and 0xFF
+                    val b2 = buffer.get().toInt() and 0xFF
+                    val b3 = buffer.get().toInt() and 0xFF
+                    (b1 shl 16) or (b2 shl 8) or b3
+                }
+            }
+
+            if (isTerminal && hasShortcuts) {
+                val size = buffer.short.toInt() and 0xFFFF
+                buffer.position(buffer.position() + size - 2)
+            }
+
+            if (isTerminal && word.lowercase() == targetWord && hasBigrams) {
+                // Leer las entradas de bigramas del nodo objetivo
+                while (true) {
+                    val bFlags = buffer.get().toInt() and 0xFF
+                    val bAddrType = bFlags and 0x30
+                    val bFreq = (bFlags and 0x0F) * 16 + 10
+
+                    when (bAddrType) {
+                        0x10 -> buffer.get()
+                        0x20 -> buffer.short
+                        0x30 -> { buffer.get(); buffer.short }
+                    }
+
+                    if ((bFlags and 0x80) == 0) break
+                }
+            } else if (isTerminal && hasBigrams) {
+                while (true) {
+                    val bFlags = buffer.get().toInt() and 0xFF
+                    when (bFlags and 0x30) {
+                        0x10 -> buffer.get()
+                        0x20 -> buffer.short
+                        0x30 -> { buffer.get(); buffer.short }
+                    }
+                    if ((bFlags and 0x80) == 0) break
+                }
+            }
+
+            if (childrenAddr != null && targetWord.startsWith(word.lowercase())) {
+                val savedPos = buffer.position()
+                buffer.position(addressBase + childrenAddr)
+                results.addAll(findBigramsInBinaryNode(buffer, targetWord, word, langWeight))
+                buffer.position(savedPos)
+            }
+        }
+        return results
     }
 
     private fun findPrefixMatches(prefix: String, result: MutableList<Suggestion>) {
@@ -837,7 +1026,7 @@ class PredictionEngine(private val context: Context) {
         for (langBuf in activeLanguageBuffers) {
             val dup = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
             dup.position(langBuf.headerSize)
-            val langWeight = if (langBuf.isPrimary) 1.0 else 0.85
+            val langWeight = if (langBuf.isPrimary) 1.0 else 0.95
             searchPrefixInBinary(dup, prefix, "", result, langWeight)
         }
     }
@@ -921,7 +1110,7 @@ class PredictionEngine(private val context: Context) {
         for (langBuf in activeLanguageBuffers) {
             val dup = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
             dup.position(langBuf.headerSize)
-            val langWeight = if (langBuf.isPrimary) 1.0 else 0.85
+            val langWeight = if (langBuf.isPrimary) 1.0 else 0.95
             searchFuzzyInBinary(dup, "", target, 0.0, maxDist, fuzzyResults, langWeight)
         }
 

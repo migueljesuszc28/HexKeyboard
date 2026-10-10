@@ -95,8 +95,8 @@ fun LanguagePanel(
     }
 
     val borderStroke = rememberKeyBorderStroke(theme)
-    val baseColor = Color(theme.keyBackgroundColor)
-    val isTransparentBg = baseColor.alpha == 0f || baseColor == Color.Transparent
+    val baseColor = Color(theme.keyBackgroundColor).copy(alpha = if (theme.keysOpacity >= 0.95f) 1.0f else theme.keysOpacity)
+    val isTransparentBg = theme.keysOpacity == 0f || baseColor == Color.Transparent
     val cardColor = if (isTransparentBg) Color.Transparent else baseColor
     val cardElevation = if (isTransparentBg || theme.id == "glass") 0.dp else 2.dp
 

@@ -292,14 +292,14 @@ class HexLayoutEngine {
         keys += Key("?123", KeyType.TOGGLE, "123", listOf("#+=", "𝔉"), cx = cx8(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
 
         if (language == "es") {
-            keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-            keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+            keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+            keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
             keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(5f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
         } else {
-            keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-            keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+            keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+            keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
             keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
             keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(5f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
@@ -371,8 +371,8 @@ class HexLayoutEngine {
             keys += Key(l, type, value, alt, cx = finalCx, cy = ry(3), rx = dr, ry = dry, gapLeft = gL, gapRight = gR, keyScale = keyScale)
         }
         keys += Key("ABC", KeyType.TOGGLE, "123", listOf("#+=", "𝔉"), cx = cx6(-1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx6(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key(",", KeyType.CHAR, ",", longPressAlternatives[','] ?: emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
         keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
@@ -420,8 +420,8 @@ class HexLayoutEngine {
         }
         keys += Key("⌫", KeyType.DELETE, "DELETE", emptyList(), cx = cx7(6.0f), cy = ry(3), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("ABC", KeyType.TOGGLE, "?123", listOf("123", "#+=", "𝔉"), cx = cx8(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key((fontPage + 1).toString(), KeyType.FONT_PAGE, "FONT_PAGE", (1..10).map { it.toString() }, cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx8(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key((fontPage + 1).toString(), KeyType.FONT_PAGE, "FONT_PAGE", (1..10).map { it.toString() }, cx = cx8(2f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
         keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx8(3f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx8(5f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)
@@ -440,6 +440,9 @@ class HexLayoutEngine {
 
         val symbols = symbolPages[symbolPage] ?: emptyList()
         val pages = symbolPages.keys.toList()
+        val currentPageIndex = pages.indexOf(symbolPage).coerceAtLeast(0)
+        val displaySymbolPageStr = (currentPageIndex + 1).toString()
+        val symbolPageAlternatives = (1..pages.size).map { it.toString() }
         var idx = 0
         fun nextSym(): String = if (idx < symbols.size) symbols[idx++] else ""
 
@@ -464,8 +467,8 @@ class HexLayoutEngine {
         }
         keys += Key("⌫", KeyType.DELETE, "DELETE", emptyList(), cx = cx7(6.0f), cy = ry(3), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("ABC", KeyType.TOGGLE, "?123", listOf("123", "𝔉"), cx = cx6(-1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key("→", KeyType.SYMBOL_PAGE, "→", pages.mapIndexed { i, _ -> (i + 1).toString() }, cx = cx6(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
-        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key("😀", KeyType.EMOJI, "EMOJI", emptyList(), cx = cx6(0f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
+        keys += Key(displaySymbolPageStr, KeyType.SYMBOL_PAGE, "SYMBOL_PAGE", symbolPageAlternatives, cx = cx6(1f), cy = ry(4), rx = dr, ry = dry, keyScale = keyScale)
         keys += Key(" ", KeyType.SPACE, " ", emptyList(), cx = cx6(2f), cy = ry(4), rx = dr, ry = dry, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(3f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, gapRight = false, keyScale = keyScale)
         keys += Key("", KeyType.SPACE, " ", emptyList(), cx = cx6(4f), cy = ry(4), rx = dr, ry = dry, gapLeft = false, keyScale = keyScale)

@@ -23,12 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.datastore.preferences.core.emptyPreferences
 import com.example.hexkeyboard.data.repository.KeyboardTheme
-import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
-import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
+import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
 @Composable
 fun KeyboardPreview(
     theme: KeyboardTheme,
@@ -38,20 +36,6 @@ fun KeyboardPreview(
     val context = LocalContext.current
     var backgroundImage by remember(theme.backgroundImageUri) { mutableStateOf<Bitmap?>(null) }
     var backgroundBlurImage by remember(theme.backgroundImageUri, theme.backgroundBlur) { mutableStateOf<Bitmap?>(null) }
-    
-    val parallaxManager = remember { ParallaxSensorManager(context) }
-    val parallaxOffsetState = parallaxManager.parallaxOffset.collectAsState()
-
-    DisposableEffect(theme.parallaxEffect) {
-        if (theme.parallaxEffect) {
-            parallaxManager.start()
-        } else {
-            parallaxManager.stop()
-        }
-        onDispose {
-            parallaxManager.stop()
-        }
-    }
 
     LaunchedEffect(theme.backgroundImageUri, theme.backgroundBlur) {
         if (theme.backgroundImageUri != null) {
@@ -85,21 +69,7 @@ fun KeyboardPreview(
                 contentDescription = null,
                 modifier = Modifier
                     .matchParentSize()
-                    .alpha(theme.backgroundOpacity)
-                    .graphicsLayer {
-                        if (theme.parallaxEffect) {
-                            val parallaxLimit = 0.10f
-                            val scale = 1.0f + parallaxLimit
-                            val maxShiftX = (size.width * parallaxLimit) / 2f
-                            val maxShiftY = (size.height * parallaxLimit) / 2f
-                            
-                            val offset = parallaxOffsetState.value
-                            translationX = offset.x * maxShiftX
-                            translationY = offset.y * maxShiftY
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                    },
+                    .alpha(theme.backgroundOpacity),
                 contentScale = ContentScale.Crop
             )
         }

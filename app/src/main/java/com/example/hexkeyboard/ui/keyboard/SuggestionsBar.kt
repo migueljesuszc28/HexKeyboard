@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,7 +84,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Extension,
+                        imageVector = Icons.Rounded.Extension,
                         contentDescription = "Funciones",
                         tint = Color(theme.keyboardIconTint),
                         modifier = Modifier.size(24.dp)
@@ -317,9 +318,11 @@ fun GboardCapsule(
     val baseColor = Color(theme.keyBackgroundColor)
     val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
         Color.Transparent
+    } else if (theme.keysOpacity >= 0.95f) {
+        baseColor.copy(alpha = 1.0f)
     } else {
-        val factor = if (isCenterPrimary) 0.95f else 0.65f
-        baseColor.copy(alpha = baseColor.alpha * factor)
+        val factor = if (isCenterPrimary) 1.0f else 0.85f
+        baseColor.copy(alpha = (theme.keysOpacity * factor).coerceIn(0f, 1f))
     }
 
     val borderStroke = rememberKeyBorderStroke(theme)
@@ -368,8 +371,10 @@ fun ShortcutIconCapsule(
     val baseColor = Color(theme.keyBackgroundColor)
     val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
         Color.Transparent
+    } else if (theme.keysOpacity >= 0.95f) {
+        baseColor.copy(alpha = 1.0f)
     } else {
-        baseColor.copy(alpha = baseColor.alpha * 0.75f)
+        baseColor.copy(alpha = (theme.keysOpacity * 0.85f).coerceIn(0f, 1f))
     }
     val iconColor = Color(theme.keyboardIconTint)
     val borderStroke = rememberKeyBorderStroke(theme)
@@ -405,8 +410,10 @@ fun ClipboardSuggestionChip(clipText: String, theme: KeyboardTheme, onClick: () 
     val baseColor = Color(theme.keyBackgroundColor)
     val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
         Color.Transparent
+    } else if (theme.keysOpacity >= 0.95f) {
+        baseColor.copy(alpha = 1.0f)
     } else {
-        baseColor.copy(alpha = baseColor.alpha * 0.95f)
+        baseColor.copy(alpha = (theme.keysOpacity * 0.95f).coerceIn(0f, 1f))
     }
 
     Surface(

@@ -7,7 +7,6 @@ import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.engine.PredictionEngine
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.service.SpellCheckerManager
 import dagger.Module
@@ -43,12 +42,6 @@ object KeyboardModule {
     @Singleton
     fun provideEmojiProvider(): EmojiProvider {
         return EmojiProvider
-    }
-
-    @Provides
-    @Singleton
-    fun provideParallaxSensorManager(@ApplicationContext context: Context): ParallaxSensorManager {
-        return ParallaxSensorManager(context)
     }
 
     @Provides

@@ -10,7 +10,6 @@ import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.ClipboardItem
-import com.example.hexkeyboard.logic.managers.ParallaxSensorManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,9 +22,6 @@ import javax.inject.Inject
 class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     // --- Estado de la UI ---
-    private val _parallaxOffset = MutableStateFlow(ParallaxSensorManager.Offset(0f, 0f))
-    val parallaxOffset: StateFlow<ParallaxSensorManager.Offset> = _parallaxOffset.asStateFlow()
-
     private val _suggestions = MutableStateFlow<List<String>>(emptyList())
     val suggestions: StateFlow<List<String>> = _suggestions.asStateFlow()
 
@@ -108,10 +104,6 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     enum class SettingsType { GENERAL, THEMES, PERMISSIONS }
 
     // --- Lógica de Negocio / UI ---
-
-    fun updateParallaxOffset(offset: ParallaxSensorManager.Offset) {
-        _parallaxOffset.value = offset
-    }
 
     fun updateSuggestions(newList: List<String>) {
         _suggestions.value = newList

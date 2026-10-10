@@ -9,8 +9,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -45,8 +43,7 @@ import java.io.File
 fun KeyboardMainSection(
     viewModel: KeyboardViewModel,
     theme: KeyboardTheme,
-    hasBackgroundImage: Boolean,
-    onParallax: (Float, Float) -> Unit
+    hasBackgroundImage: Boolean
 ) {
     val currentView by viewModel.currentView.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
@@ -97,11 +94,16 @@ fun KeyboardMainSection(
                 this.drawBackground = !hasBackgroundImage
                 listener = object : HexKeyboardView.Listener {
                     override fun onChar(text: String) { viewModel.onCharTyped(text) }
+                    override fun onCharWithPoint(text: String, x: Float, y: Float) {
+                        service?.recordTouchPoint(text, x, y)
+                    }
                     override fun onDelete() { viewModel.onDelete() }
                     override fun onEnter() { viewModel.onEnter() }
                     override fun onLongPressSelect(char: String) { viewModel.onCharTyped(char) }
                     override fun onSymbolPageChange(page: String) {}
-                    override fun onParallaxChange(x: Float, y: Float) { onParallax(x, y) }
+                    override fun onLayoutUpdated(keyCenters: Map<Char, PointF>) {
+                        service?.updateKeyCenters(keyCenters)
+                    }
                     override fun onGesture(points: List<PointF>) {
                         service?.handleGesture(points, allKeys)
                     }
@@ -145,11 +147,16 @@ fun KeyboardMainSection(
 
             view.listener = object : HexKeyboardView.Listener {
                 override fun onChar(text: String) { viewModel.onCharTyped(text) }
+                override fun onCharWithPoint(text: String, x: Float, y: Float) {
+                    service?.recordTouchPoint(text, x, y)
+                }
                 override fun onDelete() { viewModel.onDelete() }
                 override fun onEnter() { viewModel.onEnter() }
                 override fun onLongPressSelect(char: String) { viewModel.onCharTyped(char) }
                 override fun onSymbolPageChange(page: String) {}
-                override fun onParallaxChange(x: Float, y: Float) { onParallax(x, y) }
+                override fun onLayoutUpdated(keyCenters: Map<Char, PointF>) {
+                    service?.updateKeyCenters(keyCenters)
+                }
                 override fun onGesture(points: List<PointF>) {
                     service?.handleGesture(points, view.allKeys)
                 }
@@ -244,7 +251,9 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
                 onBack = { viewModel.setCurrentView("keyboard") },
                 onSettings = { viewModel.onSettingsClick() },
                 theme = theme,
-                viewModel = viewModel
+                viewModel = viewModel,
+                bottomOffset = bottomOffset,
+                navBarBottomDp = navBarBottomDp
             )
             "credentials" -> {
                 val credentials by viewModel.credentials.collectAsState()

@@ -462,20 +462,12 @@ fun ThemeEditorScreen(
                             currentTheme = currentTheme.copy(keysBlur = it)
                         }
 
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        EditorSlider("Opacidad de teclas", currentTheme.keysOpacity, 0f..1f) {
+                            currentTheme = currentTheme.copy(keysOpacity = it)
+                        }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Efecto paralaje", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                Text("La imagen de fondo reacciona al movimiento del giroscopio", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(
-                                checked = currentTheme.parallaxEffect,
-                                onCheckedChange = { currentTheme = currentTheme.copy(parallaxEffect = it) }
-                            )
+                        EditorSlider("Grosor de borde de teclas", currentTheme.keyStrokeWidth, 0f..10f) {
+                            currentTheme = currentTheme.copy(keyStrokeWidth = it)
                         }
                     }
                 }

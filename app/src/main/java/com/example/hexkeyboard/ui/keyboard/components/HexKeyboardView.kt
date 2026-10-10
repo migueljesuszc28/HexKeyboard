@@ -42,14 +42,15 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     interface Listener {
         fun onChar(text: String)
+        fun onCharWithPoint(text: String, x: Float, y: Float) {}
         fun onDelete()
         fun onEnter()
         fun onLongPressSelect(char: String)
         fun onSymbolPageChange(page: String)
         fun onKeyClick(key: HexLayoutEngine.Key) {}
-        fun onParallaxChange(x: Float, y: Float) {}
         fun onGesture(points: List<PointF>) {}
         fun onLiveGesture(points: List<PointF>) {}
+        fun onLayoutUpdated(keyCenters: Map<Char, PointF>) {}
     }
 
     var listener: Listener? = null
@@ -141,8 +142,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         set(value) {
             if (field != value) {
                 field = value
-                renderer.emojiProcessedCache.clear()
-                renderer.staticLayoutCache.clear()
+                renderer.clearCaches()
                 if (value != null) applyTheme(value)
                 else updateColors()
                 invalidate()
@@ -156,12 +156,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     private var backgroundImage: Bitmap? = null
     private var backgroundBlurImage: Bitmap? = null
-    private var parallaxX = 0f
-    private var parallaxY = 0f
     private var currentBackgroundUri: String? = null
     private var currentBackgroundBlur: Float = -1f
 
     private val gesturePath = Path()
+    private val gestureTrailPath = Path()
     private val gesturePoints = mutableListOf<PointF>()
     private var isGestureActive = false
     private var isDissolvingTrail = false
@@ -199,15 +198,6 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         strokeWidth = 3f
     }
     private val floatingRect = RectF()
-
-    @Suppress("unused")
-    fun setParallaxOffset(x: Float, y: Float) {
-        if (drawBackground && (parallaxX != x || parallaxY != y)) {
-            parallaxX = x
-            parallaxY = y
-            invalidate()
-        }
-    }
 
     private fun applyTheme(theme: KeyboardTheme) {
         renderer.applyTheme(theme, this)
@@ -429,6 +419,19 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
         if (spaceKeys.isNotEmpty()) unifiedSpaceCenterX = (spaceKeys.minOf { it.cx } + spaceKeys.maxOf { it.cx }) / 2f
         if (enterKeys.isNotEmpty()) unifiedEnterCenterX = (enterKeys.minOf { it.cx } + enterKeys.maxOf { it.cx }) / 2f
+
+        listener?.onLayoutUpdated(getKeyCenters())
+    }
+
+    fun getKeyCenters(): Map<Char, PointF> {
+        val map = mutableMapOf<Char, PointF>()
+        for (key in keys) {
+            if (key.type == HexLayoutEngine.KeyType.CHAR && key.value.isNotEmpty()) {
+                val c = key.value.first().lowercaseChar()
+                map[c] = PointF(key.cx, key.cy)
+            }
+        }
+        return map
     }
 
     fun buildLayoutExternally() {
@@ -479,7 +482,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     override fun onDraw(canvas: Canvas) {
         val theme = keyboardTheme ?: return
         if (drawBackground) {
-            renderer.drawBackground(canvas, theme, backgroundImage, backgroundBlurImage, parallaxX, parallaxY, width, height)
+            renderer.drawBackground(canvas, theme, backgroundImage, backgroundBlurImage, width, height)
         }
         if (needsRedraw || keysBitmap == null) drawKeysToCache()
         keysBitmap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
@@ -516,7 +519,6 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val green = Color.green(activeColor)
         val blue = Color.blue(activeColor)
 
-        val trailPath = Path()
         for (i in 0 until count - 1) {
             val p1 = gesturePoints[i]
             val p2 = gesturePoints[i + 1]
@@ -528,20 +530,20 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             pGesture.color = Color.argb(segAlpha, red, green, blue)
             pGesture.strokeWidth = segWidth
 
-            trailPath.reset()
+            gestureTrailPath.reset()
             if (i == 0) {
-                trailPath.moveTo(p1.x, p1.y)
-                trailPath.lineTo(p2.x, p2.y)
+                gestureTrailPath.moveTo(p1.x, p1.y)
+                gestureTrailPath.lineTo(p2.x, p2.y)
             } else {
                 val pPrev = gesturePoints[i - 1]
                 val mid1X = (pPrev.x + p1.x) / 2f
                 val mid1Y = (pPrev.y + p1.y) / 2f
                 val mid2X = (p1.x + p2.x) / 2f
                 val mid2Y = (p1.y + p2.y) / 2f
-                trailPath.moveTo(mid1X, mid1Y)
-                trailPath.quadTo(p1.x, p1.y, mid2X, mid2Y)
+                gestureTrailPath.moveTo(mid1X, mid1Y)
+                gestureTrailPath.quadTo(p1.x, p1.y, mid2X, mid2Y)
             }
-            canvas.drawPath(trailPath, pGesture)
+            canvas.drawPath(gestureTrailPath, pGesture)
         }
     }
 
@@ -606,6 +608,25 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
     }
 
+    data class PopupCell(
+        val label: String,
+        val bounds: RectF,
+        val centerX: Float,
+        val centerY: Float
+    )
+
+    data class PopupLayoutInfo(
+        val key: HexLayoutEngine.Key,
+        val isLongPress: Boolean,
+        val cells: List<PopupCell>,
+        val width: Int,
+        val height: Int,
+        val popupX: Int,
+        val popupY: Int
+    )
+
+    private var currentPopupLayout: PopupLayoutInfo? = null
+
     private var popupWindow: PopupWindow? = null
     private var popupContentView: KeyPopupView? = null
 
@@ -617,65 +638,151 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         private val localPopupHexPath = Path()
 
         override fun onDraw(canvas: Canvas) {
-            val k = key ?: return
-            val px = width / 2f; val py = height / 2f
-            val prx = k.rx * keyScale * 1.1f * popupScale
-            val pry = k.ry * keyScale * 1.1f * popupScale
-            val textSize = min(prx, pry) * 0.7f
+            val layout = currentPopupLayout ?: return
+            val px = width / 2f
+            val py = height / 2f
 
-            if (!isLongPress) {
+            if (!layout.isLongPress) {
+                val cell = layout.cells.firstOrNull() ?: return
+                val prx = width * 0.44f
+                val pry = height * 0.44f
+                val textSize = min(prx, pry) * 0.7f
+
                 renderer.updateHexPath(localPopupHexPath, px, py, prx, pry)
                 canvas.withTranslation(0f, 6f) {
                     renderer.pShadow.color = renderer.colorPopupShadow
                     drawPath(localPopupHexPath, renderer.pShadow)
                 }
-                renderer.pPopupBg.color = renderer.colorPopupBg; canvas.drawPath(localPopupHexPath, renderer.pPopupBg)
+                renderer.pPopupBg.color = renderer.colorPopupBg
+                canvas.drawPath(localPopupHexPath, renderer.pPopupBg)
                 if (renderer.strokeWidth > 0) {
-                    renderer.pStroke.color = renderer.colorStroke; renderer.pStroke.strokeWidth = 2f; canvas.drawPath(localPopupHexPath, renderer.pStroke)
+                    renderer.pStroke.color = renderer.colorStroke
+                    renderer.pStroke.strokeWidth = 2f
+                    canvas.drawPath(localPopupHexPath, renderer.pStroke)
                 }
                 renderer.pPopupText.textSize = textSize
                 val ty = py - (renderer.pPopupText.ascent() + renderer.pPopupText.descent()) / 2f
-                val label = if (shifted && k.type == HexLayoutEngine.KeyType.CHAR && k.value.length == 1 && k.value[0].isLetter()) k.display.uppercase() else k.display
                 renderer.pPopupText.color = renderer.colorPopupText
-                canvas.drawText(label, px, ty, renderer.pPopupText)
+                canvas.drawText(cell.label, px, ty, renderer.pPopupText)
             } else {
-                val firstLabel = if (k.type == HexLayoutEngine.KeyType.FONT_PAGE) k.display else k.value
-                val alts = listOf(firstLabel) + k.alternatives
-                //marca############################################3
-                val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
-                //#################################################
-                val maxW = width - p * 2f
-                var cols = when { alts.size <= 5 -> alts.size; alts.size <= 10 -> 5; else -> 6 }.coerceAtMost(alts.size)
-                while (cols > 1 && (cols * sW + (cols - 1) * g) > maxW) cols--
-                val rows = (alts.size + cols - 1) / cols
-                val tw = if (rows > 1) cols * sW + (cols - 1) * g else alts.size * sW + (alts.size - 1) * g
-                val th = rows * sH + (rows - 1) * g
-                localPopupPath.reset(); val cornerRadius = sW * 0.45f
-                localPopupPath.addRoundRect(px - tw/2f - p, py - th/2f - p/2f, px + tw/2f + p, py + th/2f + p/2f, cornerRadius, cornerRadius, Path.Direction.CW)
+                val p = min(width, height) * 0.08f
+                localPopupPath.reset()
+                val cornerRadius = p * 1.5f
+                localPopupPath.addRoundRect(p, p, width - p, height - p, cornerRadius, cornerRadius, Path.Direction.CW)
                 canvas.withTranslation(0f, 6f) {
                     renderer.pShadow.color = renderer.colorPopupShadow
                     drawPath(localPopupPath, renderer.pShadow)
                 }
-                renderer.pPopupBg.color = renderer.colorPopupBg; canvas.drawPath(localPopupPath, renderer.pPopupBg)
-                if (renderer.strokeWidth > 0) { renderer.pStroke.color = renderer.colorStroke; renderer.pStroke.strokeWidth = 1f; canvas.drawPath(localPopupPath, renderer.pStroke) }
-                renderer.pPopupText.textSize = textSize * 0.9f
-                alts.forEachIndexed { i, a ->
-                    val row = i / cols; val col = i % cols
-                    val itemsInThisRow = if (row == rows - 1) alts.size - (row * cols) else cols
-                    val rowW = itemsInThisRow * sW + (itemsInThisRow - 1) * g
-                    val kx = px - rowW/2f + sW/2f + col * (sW + g)
-                    val ky = py - th/2f + sH/2f + row * (sH + g)
+                renderer.pPopupBg.color = renderer.colorPopupBg
+                canvas.drawPath(localPopupPath, renderer.pPopupBg)
+                if (renderer.strokeWidth > 0) {
+                    renderer.pStroke.color = renderer.colorStroke
+                    renderer.pStroke.strokeWidth = 1f
+                    canvas.drawPath(localPopupPath, renderer.pStroke)
+                }
+
+                val textSize = min(width, height) * 0.22f
+                renderer.pPopupText.textSize = textSize
+
+                val themeId = keyboardTheme?.id ?: ""
+                val highlightColor = if (themeId.contains("dark") || themeId == "terminal") "#4285F4".toColorInt() else renderer.colorPopupSelectedBg
+
+                layout.cells.forEachIndexed { i, cell ->
+                    val kx = cell.centerX
+                    val ky = cell.centerY
                     val ty = ky - (renderer.pPopupText.ascent() + renderer.pPopupText.descent()) / 2f
+
                     if (i == selectedIndex) {
+                        val sW = cell.bounds.width()
+                        val sH = cell.bounds.height()
                         renderer.updateHexPath(localPopupHexPath, kx, ky, sW * 0.48f, sH * 0.48f)
-                        val themeId = keyboardTheme?.id ?: ""
-                        val highlightColor = if (themeId.contains("dark") || themeId == "terminal") "#4285F4".toColorInt() else renderer.colorPopupSelectedBg
                         canvas.drawPath(localPopupHexPath, renderer.pPress.apply { color = highlightColor })
                         renderer.pPopupText.color = renderer.colorPopupSelectedText
-                    } else renderer.pPopupText.color = renderer.colorPopupText
-                    canvas.drawText(if (a == " " && i == 0) "␣" else a, kx, ty, renderer.pPopupText)
+                    } else {
+                        renderer.pPopupText.color = renderer.colorPopupText
+                    }
+                    canvas.drawText(cell.label, kx, ty, renderer.pPopupText)
                 }
             }
+        }
+    }
+
+    private fun getPopupAlternatives(key: HexLayoutEngine.Key): List<String> {
+        return if (key.type == HexLayoutEngine.KeyType.FONT_PAGE || key.type == HexLayoutEngine.KeyType.SYMBOL_PAGE) {
+            key.alternatives
+        } else {
+            val firstLabel = key.value
+            listOf(firstLabel) + key.alternatives
+        }
+    }
+
+    private fun buildPopupLayoutInfo(key: HexLayoutEngine.Key, isLongPress: Boolean): PopupLayoutInfo {
+        val prx = key.rx * keyScale * 1.1f * popupScale
+        val pry = key.ry * keyScale * 1.1f * popupScale
+        val screenWidth = context.resources.displayMetrics.widthPixels
+
+        if (!isLongPress) {
+            val w = (prx * 2.5f).toInt()
+            val h = (pry * 2.5f).toInt()
+            val location = IntArray(2)
+            getLocationInWindow(location)
+            var x = (location[0] + key.cx - w / 2f).toInt()
+            val y = (location[1] + getPopupOffsetY(key, false, h)).toInt()
+            if (x < 0) x = 0
+            if (x + w > screenWidth) x = screenWidth - w
+
+            val label = if (shifted && key.type == HexLayoutEngine.KeyType.CHAR && key.value.length == 1 && key.value[0].isLetter()) key.display.uppercase() else key.display
+            val singleCell = PopupCell(
+                label = label,
+                bounds = RectF(0f, 0f, w.toFloat(), h.toFloat()),
+                centerX = w / 2f,
+                centerY = h / 2f
+            )
+            return PopupLayoutInfo(key, false, listOf(singleCell), w, h, x, y)
+        } else {
+            val alts = getPopupAlternatives(key)
+            val sW = prx * 1.45f
+            val sH = pry * 1.45f
+            val g = sW * 0.15f
+            val p = sW * 0.5f
+
+            val maxW = screenWidth - p * 2f
+            var cols = when { alts.size <= 5 -> alts.size; alts.size <= 10 -> 5; else -> 6 }.coerceAtMost(alts.size)
+            while (cols > 1 && (cols * sW + (cols - 1) * g) > maxW) cols--
+            val rows = (alts.size + cols - 1) / cols
+
+            val tw = if (rows > 1) cols * sW + (cols - 1) * g else alts.size * sW + (alts.size - 1) * g
+            val th = rows * sH + (rows - 1) * g
+
+            val w = (tw + p * 2.5f).toInt().coerceAtMost(screenWidth)
+            val h = (th + p * 1.5f).toInt()
+
+            val px = w / 2f
+            val py = h / 2f
+
+            val cells = mutableListOf<PopupCell>()
+            alts.forEachIndexed { i, a ->
+                val row = i / cols
+                val col = i % cols
+                val itemsInThisRow = if (row == rows - 1) alts.size - (row * cols) else cols
+                val rowW = itemsInThisRow * sW + (itemsInThisRow - 1) * g
+                val kx = px - rowW / 2f + sW / 2f + col * (sW + g)
+                val ky = py - th / 2f + sH / 2f + row * (sH + g)
+                val displayLabel = if (a == " " && i == 0) "␣" else a
+                val bounds = RectF(kx - sW / 2f, ky - sH / 2f, kx + sW / 2f, ky + sH / 2f)
+                cells.add(PopupCell(displayLabel, bounds, kx, ky))
+            }
+
+            val location = IntArray(2)
+            getLocationInWindow(location)
+            var x = (location[0] + key.cx - w / 2f).toInt()
+            val y = (location[1] + getPopupOffsetY(key, true, h)).toInt()
+
+            // Anclaje inteligente en bordes
+            if (x < 0) x = 0
+            if (x + w > screenWidth) x = screenWidth - w
+
+            return PopupLayoutInfo(key, true, cells, w, h, x, y)
         }
     }
 
@@ -695,42 +802,45 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private fun showPopup(key: HexLayoutEngine.Key, isLongPress: Boolean = false) {
         if (!showKeyPopup || windowToken == null) return
         handler.removeCallbacks(hidePopupRunnable)
+
+        val layout = buildPopupLayoutInfo(key, isLongPress)
+        currentPopupLayout = layout
+
         if (popupWindow == null) {
             popupContentView = KeyPopupView(context).apply { setLayerType(LAYER_TYPE_SOFTWARE, null) }
             popupWindow = PopupWindow(popupContentView, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                elevation = 20f; isTouchable = false; isOutsideTouchable = false; setBackgroundDrawable(null)
-                inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED; isClippingEnabled = false; animationStyle = 0
+                elevation = 20f
+                isTouchable = false
+                isOutsideTouchable = false
+                setBackgroundDrawable(null)
+                inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+                isClippingEnabled = false
+                animationStyle = 0
             }
         }
-        popupContentView?.key = key; popupContentView?.isLongPress = isLongPress; popupContentView?.selectedIndex = if (isLongPress) 0 else -1
-        val prx = key.rx * keyScale * 1.1f * popupScale; val pry = key.ry * keyScale * 1.1f * popupScale
-        val screenWidth = context.resources.displayMetrics.widthPixels
-        val w: Int; val h: Int
-        if (!isLongPress) {
-            w = (prx * 2.5f).toInt()
-            h = (pry * 2.5f).toInt()
+
+        val alts = getPopupAlternatives(key)
+        val initialIndex = if (isLongPress) {
+            val idx = alts.indexOf(key.display)
+            if (idx != -1) idx else 0
         } else {
-            val firstLabel = if (key.type == HexLayoutEngine.KeyType.FONT_PAGE) key.display else key.value
-            val alts = listOf(firstLabel) + key.alternatives
-            val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
-            val maxW = screenWidth - p * 2f
-            var cols = when { alts.size <= 5 -> alts.size; alts.size <= 10 -> 5; else -> 6 }.coerceAtMost(alts.size)
-            while (cols > 1 && (cols * sW + (cols - 1) * g) > maxW) cols--
-            val rows = (alts.size + cols - 1) / cols
-            val tw = if (rows > 1) cols * sW + (cols - 1) * g else alts.size * sW + (alts.size - 1) * g
-            val th = rows * sH + (rows - 1) * g
-            w = (tw + p * 2.5f).toInt().coerceAtMost(screenWidth)
-            h = (th + p * 1.5f).toInt()
+            -1
         }
-        popupWindow?.width = w; popupWindow?.height = h; popupContentView?.invalidate()
-        val location = IntArray(2); getLocationInWindow(location)
-        val offsetX = (key.cx - w / 2f).toInt()
-        val offsetY = getPopupOffsetY(key, isLongPress, h)
-        var x = location[0] + offsetX
-        val y = location[1] + offsetY
-        if (x < 0) x = 0; if (x + w > screenWidth) x = screenWidth - w
-        if (popupWindow?.isShowing == true) popupWindow?.update(x, y, w, h)
-        else popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+
+        popupContentView?.key = key
+        popupContentView?.isLongPress = isLongPress
+        popupContentView?.selectedIndex = initialIndex
+        popupSelectedIndex = initialIndex
+
+        popupWindow?.width = layout.width
+        popupWindow?.height = layout.height
+        popupContentView?.invalidate()
+
+        if (popupWindow?.isShowing == true) {
+            popupWindow?.update(layout.popupX, layout.popupY, layout.width, layout.height)
+        } else {
+            popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, layout.popupX, layout.popupY)
+        }
     }
 
     private fun hidePopup(immediate: Boolean = false) {
@@ -861,13 +971,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             }
                             isGestureActive = false; gesturePath.reset(); gesturePoints.clear(); invalidate()
                         } else if (popupVisibleKey != null && longPressStarted) {
-                            val a = listOf(popupVisibleKey!!.value) + popupVisibleKey!!.alternatives
+                            val a = getPopupAlternatives(popupVisibleKey!!)
                             if (popupSelectedIndex in a.indices) {
                                 triggerVibration(); val v = a[popupSelectedIndex]
                                 when (popupVisibleKey!!.type) {
                                     HexLayoutEngine.KeyType.LANGUAGE -> if (v == "🌐") (context as? HexKeyboardService)?.showLanguagePicker() else (context as? HexKeyboardService)?.switchToNextLanguage()
                                     HexLayoutEngine.KeyType.TOGGLE -> switchLayoutByValue(v)
-                                    HexLayoutEngine.KeyType.SYMBOL_PAGE -> if (v == "→") fireKey(popupVisibleKey!!) else switchSymbolPageByValue(v)
+                                    HexLayoutEngine.KeyType.SYMBOL_PAGE -> { if (v.toIntOrNull() != null) switchSymbolPageByValue(v) else fireKey(popupVisibleKey!!) }
                                     HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (v.toIntOrNull() ?: 1) - 1; buildLayout(width.toFloat()); invalidate() }
                                     else -> listener?.onLongPressSelect(v)
                                 }
@@ -928,31 +1038,39 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private fun handlePopupSelection(x: Float, y: Float) {
-        val k = popupVisibleKey ?: return
-        val prx = k.rx * keyScale * 1.1f * popupScale; val pry = k.ry * keyScale * 1.1f * popupScale
-        val firstLabel = if (k.type == HexLayoutEngine.KeyType.FONT_PAGE) k.display else k.value
-        val alts = listOf(firstLabel) + k.alternatives; val sW = prx * 1.45f; val sH = pry * 1.45f; val g = sW * 0.15f; val p = sW * 0.5f
-        val w = popupWindow?.width?.toFloat() ?: width.toFloat(); val h = popupWindow?.height?.toFloat() ?: 0f
-        var cols = when { alts.size <= 5 -> alts.size; alts.size <= 10 -> 5; else -> 6 }.coerceAtMost(alts.size)
-        while (cols > 1 && (cols * sW + (cols - 1) * g) > (w - p * 2f)) cols--
-        val rows = (alts.size + cols - 1) / cols; val th = rows * sH + (rows - 1) * g
-        val location = IntArray(2); getLocationInWindow(location)
-        val screenWidth = context.resources.displayMetrics.widthPixels
-        var finalPopupX = location[0] + (k.cx - w / 2f)
-        if (finalPopupX < 0) finalPopupX = 0f; if (finalPopupX + w > screenWidth) finalPopupX = screenWidth - w
-        val offsetY = getPopupOffsetY(k, true, h.toInt())
-        val rx = x - finalPopupX; val ry = y - (location[1] + offsetY)
-        var minDist = Float.MAX_VALUE; var newIndex = 0
-        alts.forEachIndexed { i, _ ->
-            val r = i / cols; val c = i % cols; val itemsInThisRow = if (r == rows - 1) alts.size - (r * cols) else cols
-            val rowW = itemsInThisRow * sW + (itemsInThisRow - 1) * g
-            val kx = w/2f - rowW/2f + sW/2f + c * (sW + g); val ky = h/2f - th/2f + sH/2f + r * (sH + g)
-            val dist = (rx - kx)*(rx - kx) + (ry - ky)*(ry - ky)
-            if (dist < minDist) { minDist = dist; newIndex = i }
+        val layout = currentPopupLayout ?: return
+        if (!layout.isLongPress) return
+
+        // Convertir coordenadas de pantalla global a la vista local del popup
+        val localX = x - layout.popupX
+        val localY = y - layout.popupY
+
+        // Búsqueda por Hitbox / Bounding Box de la celda con tolerancia cómoda
+        var newIndex = layout.cells.indexOfFirst { cell ->
+            val expandedRect = RectF(cell.bounds)
+            expandedRect.inset(-24f, -24f)
+            expandedRect.contains(localX, localY)
         }
-        if (newIndex != popupSelectedIndex) {
-            popupSelectedIndex = newIndex; triggerVibration(FeedbackManager.HapticType.TICK)
-            popupContentView?.selectedIndex = newIndex; popupContentView?.invalidate()
+
+        // Si el dedo está dentro del área del popup pero entre celdas, elegir la celda más cercana
+        if (newIndex == -1 && localY >= -50f && localY <= layout.height + 150f) {
+            var minDist = Float.MAX_VALUE
+            layout.cells.forEachIndexed { i, cell ->
+                val dx = localX - cell.centerX
+                val dy = localY - cell.centerY
+                val dist = dx * dx + dy * dy
+                if (dist < minDist) {
+                    minDist = dist
+                    newIndex = i
+                }
+            }
+        }
+
+        if (newIndex != -1 && newIndex != popupSelectedIndex) {
+            popupSelectedIndex = newIndex
+            triggerVibration(FeedbackManager.HapticType.TICK)
+            popupContentView?.selectedIndex = newIndex
+            popupContentView?.invalidate()
         }
     }
 
@@ -962,7 +1080,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         return engine.findKeyAt(x, y, if (isNGestureActive) keys.filter { it.value !in keysToIgnoreDuringNGesture } else keys)
     }
 
-    private fun fireKey(key: HexLayoutEngine.Key) {
+    private fun fireKey(key: HexLayoutEngine.Key, touchX: Float = key.cx, touchY: Float = key.cy) {
         listener?.onKeyClick(key)
         when (key.type) {
             HexLayoutEngine.KeyType.LANGUAGE -> (context as? HexKeyboardService)?.switchToNextLanguage()
@@ -994,7 +1112,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (fontPage + 1) % 10; buildLayout(width.toFloat()); invalidate() }
             HexLayoutEngine.KeyType.CHAR -> {
                 val o = if (shifted && key.value.length == 1 && key.value[0].isLetter()) key.value.uppercase() else key.value
-                listener?.onChar(o); if (shifted && !capsLock) { shifted = false; invalidate() }
+                listener?.onChar(o)
+                listener?.onCharWithPoint(o, touchX, touchY)
+                if (shifted && !capsLock) { shifted = false; invalidate() }
             }
             else -> {}
         }
