@@ -2,6 +2,8 @@ package com.example.hexkeyboard.ui.keyboard.panels
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -89,9 +91,18 @@ fun FunctionsPanel(
     val topShadowMaskBrush = remember(theme.backgroundColor) {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.0f to baseThemeColor.copy(alpha = 0.40f),
-                0.6f to baseThemeColor.copy(alpha = 0.15f),
+                0.0f to baseThemeColor.copy(alpha = 0.15f),
+                0.6f to baseThemeColor.copy(alpha = 0.05f),
                 1.0f to Color.Transparent
+            )
+        )
+    }
+    val bottomShadowMaskBrush = remember(theme.backgroundColor) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to Color.Transparent,
+                0.4f to baseThemeColor.copy(alpha = 0.05f),
+                1.0f to baseThemeColor.copy(alpha = 0.15f)
             )
         )
     }
@@ -174,6 +185,21 @@ fun FunctionsPanel(
                         )
                     }
                 }
+            }
+
+            val totalBottomHazeHeight = (bottomOffset + navBarBottomDp + 16).dp
+            if (totalBottomHazeHeight > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(totalBottomHazeHeight)
+                        .background(bottomShadowMaskBrush)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { /* Absorbe toques */ }
+                )
             }
 
             Box(

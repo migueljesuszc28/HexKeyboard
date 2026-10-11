@@ -125,6 +125,65 @@ fun UserDictionaryScreen(
                         },
                         actions = {
                             if (uiState.words.isNotEmpty()) {
+                                var showSortMenu by remember { mutableStateOf(false) }
+                                Box {
+                                    FilledTonalIconButton(
+                                        onClick = { showSortMenu = true },
+                                        shape = CircleShape
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Sort,
+                                            contentDescription = "Ordenar palabras"
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = showSortMenu,
+                                        onDismissRequest = { showSortMenu = false },
+                                        shape = RoundedCornerShape(20.dp),
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Orden alfabético (A-Z)") },
+                                            leadingIcon = {
+                                                RadioButton(
+                                                    selected = uiState.sortType == com.example.hexkeyboard.viewmodel.UserDictionarySortType.ALPHABETICAL,
+                                                    onClick = null
+                                                )
+                                            },
+                                            onClick = {
+                                                viewModel.setSortType(com.example.hexkeyboard.viewmodel.UserDictionarySortType.ALPHABETICAL)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Fecha de adición (más recientes)") },
+                                            leadingIcon = {
+                                                RadioButton(
+                                                    selected = uiState.sortType == com.example.hexkeyboard.viewmodel.UserDictionarySortType.DATE_ADDED_DESC,
+                                                    onClick = null
+                                                )
+                                            },
+                                            onClick = {
+                                                viewModel.setSortType(com.example.hexkeyboard.viewmodel.UserDictionarySortType.DATE_ADDED_DESC)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Fecha de adición (más antiguas)") },
+                                            leadingIcon = {
+                                                RadioButton(
+                                                    selected = uiState.sortType == com.example.hexkeyboard.viewmodel.UserDictionarySortType.DATE_ADDED_ASC,
+                                                    onClick = null
+                                                )
+                                            },
+                                            onClick = {
+                                                viewModel.setSortType(com.example.hexkeyboard.viewmodel.UserDictionarySortType.DATE_ADDED_ASC)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(8.dp))
                                 FilledTonalIconButton(
                                     onClick = { showDeleteAllConfirm = true },
                                     shape = CircleShape
@@ -292,15 +351,17 @@ fun UserDictionaryScreen(
                         ) {
                             Column {
                                 uiState.filteredWords.forEachIndexed { index, word ->
-                                    SwipeableWordItem(
-                                        word = word,
-                                        onDelete = { viewModel.removeWord(word) }
-                                    )
-                                    if (index < uiState.filteredWords.size - 1) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(horizontal = 16.dp),
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                    key(word) {
+                                        SwipeableWordItem(
+                                            word = word,
+                                            onDelete = { viewModel.removeWord(word) }
                                         )
+                                        if (index < uiState.filteredWords.size - 1) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(horizontal = 16.dp),
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -354,14 +415,20 @@ fun SwipeableWordItem(
     word: String,
     onDelete: () -> Unit
 ) {
+    var isDismissed by remember(word) { mutableStateOf(false) }
+    val currentOnDelete by rememberUpdatedState(onDelete)
+
     val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            if (it == SwipeToDismissBoxValue.EndToStart) {
-                onDelete()
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                isDismissed = true
+                currentOnDelete()
                 true
             } else false
         }
     )
+
+    if (isDismissed) return
 
     SwipeToDismissBox(
         state = dismissState,
@@ -410,8 +477,17 @@ fun SwipeableWordItem(
                     }
                 }
             },
+            trailingContent = {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Eliminar $word",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
             colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             )
         )
     }

@@ -43,7 +43,7 @@ class PredictionEngine(private val context: Context) {
         private const val CACHE_SIZE = 250
         private const val MAX_INTERNAL_RESULTS = 60
         private const val BIGRAM_LIMIT = 600
-        private const val MIN_LEARN_COUNT = 3
+        private const val MIN_LEARN_COUNT = 2
 
         // Pesos de scoring
         private const val USER_WORD_BOOST = 2.6
@@ -94,7 +94,7 @@ class PredictionEngine(private val context: Context) {
     private val beamSearchDecoder = BeamSearchDecoder(calibrationManager)
     private val diacriticManager = DiacriticManager()
     @Volatile private var keyCenters: Map<Char, PointF> = emptyMap()
-    private val userDictionary = mutableSetOf<String>()
+    private val userWordsMap = LinkedHashMap<String, Long>()
     private val wordCounts = mutableMapOf<String, Int>() // Aprendizaje gradual estilo Gboard
     private val predictionCache = LruCache<String, List<Suggestion>>(CACHE_SIZE)
 
@@ -262,7 +262,7 @@ class PredictionEngine(private val context: Context) {
 
         withContext(Dispatchers.IO) {
             if (forceUserDictReload || !isUserLoaded) {
-                userDictionary.clear()
+                userWordsMap.clear()
                 loadUserDictionary()
                 isUserLoaded = true
             }
@@ -318,15 +318,21 @@ class PredictionEngine(private val context: Context) {
     }
 
     private fun loadUserDictionary() {
+        trie.children.clear()
+        userWordsMap.clear()
         val file = File(context.filesDir, "user_dict.txt")
         if (file.exists()) {
-            file.readLines().forEach { line ->
+            val baseTime = System.currentTimeMillis() - 1000000L
+            file.readLines().forEachIndexed { index, line ->
                 val parts = line.split("|")
-                if (parts.size >= 2) {
-                    val word = parts[0]
-                    val freq = parts[1].toIntOrNull() ?: 200
-                    insert(word, freq, isUser = true)
-                    userDictionary.add(word)
+                if (parts.isNotEmpty()) {
+                    val word = parts[0].trim().lowercase()
+                    if (word.isNotEmpty()) {
+                        val freq = parts.getOrNull(1)?.toIntOrNull() ?: 200
+                        val timestamp = parts.getOrNull(2)?.toLongOrNull() ?: (baseTime + index * 1000L)
+                        insert(word, freq, isUser = true)
+                        userWordsMap[word] = timestamp
+                    }
                 }
             }
         }
@@ -334,7 +340,7 @@ class PredictionEngine(private val context: Context) {
 
     private fun saveUserDictionary() {
         val file = File(context.filesDir, "user_dict.txt")
-        val content = userDictionary.joinToString("\n") { "$it|200" }
+        val content = userWordsMap.entries.joinToString("\n") { (word, timestamp) -> "$word|200|$timestamp" }
         file.writeText(content)
     }
 
@@ -438,35 +444,47 @@ class PredictionEngine(private val context: Context) {
 
     private fun isKnownWord(word: String): Boolean {
         val lower = word.lowercase()
+        val norm = stripAccents(lower)
         var current: TrieNode? = trie
         for (char in lower) {
             current = current?.children?.get(char)
             if (current == null) break
         }
         if (current?.isWord == true) return true
-        return isKnownWordInBinary(lower)
+        return isKnownWordInBinary(lower) || (norm != lower && isKnownWordInBinary(norm))
     }
 
     private fun isKnownWordInBinary(target: String): Boolean {
+        val targetLower = target.lowercase()
+        val targetNorm = stripAccents(targetLower)
         for (langBuf in activeLanguageBuffers) {
             val buffer = langBuf.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
             buffer.position(langBuf.headerSize)
-            if (isKnownWordInBinaryRecursive(buffer, target, "")) return true
+            if (isKnownWordInBinaryRecursive(buffer, targetLower, targetNorm, "")) return true
         }
         return false
     }
 
-    private fun isKnownWordInBinaryRecursive(buffer: ByteBuffer, target: String, prefix: String): Boolean {
+    private fun isKnownWordInBinaryRecursive(
+        buffer: ByteBuffer,
+        targetLower: String,
+        targetNorm: String,
+        prefix: String
+    ): Boolean {
         val count = try { readPtNodeCount(buffer) } catch (_: Exception) { 0 }
         repeat(count) {
             val node = parseNextNode(buffer, prefix)
+            val nodeLower = node.word.lowercase()
+            val nodeNorm = stripAccents(nodeLower)
 
-            if (node.word == target && node.isTerminal) return true
+            if (node.isTerminal && (nodeLower == targetLower || nodeNorm == targetNorm)) {
+                return true
+            }
 
-            if (target.startsWith(node.word) && node.childrenAddr != null) {
+            if ((targetLower.startsWith(nodeLower) || targetNorm.startsWith(nodeNorm)) && node.childrenAddr != null) {
                 val savedPos = buffer.position()
                 buffer.position(node.addressBase + node.childrenAddr)
-                if (isKnownWordInBinaryRecursive(buffer, target, node.word)) return true
+                if (isKnownWordInBinaryRecursive(buffer, targetLower, targetNorm, node.word)) return true
                 buffer.position(savedPos)
             }
         }
@@ -1283,10 +1301,14 @@ class PredictionEngine(private val context: Context) {
     fun learnFromInput(word: String, prev1: String? = null, prev2: String? = null) {
         val sanitized = WordSanitizer.sanitizeToken(word)
         val w = sanitized.cleanWord.lowercase().trim()
-        if (w.length < 2 || w.any { !it.isLetter() }) return
+        if (w.length < 2) return
 
-        val accentedVersion = getAccentedBaseWord(w)
-        val targetWord = accentedVersion ?: w
+        // Permitir letras, dígitos, com, arroba, punto, etc.
+        val targetWord = if (!w.contains('@') && !w.any { it.isDigit() }) {
+            getAccentedBaseWord(w) ?: w
+        } else {
+            w
+        }
 
         patternLearningManager.recordSequence(prev2, prev1, targetWord)
 
@@ -1299,10 +1321,10 @@ class PredictionEngine(private val context: Context) {
         val count = (wordCounts[targetWord] ?: 0) + 1
         wordCounts[targetWord] = count
 
-        if (count >= MIN_LEARN_COUNT || userDictionary.contains(targetWord)) {
-            if (!userDictionary.contains(targetWord)) {
+        if (count >= MIN_LEARN_COUNT || userWordsMap.containsKey(targetWord)) {
+            if (!userWordsMap.containsKey(targetWord)) {
                 insert(targetWord, 200, isUser = true)
-                userDictionary.add(targetWord)
+                userWordsMap[targetWord] = System.currentTimeMillis()
                 saveUserDictionary()
             }
         }
@@ -1313,24 +1335,35 @@ class PredictionEngine(private val context: Context) {
         val w = word.lowercase().trim()
         if (w.isEmpty()) return
         insert(w, 800, isUser = true)
-        userDictionary.add(w)
+        userWordsMap[w] = System.currentTimeMillis()
         saveUserDictionary()
         synchronized(predictionCache) { predictionCache.evictAll() }
+    }
+
+    private fun rebuildTrie() {
+        trie.children.clear()
+        userWordsMap.forEach { (word, _) ->
+            insert(word, 200, isUser = true)
+        }
     }
 
     fun removeUserWord(word: String) {
-        userDictionary.remove(word.lowercase())
+        userWordsMap.remove(word.lowercase())
         saveUserDictionary()
-        isUserLoaded = false // Forzar recarga total para limpiar el trie
+        rebuildTrie()
         synchronized(predictionCache) { predictionCache.evictAll() }
     }
 
-    fun getUserWords(): List<String> = userDictionary.toList().sorted()
+    data class UserWordEntry(val word: String, val timestamp: Long)
+
+    fun getUserWordEntries(): List<UserWordEntry> = userWordsMap.map { (word, ts) -> UserWordEntry(word, ts) }
+
+    fun getUserWords(): List<String> = userWordsMap.keys.toList()
 
     fun removeAllUserWords() {
-        userDictionary.clear()
+        userWordsMap.clear()
         saveUserDictionary()
-        isUserLoaded = false
+        rebuildTrie()
         synchronized(predictionCache) { predictionCache.evictAll() }
     }
 }

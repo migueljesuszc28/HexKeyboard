@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -284,41 +283,13 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         modifier = Modifier.matchParentSize()
                     ) { showEmojiPanel ->
                         if (showEmojiPanel) {
-                            val baseThemeColor = Color(keyboardTheme.backgroundColor)
-
-                            val bottomShadowMaskBrush = remember(keyboardTheme.backgroundColor) {
-                                Brush.verticalGradient(
-                                    colorStops = arrayOf(
-                                        0.0f to Color.Transparent,
-                                        0.3f to baseThemeColor.copy(alpha = 0.40f),
-                                        1.0f to baseThemeColor.copy(alpha = 0.82f)
-                                    )
-                                )
-                            }
-
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
                                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                             ) {
-                                // 1. El Panel ocupa la altura total de la capa base
+                                // El Panel ocupa la altura total de la capa base
                                 PanelsSection(viewModel, keyboardTheme, bottomOffset, navBarBottomDp)
-
-                                // 2. Margen Inferior Flotante con Máscara de Sombra (Bloquea toques hacia el fondo)
-                                val totalBottomHazeHeight = bottomOffset + navBarBottomDp + 16
-                                if (totalBottomHazeHeight > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth()
-                                            .height(totalBottomHazeHeight.dp)
-                                            .background(bottomShadowMaskBrush)
-                                            .clickable(
-                                                interactionSource = remember { MutableInteractionSource() },
-                                                indication = null
-                                            ) { /* Absorbe toques */ }
-                                    )
-                                }
                             }
                         }
                     }

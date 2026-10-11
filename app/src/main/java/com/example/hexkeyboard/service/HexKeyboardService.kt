@@ -732,7 +732,7 @@ class HexKeyboardService : InputMethodService(),
             withContext(Dispatchers.Main) {
                 viewModel.updateCurrentLocale(lang)
                 serviceScope.launch(Dispatchers.IO) {
-                    predictionEngine.initialize(lang = lang, secondaryLangs = secondaryLangs, forceUserDictReload = false)
+                    predictionEngine.initialize(lang = lang, secondaryLangs = secondaryLangs, forceUserDictReload = true)
                 }
                 switchToLanguage(lang)
 
@@ -794,26 +794,29 @@ class HexKeyboardService : InputMethodService(),
             val localSuggestions = mutableListOf<String>()
 
             if (cleanLastWord.isNotEmpty()) {
-                if (WordSanitizer.isAutocorrectImmune(rawLastToken, cleanLastWord)) {
+                val isImmune = WordSanitizer.isAutocorrectImmune(rawLastToken, cleanLastWord)
+                val rawPredictions = predictionEngine.getSuggestions(
+                    cleanLastWord,
+                    previousWord = prev1,
+                    prev2 = prev2,
+                    touchPoints = ArrayList(currentWordTouchPoints),
+                    limit = 10
+                )
+                var rawCandidates = rawPredictions.map { it.text }.distinct()
+
+                if (shouldCapitalize) {
+                    rawCandidates = rawCandidates.map { word ->
+                        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                    }.distinct()
+                }
+
+                if (isImmune) {
+                    // Para palabras o tokens inmunes (correos, palabras con números, etc.), no autocorrige.
+                    // Mantiene la palabra escrita intacta en primera posición.
                     localSuggestions.add(cleanLastWord)
-                    val nextWordPredictions = predictionEngine.getSuggestions("", previousWord = cleanLastWord, prev2 = prev1, limit = 2).map { it.text }
-                    localSuggestions.addAll(nextWordPredictions)
+                    val matchingPredictions = rawCandidates.filter { it.lowercase() != cleanLastWord.lowercase() }
+                    localSuggestions.addAll(matchingPredictions.take(2))
                 } else {
-                    val rawPredictions = predictionEngine.getSuggestions(
-                        cleanLastWord,
-                        previousWord = prev1,
-                        prev2 = prev2,
-                        touchPoints = ArrayList(currentWordTouchPoints),
-                        limit = 10
-                    )
-                    var rawCandidates = rawPredictions.map { it.text }.distinct()
-
-                    if (shouldCapitalize) {
-                        rawCandidates = rawCandidates.map { word ->
-                            word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-                        }.distinct()
-                    }
-
                     if (rawCandidates.isNotEmpty()) {
                         val primaryCandidate = rawCandidates.first()
 

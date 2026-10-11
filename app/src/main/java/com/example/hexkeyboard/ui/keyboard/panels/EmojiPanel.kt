@@ -116,9 +116,18 @@ fun EmojiPanel(
     val topShadowMaskBrush = remember(theme.backgroundColor) {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.0f to baseThemeColor.copy(alpha = 0.40f),
-                0.6f to baseThemeColor.copy(alpha = 0.15f),
+                0.0f to baseThemeColor.copy(alpha = 0.15f),
+                0.6f to baseThemeColor.copy(alpha = 0.05f),
                 1.0f to Color.Transparent
+            )
+        )
+    }
+    val bottomShadowMaskBrush = remember(theme.backgroundColor) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to Color.Transparent,
+                0.3f to baseThemeColor.copy(alpha = 0.40f),
+                1.0f to baseThemeColor.copy(alpha = 0.82f)
             )
         )
     }
@@ -215,6 +224,21 @@ fun EmojiPanel(
                         }
                     }
                 }
+            }
+
+            val totalBottomHazeHeight = (bottomOffset + navBarBottomDp + 16).dp
+            if (totalBottomHazeHeight > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(totalBottomHazeHeight)
+                        .background(bottomShadowMaskBrush)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { /* Absorbe toques */ }
+                )
             }
 
             if (!isEmojiSearchActive) {
