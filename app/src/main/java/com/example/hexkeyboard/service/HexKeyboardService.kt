@@ -337,6 +337,13 @@ class HexKeyboardService : InputMethodService(),
 
     private val currentWordTouchPoints = mutableListOf<TouchPoint>()
     private var autoCorrectForField = true
+    private var allowPersonalizedLearning = true
+
+    private fun learnFromInputSafely(word: String, prev1: String? = null, prev2: String? = null) {
+        if (allowPersonalizedLearning) {
+            predictionEngine.learnFromInput(word, prev1, prev2)
+        }
+    }
 
     fun recordTouchPoint(text: String, x: Float, y: Float) {
         if (text.isNotEmpty()) {
@@ -703,7 +710,9 @@ class HexKeyboardService : InputMethodService(),
                 variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
                 variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
 
+        val noPersonalizedLearning = (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         autoCorrectForField = !isPassword && !isUrlOrEmail
+        allowPersonalizedLearning = !isPassword && !isUrlOrEmail && !noPersonalizedLearning
         currentWordTouchPoints.clear()
 
         mHexKeyboardView?.setImeAction(effectiveAction)
@@ -959,7 +968,7 @@ class HexKeyboardService : InputMethodService(),
                         replaceLastWord(replacement)
                         lastAutoCorrection = LastCorrection(rawOriginalToken, correction.text)
                         lastUndoneCorrection = null
-                        predictionEngine.learnFromInput(correction.text, prev1Clean, prev2Clean)
+                        learnFromInputSafely(correction.text, prev1Clean, prev2Clean)
                         predictionEngine.registerConfirmedWordTouch(ArrayList(currentWordTouchPoints), correction.text)
                         currentWordTouchPoints.clear()
                         performedAutocorrect = true
@@ -997,7 +1006,7 @@ class HexKeyboardService : InputMethodService(),
                 if (emailRegex.matches(currentRaw)) {
                     predictionEngine.addUserWord(currentRaw)
                 } else if (currentClean.isNotEmpty()) {
-                    predictionEngine.learnFromInput(currentClean, prev1Clean, prev2Clean)
+                    learnFromInputSafely(currentClean, prev1Clean, prev2Clean)
                 }
             }
         }
@@ -1151,7 +1160,7 @@ class HexKeyboardService : InputMethodService(),
             if (emailRegex.matches(currentWord)) {
                 predictionEngine.addUserWord(currentWord)
             } else {
-                predictionEngine.learnFromInput(currentWord, previousWord)
+                learnFromInputSafely(currentWord, previousWord)
             }
         }
 
@@ -1212,7 +1221,7 @@ class HexKeyboardService : InputMethodService(),
                         val words = textBefore.split(" ", "\n", "\t").filter { it.isNotEmpty() }
                         val prev1 = if (words.size > 1) words[words.size - 2] else null
                         val prev2 = if (words.size > 2) words[words.size - 3] else null
-                        predictionEngine.learnFromInput(textToCommit, prev1, prev2)
+                        learnFromInputSafely(textToCommit, prev1, prev2)
                         currentWordTouchPoints.clear()
 
                         if (mHexKeyboardView?.shifted == true && mHexKeyboardView?.capsLock == false) {
