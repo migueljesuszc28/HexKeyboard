@@ -13,7 +13,6 @@ import android.content.res.Configuration
 import android.database.ContentObserver
 import android.graphics.Color
 import android.graphics.PointF
-import com.example.hexkeyboard.logic.engine.TouchPoint
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.os.Build
@@ -23,8 +22,6 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.text.InputType
 import android.text.TextUtils
-import androidx.core.net.toUri
-import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -32,74 +29,70 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.Toast
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.core.graphics.ColorUtils
+import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.ComposeView
-import com.example.hexkeyboard.data.repository.CredentialsManager
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
-import androidx.preference.PreferenceManager
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.example.hexkeyboard.data.repository.CredentialsManager
 import com.example.hexkeyboard.data.repository.EmojiProvider
-import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.engine.PredictionEngine
+import com.example.hexkeyboard.logic.engine.TouchPoint
 import com.example.hexkeyboard.logic.engine.WordSanitizer
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
-import com.example.hexkeyboard.ui.keyboard.components.LayoutRegistry
-import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
-import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.ui.keyboard.KeyboardScreen
-import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
-import androidx.lifecycle.ViewModelProvider
-import com.example.hexkeyboard.viewmodel.KeyboardViewModel
+import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
+import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
+import com.example.hexkeyboard.ui.keyboard.components.LayoutRegistry
+import com.example.hexkeyboard.ui.settings.PermissionActivity
 import com.example.hexkeyboard.ui.settings.SettingsActivity
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
-import com.example.hexkeyboard.ui.settings.PermissionActivity
-import androidx.core.graphics.ColorUtils
-import androidx.core.view.WindowCompat
-import androidx.core.content.edit
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
+import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.text.BreakIterator
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
 class HexKeyboardService : InputMethodService(),
@@ -402,9 +395,6 @@ class HexKeyboardService : InputMethodService(),
     val symbolPages = LayoutRegistry.symbolPages
     val fontPages = LayoutRegistry.fontPages
 
-    fun setEmojiSearchActive(active: Boolean) {
-        viewModel.setEmojiSearchActive(active)
-    }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
@@ -454,6 +444,7 @@ class HexKeyboardService : InputMethodService(),
     }
 
     private val wallpaperReceiver = object : BroadcastReceiver() {
+        @Suppress("DEPRECATION")
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Intent.ACTION_WALLPAPER_CHANGED) {
                 ThemeUtils.notifyDynamicColorsChanged()
@@ -467,6 +458,7 @@ class HexKeyboardService : InputMethodService(),
         setupViewModelCallbacks()
         registerScreenshotObserver()
 
+        @Suppress("DEPRECATION")
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         registerReceiver(wallpaperReceiver, filter)
         
@@ -758,7 +750,7 @@ class HexKeyboardService : InputMethodService(),
     fun updateSuggestions() {
         updateSuggestionsJob?.cancel()
         updateSuggestionsJob = serviceScope.launch(Dispatchers.Default) {
-            delay(15)
+            delay(15.milliseconds)
             val textBeforeSequence = withContext(Dispatchers.Main) {
                 currentInputConnection?.getTextBeforeCursor(40, 0) ?: ""
             }
@@ -843,7 +835,7 @@ class HexKeyboardService : InputMethodService(),
                         if (fallbackCandidate.isNotEmpty()) {
                             localSuggestions.add(fallbackCandidate)
                         }
-                        if (alternativeCandidate != null && alternativeCandidate.isNotEmpty()) {
+                        if (!alternativeCandidate.isNullOrEmpty()) {
                             localSuggestions.add(alternativeCandidate)
                         }
                     } else {
@@ -874,14 +866,6 @@ class HexKeyboardService : InputMethodService(),
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        updateShiftState()
-        updateSuggestions()
-    }
-
-    fun onEmojiSelected(emoji: String) {
-        val ic = currentInputConnection ?: return
-        ic.commitText(emoji, 1)
-        viewModel.setEmojiSearchActive(false)
         updateShiftState()
         updateSuggestions()
     }
@@ -1319,6 +1303,7 @@ class HexKeyboardService : InputMethodService(),
 
             val clipData = ClipData.newUri(contentResolver, "Clipboard Image", imageUri)
             isSettingInternalClip = true
+            @Suppress("UsePropertyAccessSyntax")
             clipboardManager.setPrimaryClip(clipData)
             Toast.makeText(this, "Imagen copiada al portapapeles. Usa Pegar.", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -1357,10 +1342,6 @@ class HexKeyboardService : InputMethodService(),
         }
     }
 
-    fun setCurrentView(view: String) {
-        viewModel.setCurrentView(view)
-    }
-
     fun clearSystemClipboardIfMatches(item: ClipboardItem) {
         try {
             if (!::clipboardManager.isInitialized || !clipboardManager.hasPrimaryClip()) return
@@ -1378,6 +1359,7 @@ class HexKeyboardService : InputMethodService(),
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     clipboardManager.clearPrimaryClip()
                 } else {
+                    @Suppress("UsePropertyAccessSyntax")
                     clipboardManager.setPrimaryClip(ClipData.newPlainText("", ""))
                 }
             }
@@ -1440,10 +1422,6 @@ class HexKeyboardService : InputMethodService(),
 
     private val stickyEmojiCache = ConcurrentHashMap<String, String>()
 
-    fun getStickyVariant(canonicalEmoji: String): String? {
-        return stickyEmojiCache[canonicalEmoji]
-    }
-
     fun saveStickyVariant(canonicalEmoji: String, variant: String) {
         stickyEmojiCache[canonicalEmoji] = variant
         serviceScope.launch {
@@ -1467,5 +1445,5 @@ class HexKeyboardService : InputMethodService(),
 
     override val viewModelStore: ViewModelStore get() = mViewModelStore
     override val savedStateRegistry: SavedStateRegistry get() = mSavedStateRegistryController.savedStateRegistry
-    override val lifecycle: Lifecycle get() = mLifecycleRegistry
+    override val lifecycle: Lifecycle = mLifecycleRegistry
 }

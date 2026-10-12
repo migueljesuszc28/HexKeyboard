@@ -106,8 +106,6 @@ fun PreviewClipboardPanel() {
                     ClipboardItem("Hex Keyboard es genial")
                 ),
                 onItemSelected = {},
-                onDelete = {},
-                onTogglePin = {},
                 onLongPress = {},
                 onBack = {},
                 theme = theme

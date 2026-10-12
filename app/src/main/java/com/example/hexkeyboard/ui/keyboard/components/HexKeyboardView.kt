@@ -727,7 +727,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             val location = IntArray(2)
             getLocationInWindow(location)
             var x = (location[0] + key.cx - w / 2f).toInt()
-            val y = (location[1] + getPopupOffsetY(key, false, h)).toInt()
+            val y = location[1] + getPopupOffsetY(key, false, h)
             if (x < 0) x = 0
             if (x + w > screenWidth) x = screenWidth - w
 
@@ -776,7 +776,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             val location = IntArray(2)
             getLocationInWindow(location)
             var x = (location[0] + key.cx - w / 2f).toInt()
-            val y = (location[1] + getPopupOffsetY(key, true, h)).toInt()
+            val y = location[1] + getPopupOffsetY(key, true, h)
 
             // Anclaje inteligente en bordes
             if (x < 0) x = 0

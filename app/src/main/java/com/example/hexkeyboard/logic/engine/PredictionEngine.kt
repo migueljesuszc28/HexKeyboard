@@ -318,7 +318,7 @@ class PredictionEngine(private val context: Context) {
                 if (current == null) break
             }
             if (current != null) {
-                collectAllFromNode(current!!, prefix, prefix, result)
+                collectAllFromNode(current, prefix, prefix, result)
             }
         }
 

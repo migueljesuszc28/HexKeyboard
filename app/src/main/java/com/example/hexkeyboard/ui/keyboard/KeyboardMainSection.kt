@@ -20,10 +20,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
-import androidx.preference.PreferenceManager
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.KeyboardTheme
-import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.ui.keyboard.panels.CredentialsPanel
 import com.example.hexkeyboard.ui.keyboard.panels.LanguagePanel
@@ -36,7 +34,6 @@ import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -183,9 +180,7 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
     val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
     val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
     val context = LocalContext.current
-    val service = context as? HexKeyboardService
 
-    val scope = rememberCoroutineScope()
     val panelModifier = if (isSearchActive) Modifier.fillMaxWidth().height(180.dp) else Modifier.matchParentSize()
 
     AnimatedContent(
@@ -225,21 +220,6 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
             "clipboard" -> ClipboardPanel(
                 history = clipboardHistory,
                 onItemSelected = { item -> viewModel.onClipboardItemClick(item) },
-                onDelete = { item -> 
-                    if (service != null) {
-                        service.deleteClipboardItem(item)
-                    } else {
-                        scope.launch {
-                            ClipboardHistoryManager.deleteItem(context, item)
-                        }
-                    }
-                },
-                onTogglePin = { item -> 
-                    scope.launch {
-                        ClipboardHistoryManager.togglePin(context, item)
-                        service?.refreshClipboardHistory(triggerSuggestionsUpdate = true) 
-                    }
-                },
                 onLongPress = { item -> viewModel.setClipboardItemWithOptions(item) },
                 onBack = { viewModel.setCurrentView("keyboard") },
                 theme = theme,

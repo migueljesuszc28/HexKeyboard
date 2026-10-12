@@ -2,14 +2,22 @@ package com.example.hexkeyboard.ui.keyboard.panels
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -17,22 +25,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.example.hexkeyboard.R
@@ -51,13 +66,10 @@ import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ClipboardPanel(
     history: List<ClipboardItem>, 
     onItemSelected: (ClipboardItem) -> Unit, 
-    onDelete: (ClipboardItem) -> Unit,
-    onTogglePin: (ClipboardItem) -> Unit,
     onLongPress: (ClipboardItem) -> Unit,
     onBack: () -> Unit, 
     theme: KeyboardTheme,
@@ -271,40 +283,6 @@ fun ClipboardPanel(
 }
 
 @Composable
-fun ClipboardMenuRow(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(22.dp)
-        )
-        Text(
-            text = label,
-            color = tint,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
 fun ClipboardImageThumbnail(imageUriString: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var bitmap by remember(imageUriString) { mutableStateOf<Bitmap?>(null) }
@@ -312,7 +290,7 @@ fun ClipboardImageThumbnail(imageUriString: String, modifier: Modifier = Modifie
     LaunchedEffect(imageUriString) {
         withContext(Dispatchers.IO) {
             try {
-                val uri = Uri.parse(imageUriString)
+                val uri = imageUriString.toUri()
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     val options = BitmapFactory.Options().apply {
                         inSampleSize = 2 // Scale down for thumbnail

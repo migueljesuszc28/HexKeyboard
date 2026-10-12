@@ -418,15 +418,15 @@ fun SwipeableWordItem(
     var isDismissed by remember(word) { mutableStateOf(false) }
     val currentOnDelete by rememberUpdatedState(onDelete)
 
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                isDismissed = true
-                currentOnDelete()
-                true
-            } else false
+    val dismissState = rememberSwipeToDismissBoxState()
+
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+            isDismissed = true
+            currentOnDelete()
+            dismissState.reset()
         }
-    )
+    }
 
     if (isDismissed) return
 

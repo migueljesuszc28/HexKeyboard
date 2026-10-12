@@ -219,11 +219,11 @@ class HexLayoutEngine {
     var symbolPages: Map<String, List<String>> = emptyMap()
     var fontPages: List<List<String>> = emptyList()
 
-    fun getHexR(vw: Float): Float = if (vw <= 0) 0f else (vw / 8.0f) / sqrt(3.0f).toFloat()
+    fun getHexR(vw: Float): Float = if (vw <= 0) 0f else (vw / 8.0f) / sqrt(3.0f)
 
     fun getNumericR(vw: Float, scale: Float = 0.85f): Float {
         if (vw <= 0) return 0f
-        return (vw / (5.6f / scale)) / sqrt(3.0f).toFloat()
+        return (vw / (5.6f / scale)) / sqrt(3.0f)
     }
 
     fun buildLayout(vw: Float, layoutMode: LayoutMode, symbolPage: String, fontPage: Int, shifted: Boolean, capsLock: Boolean): List<Key> {

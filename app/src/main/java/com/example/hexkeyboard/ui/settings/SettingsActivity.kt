@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -546,7 +547,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             // --- SECCIÓN 4: Sonido y Vibración ---
-            item { CategoryHeader("Sonido y Vibración", Icons.Default.VolumeUp) }
+            item { CategoryHeader("Sonido y Vibración", Icons.AutoMirrored.Filled.VolumeUp) }
             item {
                 SettingsCardContainer {
                     SwitchPreference(
@@ -554,7 +555,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         subtitle = "Emitir un tono táctil al presionar cada tecla",
                         key = ThemeUtils.KEYBOARD_SOUND,
                         defaultValue = true,
-                        icon = Icons.Default.VolumeUp,
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
                         context = context
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
