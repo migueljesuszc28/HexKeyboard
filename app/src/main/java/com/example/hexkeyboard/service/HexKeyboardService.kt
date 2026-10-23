@@ -545,6 +545,90 @@ class HexKeyboardService : InputMethodService(),
                 KeyboardViewModel.Action.RefreshClipboard -> refreshClipboardHistory()
                 KeyboardViewModel.Action.SwitchToNextLanguage -> switchToNextLanguage()
                 KeyboardViewModel.Action.ShowLanguagePicker -> showLanguagePicker()
+                is KeyboardViewModel.Action.ToggleFloatingMode -> {
+                    updateImeWindowForFloatingMode(action.enabled)
+                }
+                is KeyboardViewModel.Action.UpdateFloatingWindowPosition -> {
+                    // Posición manejada por Compose + touchableRegion
+                }
+                is KeyboardViewModel.Action.UpdateFloatingCardRect -> {
+                    window?.window?.decorView?.post {
+                        window?.window?.decorView?.requestLayout()
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        if (viewModel.isFloatingMode.value) {
+            val decorHeight = window?.window?.decorView?.height ?: 0
+            outInsets.contentTopInsets = decorHeight
+            outInsets.visibleTopInsets = decorHeight
+
+            val cardRect = viewModel.floatingCardRect.value
+            if (cardRect != null && !cardRect.isEmpty) {
+                outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+                outInsets.touchableRegion.set(cardRect)
+            } else {
+                outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+                val density = resources.displayMetrics.density
+                val cardWidthPx = (310 * density).toInt()
+                val cardHeightPx = (280 * density).toInt()
+                val centerX = (resources.displayMetrics.widthPixels / 2)
+                val centerY = (resources.displayMetrics.heightPixels / 2)
+                outInsets.touchableRegion.set(
+                    centerX - cardWidthPx / 2,
+                    centerY - cardHeightPx / 2,
+                    centerX + cardWidthPx / 2,
+                    centerY + cardHeightPx / 2
+                )
+            }
+        }
+    }
+
+    private fun updateImeWindowForFloatingMode(isFloating: Boolean) {
+        predictionEngine.resetCalibration()
+        window?.window?.let { win ->
+            val params = win.attributes
+            if (isFloating) {
+                // Modo Flotante Real: Ventana de pantalla completa con Insets Region para passthrough perfecto
+                win.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+                win.setGravity(android.view.Gravity.FILL)
+                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+                win.decorView.setBackgroundColor(Color.TRANSPARENT)
+                @Suppress("DEPRECATION")
+                win.navigationBarColor = Color.TRANSPARENT
+                @Suppress("DEPRECATION")
+                win.statusBarColor = Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    win.setBackgroundBlurRadius(0)
+                }
+                
+                win.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.setDimAmount(0f)
+                
+                win.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+                win.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+
+                params.x = 0
+                params.y = 0
+                win.attributes = params
+                
+            } else {
+                // Modo Anclado (Docked): Restablecer alineación inferior y tamaño
+                win.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
+                win.setGravity(android.view.Gravity.BOTTOM)
+                win.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                
+                params.x = 0
+                params.y = 0
+                win.attributes = params
+                win.decorView.post {
+                    win.decorView.requestLayout()
+                    win.decorView.requestApplyInsets()
+                }
             }
         }
     }
@@ -612,6 +696,23 @@ class HexKeyboardService : InputMethodService(),
         updateShiftState()
         updateSuggestions()
 
+        val isFloating = viewModel.isFloatingMode.value
+        updateImeWindowForFloatingMode(isFloating)
+
+        val config = resources.configuration
+        val isCompactMultiWindow = config.screenWidthDp in 1..520 || config.screenHeightDp in 1..480
+        if (isCompactMultiWindow) {
+            serviceScope.launch {
+                val prefs = dataStore.data.first()
+                val autoFloating = prefs[ThemeUtils.AUTO_FLOATING_IN_MULTIWINDOW] ?: false
+                if (autoFloating && !isFloating) {
+                    withContext(Dispatchers.Main) {
+                        viewModel.setFloatingMode(true, this@HexKeyboardService)
+                    }
+                }
+            }
+        }
+
         serviceScope.launch(Dispatchers.IO) {
             ClipboardHistoryManager.cleanUpExpiredItems(this@HexKeyboardService)
         }
@@ -622,11 +723,21 @@ class HexKeyboardService : InputMethodService(),
             WindowCompat.setDecorFitsSystemWindows(win, false)
             win.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
-            @Suppress("DEPRECATION")
-            win.navigationBarColor = if (theme.id == "glass") Color.TRANSPARENT else theme.backgroundColor
+            if (isFloating) {
+                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+                win.decorView.setBackgroundColor(Color.TRANSPARENT)
+                @Suppress("DEPRECATION")
+                win.navigationBarColor = Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    win.setBackgroundBlurRadius(0)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                win.navigationBarColor = if (theme.id == "glass") Color.TRANSPARENT else theme.backgroundColor
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                win.setBackgroundBlurRadius(if (theme.id == "glass") 60 else 0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    win.setBackgroundBlurRadius(if (theme.id == "glass") 60 else 0)
+                }
             }
 
             val isDark = ColorUtils.calculateLuminance(theme.backgroundColor) < 0.5

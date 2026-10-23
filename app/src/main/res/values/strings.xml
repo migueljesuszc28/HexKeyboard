@@ -7,6 +7,8 @@
     <string name="functions_button_description">Más funciones</string>
     <string name="functions_panel_description">Panel de funciones</string>
     <string name="keyboard_view_description">Teclado hexagonal</string>
+    <string name="floating_keyboard_title">Flotante</string>
+    <string name="floating_keyboard_dock">Anclar</string>
 
     <string name="settings_title">Ajustes del teclado</string>
 

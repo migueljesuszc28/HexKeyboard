@@ -11,8 +11,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,30 +36,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import com.example.hexkeyboard.data.repository.ThemeUtils
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
 import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import com.example.hexkeyboard.ui.component.ExpressiveLoadingScreen
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 import com.example.hexkeyboard.ui.theme.NunitoFontFamily
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
+
+// Importamos las funciones utilitarias de Material 3 Expressive
+import com.example.hexkeyboard.ui.settings.CategoryHeader
+import com.example.hexkeyboard.ui.settings.SettingsCardContainer
+import com.example.hexkeyboard.ui.settings.SettingsGap
+import com.example.hexkeyboard.ui.settings.rememberMorphingShape
 
 class FontSelectorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,33 +90,26 @@ fun FontSelectorScreen(onBack: () -> Unit) {
     val isPreview = LocalInspectionMode.current
     val dataStore = ThemeUtils.getDataStore(context)
     val customFontKey = stringPreferencesKey("custom_font_path")
-    
+
     val selectedFontPathFlow = remember { dataStore.data.map { it[customFontKey] ?: "system" } }
     val selectedFontPath by selectedFontPathFlow.collectAsState("system")
     var customFonts by remember { mutableStateOf(emptyList<File>()) }
     var isLoading by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedFontPath) {
+    LaunchedEffect(Unit) {
         if (!isPreview) {
-            var isCompleted = false
-            val loadingJob = scope.launch {
-                delay(150.milliseconds)
-                if (!isCompleted) {
-                    isLoading = true
-                }
-            }
+            isLoading = true
             withContext(Dispatchers.IO) {
                 val list = FontManager.listCustomFonts(context)
                 customFonts = list
-            }
-            if (selectedFontPath != "system" && selectedFontPath != "nunito") {
-                val file = File(selectedFontPath)
-                if (!file.exists() || file.length() == 0L) {
-                    dataStore.edit { it[customFontKey] = "system" }
+                val currentPath = dataStore.data.first()[customFontKey] ?: "system"
+                if (currentPath != "system" && currentPath != "nunito") {
+                    val file = File(currentPath)
+                    if (!file.exists() || file.length() == 0L) {
+                        dataStore.edit { it[customFontKey] = "system" }
+                    }
                 }
             }
-            isCompleted = true
-            loadingJob.cancel()
             isLoading = false
         }
     }
@@ -147,30 +148,37 @@ fun FontSelectorScreen(onBack: () -> Unit) {
         searchQuery.isBlank() || "nunito".contains(searchQuery, ignoreCase = true)
     }
 
+    // Morphing Shapes
+    val backInteraction = remember { MutableInteractionSource() }
+    val backShape = rememberMorphingShape(backInteraction, 24.dp, 14.dp)
+
+    val searchInteraction = remember { MutableInteractionSource() }
+    val searchShape = rememberMorphingShape(searchInteraction, 24.dp, 14.dp)
+
+    val fabInteraction = remember { MutableInteractionSource() }
+    val fabShape = rememberMorphingShape(fabInteraction, 28.dp, 14.dp)
+
     val surfaceColor = MaterialTheme.colorScheme.surface
     val isDark = surfaceColor.luminance() < 0.5f
 
     val topBarMaskBrush = remember(isDark, surfaceColor) {
         if (isDark) {
             Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0.0f to Color.Black.copy(alpha = 0.55f),
-                    0.6f to Color.Black.copy(alpha = 0.20f),
-                    1.0f to Color.Transparent
-                )
+                0.0f to Color.Black.copy(alpha = 0.55f),
+                0.6f to Color.Black.copy(alpha = 0.20f),
+                1.0f to Color.Transparent
             )
         } else {
             Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0.0f to surfaceColor.copy(alpha = 0.92f),
-                    0.6f to surfaceColor.copy(alpha = 0.50f),
-                    1.0f to Color.Transparent
-                )
+                0.0f to surfaceColor.copy(alpha = 0.92f),
+                0.6f to surfaceColor.copy(alpha = 0.50f),
+                1.0f to Color.Transparent
             )
         }
     }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    // Comportamiento de Scroll contraíble idéntico a SettingsActivity
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -181,12 +189,22 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                     .background(brush = topBarMaskBrush)
             ) {
                 Column {
-                    TopAppBar(
-                        title = { Text("Fuente del Teclado", fontWeight = FontWeight.Bold) },
+                    // Cambiamos TopAppBar por LargeTopAppBar
+                    LargeTopAppBar(
+                        title = {
+                            Text(
+                                "Fuente del Teclado",
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
                         navigationIcon = {
                             FilledTonalIconButton(
                                 onClick = onBack,
-                                shape = CircleShape
+                                shape = backShape,
+                                interactionSource = backInteraction,
+                                modifier = Modifier.padding(start = 4.dp).size(48.dp)
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                             }
@@ -197,7 +215,9 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                                     isSearchActive = !isSearchActive
                                     if (!isSearchActive) searchQuery = ""
                                 },
-                                shape = CircleShape
+                                shape = searchShape,
+                                interactionSource = searchInteraction,
+                                modifier = Modifier.padding(end = 4.dp).size(48.dp)
                             ) {
                                 Icon(
                                     if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
@@ -238,7 +258,7 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
                             ),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(24.dp), // Ajustado al estilo Expressive
                             singleLine = true
                         )
                     }
@@ -257,10 +277,11 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                     ))
                 },
                 icon = { Icon(Icons.Default.Add, contentDescription = "Importar fuente") },
-                text = { Text("Importar fuente") },
+                text = { Text("Importar fuente", fontWeight = FontWeight.Bold) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
+                shape = fabShape,
+                interactionSource = fabInteraction
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -287,69 +308,39 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                         bottom = padding.calculateBottomPadding() + 88.dp
                     )
                 ) {
+                    // FUENTES PREDETERMINADAS
                     if (showDefaultSystem || showDefaultNunito) {
+                        item { CategoryHeader("Fuentes Predeterminadas", Icons.Default.FontDownload) }
                         item {
-                            FontSectionHeader("Fuentes Predeterminadas", Icons.Default.FontDownload)
-                        }
-                        item {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                tonalElevation = 1.dp
-                            ) {
-                                Column {
-                                    if (showDefaultSystem) {
-                                        FontOptionItem(
-                                            name = "Sistema",
-                                            isSelected = selectedFontPath == "system",
-                                            fontFamily = FontFamily.Default,
-                                            onClick = {
-                                                scope.launch {
-                                                    dataStore.edit { it[customFontKey] = "system" }
-                                                }
-                                            }
-                                        )
-                                    }
-                                    if (showDefaultSystem && showDefaultNunito) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(horizontal = 16.dp),
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                        )
-                                    }
-                                    if (showDefaultNunito) {
-                                        FontOptionItem(
-                                            name = "Nunito",
-                                            isSelected = selectedFontPath == "nunito",
-                                            fontFamily = NunitoFontFamily,
-                                            onClick = {
-                                                scope.launch {
-                                                    dataStore.edit { it[customFontKey] = "nunito" }
-                                                }
-                                            }
-                                        )
-                                    }
+                            SettingsCardContainer {
+                                if (showDefaultSystem) {
+                                    FontOptionItem(
+                                        name = "Sistema",
+                                        isSelected = selectedFontPath == "system",
+                                        fontFamily = FontFamily.Default,
+                                        onClick = { scope.launch { dataStore.edit { it[customFontKey] = "system" } } }
+                                    )
+                                }
+                                if (showDefaultSystem && showDefaultNunito) {
+                                    SettingsGap()
+                                }
+                                if (showDefaultNunito) {
+                                    FontOptionItem(
+                                        name = "Nunito",
+                                        isSelected = selectedFontPath == "nunito",
+                                        fontFamily = NunitoFontFamily,
+                                        onClick = { scope.launch { dataStore.edit { it[customFontKey] = "nunito" } } }
+                                    )
                                 }
                             }
                         }
                     }
 
+                    // FUENTES PERSONALIZADAS
                     if (customFonts.isNotEmpty() || (searchQuery.isNotBlank() && filteredCustomFonts.isNotEmpty())) {
+                        item { CategoryHeader("Fuentes Personalizadas", Icons.Default.Add) }
                         item {
-                            FontSectionHeader("Fuentes Personalizadas", Icons.Default.Add)
-                        }
-
-                        item {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                tonalElevation = 1.dp
-                            ) {
+                            SettingsCardContainer {
                                 if (filteredCustomFonts.isEmpty()) {
                                     Box(
                                         modifier = Modifier
@@ -364,35 +355,31 @@ fun FontSelectorScreen(onBack: () -> Unit) {
                                         )
                                     }
                                 } else {
-                                    Column {
-                                        val customFontTypefaces = remember(filteredCustomFonts) { filteredCustomFonts.associateWith { FontManager.loadTypeface(it) } }
-                                        filteredCustomFonts.forEachIndexed { index, fontFile ->
-                                            val tf = customFontTypefaces[fontFile]
-                                            FontOptionItem(
-                                                name = fontFile.name,
-                                                isSelected = selectedFontPath == fontFile.absolutePath,
-                                                fontFamily = if (tf != null) FontFamily(tf) else FontFamily.Default,
-                                                onDelete = {
-                                                    FontManager.deleteFont(fontFile)
-                                                    customFonts = FontManager.listCustomFonts(context)
-                                                    if (selectedFontPath == fontFile.absolutePath) {
-                                                        scope.launch {
-                                                            dataStore.edit { it[customFontKey] = "system" }
-                                                        }
+                                    val customFontTypefaces = remember(filteredCustomFonts) { filteredCustomFonts.associateWith { FontManager.loadTypeface(it) } }
+                                    filteredCustomFonts.forEachIndexed { index, fontFile ->
+                                        val tf = customFontTypefaces[fontFile]
+                                        FontOptionItem(
+                                            name = fontFile.name,
+                                            isSelected = selectedFontPath == fontFile.absolutePath,
+                                            fontFamily = if (tf != null) FontFamily(tf) else FontFamily.Default,
+                                            onDelete = {
+                                                scope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        FontManager.deleteFont(fontFile)
+                                                        val list = FontManager.listCustomFonts(context)
+                                                        customFonts = list
                                                     }
-                                                },
-                                                onClick = {
-                                                    scope.launch {
-                                                        dataStore.edit { it[customFontKey] = fontFile.absolutePath }
+                                                    if (selectedFontPath == fontFile.absolutePath) {
+                                                        dataStore.edit { it[customFontKey] = "system" }
                                                     }
                                                 }
-                                            )
-                                            if (index < filteredCustomFonts.size - 1) {
-                                                HorizontalDivider(
-                                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                                )
+                                            },
+                                            onClick = {
+                                                scope.launch { dataStore.edit { it[customFontKey] = fontFile.absolutePath } }
                                             }
+                                        )
+                                        if (index < filteredCustomFonts.lastIndex) {
+                                            SettingsGap()
                                         }
                                     }
                                 }
@@ -421,38 +408,6 @@ fun FontSelectorScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun FontSectionHeader(title: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 10.dp)
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-@Composable
 fun FontOptionItem(
     name: String,
     isSelected: Boolean,
@@ -460,36 +415,31 @@ fun FontOptionItem(
     onDelete: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = fontFamily,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+            )
+        },
+        supportingContent = {
+            Text(
+                text = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ 1234567890",
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = fontFamily,
+                color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        leadingContent = {
             RadioButton(
                 selected = isSelected,
-                onClick = null,
-                modifier = Modifier.padding(end = 12.dp)
+                onClick = null
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = fontFamily,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ 1234567890",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = fontFamily,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        },
+        trailingContent = {
             if (onDelete != null) {
                 IconButton(onClick = onDelete) {
                     Icon(
@@ -500,11 +450,15 @@ fun FontOptionItem(
                     )
                 }
             }
-        }
-    }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f) else Color.Transparent
+        ),
+        modifier = Modifier.clickable(onClick = onClick)
+    )
 }
 
-private fun getFileName(context: Context, uri: Uri): String? {
+private suspend fun getFileName(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
     var result: String? = null
     if (uri.scheme == "content") {
         context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -519,7 +473,7 @@ private fun getFileName(context: Context, uri: Uri): String? {
         val cut = result?.lastIndexOf('/') ?: -1
         if (cut != -1) result = result?.substring(cut + 1)
     }
-    return result
+    result
 }
 
 @Preview(name = "Light Mode", showBackground = true, showSystemUi = true)

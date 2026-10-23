@@ -13,26 +13,13 @@ import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.toSize
+import com.example.hexkeyboard.ui.component.backdrop.backdrops.LayerBackdrop
 
 /**
- * Declares this composable's own bounds as provably static for the current
- * frame: its drawn pixels do not change, so a glass surface sampling [backdrop]
- * whose capture rect falls entirely inside a declared static region can reuse
- * its last capture instead of re-recording on a [backdrop] content-version bump
- * caused by unrelated content elsewhere in the same source subtree (see
- * [LayerBackdrop.isFullyStatic] and its use in `DrawBackdropNode`).
- *
- * Fails safe: an undeclared region, or one only partially covered, is always
- * treated as changed — today's existing behaviour. A missed declaration costs a
- * missed optimization, never a stale pixel. Re-declares every frame this draws;
- * [LayerBackdropNode.draw] clears all declarations at the start of every
- * generation, so a region that stops being drawn here also stops being trusted.
- *
- * Only meaningful when nothing else paints over this composable's bounds within
- * the same backdrop subtree for the current frame — e.g. a full-bleed background
- * image with no scrolling content currently drawn on top of it in that screen
- * area. Wrapping something that shares its rect with changing content elsewhere
- * silently defeats the guarantee this makes to sampling glass surfaces.
+ * Marks this composable's bounds unchanged for the current backdrop generation.
+ * Glass samplers may reuse a capture only when it falls entirely inside a declared
+ * region. Partial or undeclared areas are invalidated; overlapping changing content
+ * must not be marked static.
  */
 fun Modifier.backdropStaticRegion(backdrop: LayerBackdrop): Modifier =
     this then BackdropStaticRegionElement(backdrop)

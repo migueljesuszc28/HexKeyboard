@@ -132,6 +132,13 @@ object ThemeUtils {
     val GLASS_CHROMATIC_ABERRATION = booleanPreferencesKey("glass_chromatic_aberration")
     val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
 
+    // Floating Keyboard Keys
+    val FLOATING_KEYBOARD_ENABLED = booleanPreferencesKey("floating_keyboard_enabled")
+    val FLOATING_KEYBOARD_X = floatPreferencesKey("floating_keyboard_x")
+    val FLOATING_KEYBOARD_Y = floatPreferencesKey("floating_keyboard_y")
+    val FLOATING_KEYBOARD_SCALE = floatPreferencesKey("floating_keyboard_scale")
+    val AUTO_FLOATING_IN_MULTIWINDOW = booleanPreferencesKey("auto_floating_in_multiwindow")
+
     fun getDataStore(context: Context) = context.dataStore
 
     fun Activity.enableMaxRefreshRate() {
@@ -163,9 +170,29 @@ object ThemeUtils {
         themeRefreshTrigger.tryEmit(Unit)
     }
 
+    @Volatile
+    private var cachedAppTheme: String? = null
+
+    fun getAppThemeSync(context: Context): String {
+        cachedAppTheme?.let { return it }
+        val theme = try {
+            runBlocking(Dispatchers.IO) {
+                context.dataStore.data.first()[APP_THEME] ?: "system"
+            }
+        } catch (_: Exception) {
+            "system"
+        }
+        cachedAppTheme = theme
+        return theme
+    }
+
     fun getAppThemeFlow(context: Context): Flow<String> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { it[APP_THEME] ?: "system" }
+        .map {
+            val theme = it[APP_THEME] ?: "system"
+            cachedAppTheme = theme
+            theme
+        }
 
 
 
@@ -449,6 +476,7 @@ object ThemeUtils {
     }
 
     suspend fun saveAppTheme(context: Context, theme: String) {
+        cachedAppTheme = theme
         context.dataStore.edit { it[APP_THEME] = theme }
     }
 

@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -97,7 +98,22 @@ fun UserDictionaryScreen(
         }
     }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val backInteraction = remember { MutableInteractionSource() }
+    val backShape = rememberMorphingShape(backInteraction, 24.dp, 14.dp)
+
+    val sortInteraction = remember { MutableInteractionSource() }
+    val sortShape = rememberMorphingShape(sortInteraction, 24.dp, 14.dp)
+
+    val deleteInteraction = remember { MutableInteractionSource() }
+    val deleteShape = rememberMorphingShape(deleteInteraction, 24.dp, 14.dp)
+
+    val searchInteraction = remember { MutableInteractionSource() }
+    val searchShape = rememberMorphingShape(searchInteraction, 24.dp, 14.dp)
+
+    val fabInteraction = remember { MutableInteractionSource() }
+    val fabShape = rememberMorphingShape(fabInteraction, 28.dp, 14.dp)
+
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var isSearchActive by remember { mutableStateOf(false) }
     var showDeleteAllConfirm by remember { mutableStateOf(false) }
 
@@ -110,12 +126,14 @@ fun UserDictionaryScreen(
                     .background(brush = topBarMaskBrush)
             ) {
                 Column {
-                    TopAppBar(
+                    LargeTopAppBar(
                         title = { Text("Diccionario Personal", fontWeight = FontWeight.Bold) },
                         navigationIcon = {
                             FilledTonalIconButton(
                                 onClick = onBack,
-                                shape = CircleShape
+                                shape = backShape,
+                                interactionSource = backInteraction,
+                                modifier = Modifier.padding(start = 4.dp).size(48.dp)
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
@@ -129,7 +147,9 @@ fun UserDictionaryScreen(
                                 Box {
                                     FilledTonalIconButton(
                                         onClick = { showSortMenu = true },
-                                        shape = CircleShape
+                                        shape = sortShape,
+                                        interactionSource = sortInteraction,
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.Sort,
@@ -186,7 +206,9 @@ fun UserDictionaryScreen(
                                 Spacer(Modifier.width(8.dp))
                                 FilledTonalIconButton(
                                     onClick = { showDeleteAllConfirm = true },
-                                    shape = CircleShape
+                                    shape = deleteShape,
+                                    interactionSource = deleteInteraction,
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         Icons.Default.DeleteForever,
@@ -201,7 +223,9 @@ fun UserDictionaryScreen(
                                     isSearchActive = !isSearchActive
                                     if (!isSearchActive) viewModel.onSearchQueryChange("")
                                 },
-                                shape = CircleShape
+                                shape = searchShape,
+                                interactionSource = searchInteraction,
+                                modifier = Modifier.padding(end = 4.dp).size(48.dp)
                             ) {
                                 Icon(
                                     if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
@@ -254,7 +278,8 @@ fun UserDictionaryScreen(
                 onClick = { viewModel.toggleAddDialog(true) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
+                shape = fabShape,
+                interactionSource = fabInteraction
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Añadir palabra")
             }

@@ -6,42 +6,56 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.ui.res.stringResource
-import androidx.core.os.LocaleListCompat
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.os.LocaleListCompat
 import androidx.datastore.preferences.core.*
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
@@ -59,20 +73,83 @@ class SettingsActivity : AppCompatActivity() {
         super.attachBaseContext(ThemeUtils.getAppLanguageContext(newBase))
     }
 
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableMaxRefreshRate()
+
+        // Se mantiene para el primer renderizado antes de que Compose tome el control
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         )
 
         setContent {
-            HexKeyboardTheme {
-                SettingsScreen(onBack = { finish() })
+            // 1. Obtenemos el tema guardado directamente desde el inicio del contexto de Compose
+            val dataStore = ThemeUtils.getDataStore(this)
+            val initialTheme = remember(this) { ThemeUtils.getAppThemeSync(this) }
+            val themeValueFlow = remember { dataStore.data.map { it[ThemeUtils.APP_THEME] ?: "system" } }
+            val themeValue by themeValueFlow.collectAsState(initial = initialTheme)
+
+            // 2. Evaluamos si debe ser oscuro en base a la configuración y al sistema
+            val isSystemDark = isSystemInDarkTheme()
+            val isDark = when (themeValue) {
+                "light" -> false
+                "dark" -> true
+                else -> isSystemDark
+            }
+
+            val isDynamic = themeValue == "m3_dynamic" || themeValue == "dynamic"
+
+            // 3. Forzamos a la barra de estado y navegación a respetar el tema interno (evita íconos invisibles)
+            DisposableEffect(isDark) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { isDark },
+                    navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { isDark }
+                )
+                onDispose {}
+            }
+
+            // 4. Inyectamos los estados directamente al tema principal
+            HexKeyboardTheme(
+                darkTheme = isDark,
+                dynamicColor = isDynamic
+            ) {
+                MaterialExpressiveTheme(
+                    colorScheme = MaterialTheme.colorScheme,
+                    typography = MaterialTheme.typography
+                ) {
+                    SettingsScreen(onBack = { finish() })
+                }
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Material 3 Expressive (v1.5.0-beta01)
+// ---------------------------------------------------------------------------
+
+private val GroupCornerRadius = 28.dp
+private val SegmentGapHeight = 2.dp
+
+/**
+- Esquinas que se animan con un resorte "rápido espacial" al presionar,
+- imitando el morph de forma de los botones expresivos.
+ */
+@Composable
+fun rememberMorphingShape(
+    interactionSource: MutableInteractionSource,
+    restCorner: Dp,
+    pressedCorner: Dp
+): Shape {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val corner by animateDpAsState(
+        targetValue = if (pressed) pressedCorner else restCorner,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f),
+        label = "shapeMorph"
+    )
+    return RoundedCornerShape(corner.value.coerceAtLeast(0f).dp)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +159,16 @@ fun SettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val dataStore = ThemeUtils.getDataStore(context)
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    val backInteraction = remember { MutableInteractionSource() }
+    val backShape = rememberMorphingShape(
+        interactionSource = backInteraction,
+        restCorner = 24.dp,
+        pressedCorner = 14.dp
+    )
+
+    // Máscara de sombreado: el contenido pasa por debajo de la barra y de la barra de estado
     val surfaceColor = MaterialTheme.colorScheme.surface
     val isDark = surfaceColor.luminance() < 0.5f
 
@@ -106,24 +193,31 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(brush = topBarMaskBrush)
             ) {
-                TopAppBar(
+                LargeTopAppBar(
                     title = {
                         Text(
                             stringResource(R.string.settings_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
                         FilledTonalIconButton(
                             onClick = onBack,
-                            shape = CircleShape
+                            shape = backShape,
+                            interactionSource = backInteraction,
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .size(48.dp)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -134,7 +228,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
                         scrolledContainerColor = Color.Transparent
-                    )
+                    ),
+                    scrollBehavior = scrollBehavior
                 )
             }
         }
@@ -151,16 +246,16 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SettingsCardContainer {
                     val appLangValueFlow = remember { dataStore.data.map { it[ThemeUtils.APP_LANGUAGE] ?: "es" } }
-                    val appLangValue by appLangValueFlow.collectAsState("es")
+                    val appLangValue by appLangValueFlow.collectAsState(initial = null)
                     var showAppLangDialog by remember { mutableStateOf(false) }
 
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.setting_app_language), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(when(appLangValue) {
+                            Text(when (appLangValue ?: "es") {
                                 "es" -> stringResource(R.string.lang_spanish)
                                 "en" -> stringResource(R.string.lang_english)
-                                else -> appLangValue
+                                else -> appLangValue ?: "es"
                             })
                         },
                         leadingContent = { Icon(Icons.Default.Translate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -169,54 +264,41 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     if (showAppLangDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showAppLangDialog = false },
-                            title = { Text(stringResource(R.string.setting_app_language_title)) },
-                            text = {
-                                Column {
-                                    listOf("es" to stringResource(R.string.lang_spanish), "en" to stringResource(R.string.lang_english)).forEach { (value, label) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    scope.launch {
-                                                        dataStore.edit { it[ThemeUtils.APP_LANGUAGE] = value }
-                                                        AppCompatDelegate.setApplicationLocales(
-                                                            LocaleListCompat.forLanguageTags(value)
-                                                        )
-                                                        (context as? Activity)?.recreate()
-                                                    }
-                                                    showAppLangDialog = false
-                                                }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(selected = appLangValue == value, onClick = null)
-                                            Spacer(Modifier.width(16.dp))
-                                            Text(label)
-                                        }
-                                    }
+                        RadioOptionDialog(
+                            title = stringResource(R.string.setting_app_language_title),
+                            options = listOf(
+                                "es" to stringResource(R.string.lang_spanish),
+                                "en" to stringResource(R.string.lang_english)
+                            ),
+                            selected = appLangValue ?: "es",
+                            dismissLabel = stringResource(R.string.btn_cancel),
+                            onSelect = { value ->
+                                showAppLangDialog = false
+                                scope.launch {
+                                    dataStore.edit { it[ThemeUtils.APP_LANGUAGE] = value }
+                                    AppCompatDelegate.setApplicationLocales(
+                                        LocaleListCompat.forLanguageTags(value)
+                                    )
+                                    (context as? Activity)?.recreate()
                                 }
                             },
-                            confirmButton = {
-                                TextButton(onClick = { showAppLangDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
-                            }
+                            onDismiss = { showAppLangDialog = false }
                         )
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     val langValueFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LANGUAGE] ?: "es" } }
-                    val langValue by langValueFlow.collectAsState("es")
+                    val langValue by langValueFlow.collectAsState(initial = null)
                     var showLangDialog by remember { mutableStateOf(false) }
 
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.setting_keyboard_language), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(when(langValue) {
+                            Text(when (langValue ?: "es") {
                                 "es" -> stringResource(R.string.lang_spanish)
                                 "en" -> stringResource(R.string.lang_english)
-                                else -> langValue
+                                else -> langValue ?: "es"
                             })
                         },
                         leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -225,47 +307,34 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     if (showLangDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showLangDialog = false },
-                            title = { Text(stringResource(R.string.setting_keyboard_language_title)) },
-                            text = {
-                                Column {
-                                    listOf("es" to stringResource(R.string.lang_spanish), "en" to stringResource(R.string.lang_english)).forEach { (value, label) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    scope.launch {
-                                                        dataStore.edit { it[ThemeUtils.KEYBOARD_LANGUAGE] = value }
-                                                    }
-                                                    showLangDialog = false
-                                                }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(selected = langValue == value, onClick = null)
-                                            Spacer(Modifier.width(16.dp))
-                                            Text(label)
-                                        }
-                                    }
+                        RadioOptionDialog(
+                            title = stringResource(R.string.setting_keyboard_language_title),
+                            options = listOf(
+                                "es" to stringResource(R.string.lang_spanish),
+                                "en" to stringResource(R.string.lang_english)
+                            ),
+                            selected = langValue ?: "es",
+                            dismissLabel = stringResource(R.string.btn_cancel),
+                            onSelect = { value ->
+                                showLangDialog = false
+                                scope.launch {
+                                    dataStore.edit { it[ThemeUtils.KEYBOARD_LANGUAGE] = value }
                                 }
                             },
-                            confirmButton = {
-                                TextButton(onClick = { showLangDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
-                            }
+                            onDismiss = { showLangDialog = false }
                         )
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     val secLangValueFlow = remember { dataStore.data.map { it[ThemeUtils.SECONDARY_LANGUAGE] ?: "" } }
-                    val secLangValue by secLangValueFlow.collectAsState("")
+                    val secLangValue by secLangValueFlow.collectAsState(initial = null)
                     var showSecLangDialog by remember { mutableStateOf(false) }
 
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.setting_secondary_language), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(when(secLangValue) {
+                            Text(when (secLangValue ?: "") {
                                 "es" -> stringResource(R.string.lang_spanish)
                                 "en" -> stringResource(R.string.lang_english)
                                 else -> stringResource(R.string.lang_disabled)
@@ -277,53 +346,41 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     if (showSecLangDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showSecLangDialog = false },
-                            title = { Text(stringResource(R.string.setting_secondary_language_title)) },
-                            text = {
-                                Column {
-                                    listOf("" to stringResource(R.string.lang_disabled), "es" to stringResource(R.string.lang_spanish), "en" to stringResource(R.string.lang_english)).forEach { (value, label) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    scope.launch {
-                                                        dataStore.edit {
-                                                            it[ThemeUtils.SECONDARY_LANGUAGE] = value
-                                                            it[ThemeUtils.MULTILINGUAL_ENABLED] = value.isNotEmpty()
-                                                        }
-                                                    }
-                                                    showSecLangDialog = false
-                                                }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(selected = secLangValue == value, onClick = null)
-                                            Spacer(Modifier.width(16.dp))
-                                            Text(label)
-                                        }
+                        RadioOptionDialog(
+                            title = stringResource(R.string.setting_secondary_language_title),
+                            options = listOf(
+                                "" to stringResource(R.string.lang_disabled),
+                                "es" to stringResource(R.string.lang_spanish),
+                                "en" to stringResource(R.string.lang_english)
+                            ),
+                            selected = secLangValue ?: "",
+                            dismissLabel = stringResource(R.string.btn_cancel),
+                            onSelect = { value ->
+                                showSecLangDialog = false
+                                scope.launch {
+                                    dataStore.edit {
+                                        it[ThemeUtils.SECONDARY_LANGUAGE] = value
+                                        it[ThemeUtils.MULTILINGUAL_ENABLED] = value.isNotEmpty()
                                     }
                                 }
                             },
-                            confirmButton = {
-                                TextButton(onClick = { showSecLangDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
-                            }
+                            onDismiss = { showSecLangDialog = false }
                         )
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     val layoutValueFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default" } }
-                    val layoutValue by layoutValueFlow.collectAsState("default")
+                    val layoutValue by layoutValueFlow.collectAsState(initial = null)
                     var showLayoutDialog by remember { mutableStateOf(false) }
 
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.setting_layout_type), fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(when(layoutValue) {
+                            Text(when (layoutValue ?: "default") {
                                 "default" -> stringResource(R.string.setting_layout_default)
                                 "qwerty" -> stringResource(R.string.setting_layout_qwerty)
-                                else -> layoutValue
+                                else -> layoutValue ?: "default"
                             })
                         },
                         leadingContent = { Icon(Icons.Default.Keyboard, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -332,38 +389,25 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     if (showLayoutDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showLayoutDialog = false },
-                            title = { Text(stringResource(R.string.setting_layout_type)) },
-                            text = {
-                                Column {
-                                    listOf("default" to stringResource(R.string.setting_layout_default), "qwerty" to stringResource(R.string.setting_layout_qwerty)).forEach { (value, label) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    scope.launch {
-                                                        dataStore.edit { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] = value }
-                                                    }
-                                                    showLayoutDialog = false
-                                                }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(selected = layoutValue == value, onClick = null)
-                                            Spacer(Modifier.width(16.dp))
-                                            Text(label)
-                                        }
-                                    }
+                        RadioOptionDialog(
+                            title = stringResource(R.string.setting_layout_type),
+                            options = listOf(
+                                "default" to stringResource(R.string.setting_layout_default),
+                                "qwerty" to stringResource(R.string.setting_layout_qwerty)
+                            ),
+                            selected = layoutValue ?: "default",
+                            dismissLabel = stringResource(R.string.btn_cancel),
+                            onSelect = { value ->
+                                showLayoutDialog = false
+                                scope.launch {
+                                    dataStore.edit { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] = value }
                                 }
                             },
-                            confirmButton = {
-                                TextButton(onClick = { showLayoutDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
-                            }
+                            onDismiss = { showLayoutDialog = false }
                         )
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     ListItem(
                         headlineContent = { Text("Diccionario Personal", fontWeight = FontWeight.SemiBold) },
@@ -375,7 +419,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     ListItem(
                         headlineContent = { Text("Cuentas y Contraseñas", fontWeight = FontWeight.SemiBold) },
@@ -394,13 +438,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SettingsCardContainer {
                     val themeValueFlow = remember { dataStore.data.map { it[ThemeUtils.APP_THEME] ?: "system" } }
-                    val themeValue by themeValueFlow.collectAsState("system")
+                    val themeValue by themeValueFlow.collectAsState(initial = null)
                     var showThemeDialog by remember { mutableStateOf(false) }
 
                     ListItem(
                         headlineContent = { Text("Tema de la aplicación", fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(when(themeValue) {
+                            Text(when (themeValue ?: "system") {
                                 "light" -> "Claro"
                                 "dark" -> "Oscuro"
                                 "m3_dynamic", "dynamic" -> "Material 3 Dinámico"
@@ -413,46 +457,27 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
 
                     if (showThemeDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showThemeDialog = false },
-                            title = { Text("Seleccionar tema") },
-                            text = {
-                                Column {
-                                    listOf(
-                                        "system" to "Seguir sistema",
-                                        "light" to "Claro",
-                                        "dark" to "Oscuro",
-                                        "m3_dynamic" to "Material 3 Dinámico"
-                                    ).forEach { (value, label) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    scope.launch {
-                                                        ThemeUtils.saveAppTheme(context, value)
-                                                    }
-                                                    showThemeDialog = false
-                                                }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(
-                                                selected = themeValue == value || (value == "m3_dynamic" && themeValue == "dynamic"),
-                                                onClick = null
-                                            )
-                                            Spacer(Modifier.width(16.dp))
-                                            Text(label)
-                                        }
-                                    }
+                        RadioOptionDialog(
+                            title = "Seleccionar tema",
+                            options = listOf(
+                                "system" to "Seguir sistema",
+                                "light" to "Claro",
+                                "dark" to "Oscuro",
+                                "m3_dynamic" to "Material 3 Dinámico"
+                            ),
+                            selected = if ((themeValue ?: "system") == "dynamic") "m3_dynamic" else (themeValue ?: "system"),
+                            dismissLabel = "Cancelar",
+                            onSelect = { value ->
+                                showThemeDialog = false
+                                scope.launch {
+                                    ThemeUtils.saveAppTheme(context, value)
                                 }
                             },
-                            confirmButton = {
-                                TextButton(onClick = { showThemeDialog = false }) { Text("Cancelar") }
-                            }
+                            onDismiss = { showThemeDialog = false }
                         )
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     ListItem(
                         headlineContent = { Text("Personalización del Teclado", fontWeight = FontWeight.SemiBold) },
@@ -464,17 +489,17 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     val fontPathFlow = remember { dataStore.data.map { it[ThemeUtils.CUSTOM_FONT_PATH] ?: "system" } }
-                    val fontPath by fontPathFlow.collectAsState("system")
+                    val fontPath by fontPathFlow.collectAsState(initial = null)
                     ListItem(
                         headlineContent = { Text("Fuente del Teclado", fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text(when(fontPath) {
+                            Text(when (fontPath ?: "system") {
                                 "system" -> "Sistema"
                                 "nunito" -> "Nunito"
-                                else -> fontPath.substringAfterLast("/")
+                                else -> (fontPath ?: "system").substringAfterLast("/")
                             })
                         },
                         leadingContent = { Icon(Icons.Default.FontDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -484,7 +509,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     ListItem(
                         headlineContent = { Text("Efecto Liquid Glass", fontWeight = FontWeight.SemiBold) },
@@ -512,7 +537,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.Height,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Tamaño de las teclas",
                         subtitle = "Escala visual de los hexágonos y caracteres",
@@ -523,7 +548,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.FitScreen,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Escala teclado numérico",
                         subtitle = "Ajusta el tamaño de la cuadrícula de números",
@@ -533,7 +558,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         max = 120,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Margen inferior",
                         subtitle = "Espacio entre el teclado y la barra de navegación",
@@ -558,7 +583,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.AutoMirrored.Filled.VolumeUp,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Volumen del sonido",
                         key = ThemeUtils.KEYBOARD_SOUND_VOLUME,
@@ -567,7 +592,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         max = 100,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Vibración al presionar",
                         subtitle = "Respuesta háptica al escribir",
@@ -576,7 +601,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.Vibration,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Intensidad de vibración",
                         key = ThemeUtils.KEYBOARD_VIBRATION_INTENSITY,
@@ -600,7 +625,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.Gesture,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Auto-corrección",
                         subtitle = "Corregir automáticamente palabras al presionar espacio",
@@ -609,7 +634,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.Spellcheck,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Deshacer corrección al borrar",
                         subtitle = "Restaurar la palabra original al pulsar retroceso",
@@ -617,7 +642,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         defaultValue = true,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Auto-mayúsculas",
                         subtitle = "Iniciar cada oración con mayúscula",
@@ -625,7 +650,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         defaultValue = true,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Punto automático",
                         subtitle = "Insertar punto y espacio al presionar dos veces espacio",
@@ -648,7 +673,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.TouchApp,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Mostrar Pop-Up de tecla",
                         subtitle = "Vista previa ampliada de la tecla presionada",
@@ -657,7 +682,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.SmartButton,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Tamaño del Pop-Up",
                         key = ThemeUtils.POPUP_SCALE,
@@ -666,7 +691,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         max = 150,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SliderPreference(
                         title = "Duración toque prolongado",
                         subtitle = "Tiempo para acceder a caracteres alternativos",
@@ -678,7 +703,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.Timer,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Indicadores de acentos",
                         subtitle = "Mostrar identificadores en teclas con opciones adicionales",
@@ -686,7 +711,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         defaultValue = true,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
                     SwitchPreference(
                         title = "Reiniciar al cerrar",
                         subtitle = "Volver a la vista principal al ocultar el teclado",
@@ -715,7 +740,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             }
                         }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     SwitchPreference(
                         title = "Eliminación automática",
@@ -725,61 +750,44 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.AutoMirrored.Outlined.Assignment,
                         context = context
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    SettingsGap()
 
                     val expiryValueFlow = remember { dataStore.data.map { it[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] ?: "1" } }
-                    val expiryValue by expiryValueFlow.collectAsState("1")
+                    val expiryValue by expiryValueFlow.collectAsState(initial = null)
                     var showExpiryDialog by remember { mutableStateOf(false) }
+
+                    val expiryEntries = listOf(
+                        "0.25" to "15 minutos",
+                        "1" to "1 hora",
+                        "3" to "3 horas",
+                        "6" to "6 horas",
+                        "12" to "12 horas",
+                        "24" to "24 horas"
+                    )
 
                     ListItem(
                         headlineContent = { Text("Tiempo de expiración", fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            val labels = listOf("15 minutos", "1 hora", "3 horas", "6 horas", "12 horas", "24 horas")
-                            val values = listOf("0.25", "1", "3", "6", "12", "24")
-                            val index = values.indexOf(expiryValue).coerceAtLeast(0)
-                            Text(labels[index])
+                            val index = expiryEntries.indexOfFirst { it.first == (expiryValue ?: "1") }.coerceAtLeast(0)
+                            Text(expiryEntries[index].second)
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable { showExpiryDialog = true }
                     )
 
                     if (showExpiryDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showExpiryDialog = false },
-                            title = { Text("Tiempo de expiración") },
-                            text = {
-                                Column {
-                                    val entries = listOf(
-                                        "0.25" to "15 minutos",
-                                        "1" to "1 hora",
-                                        "3" to "3 horas",
-                                        "6" to "6 horas",
-                                        "12" to "12 horas",
-                                        "24" to "24 horas"
-                                    )
-                                    entries.forEach { (value, label) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    scope.launch {
-                                                        dataStore.edit { it[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] = value }
-                                                    }
-                                                    showExpiryDialog = false
-                                                }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(selected = expiryValue == value, onClick = null)
-                                            Spacer(Modifier.width(16.dp))
-                                            Text(label)
-                                        }
-                                    }
+                        RadioOptionDialog(
+                            title = "Tiempo de expiración",
+                            options = expiryEntries,
+                            selected = expiryValue ?: "1",
+                            dismissLabel = "Cancelar",
+                            onSelect = { value ->
+                                showExpiryDialog = false
+                                scope.launch {
+                                    dataStore.edit { it[ThemeUtils.CLIPBOARD_EXPIRY_HOURS] = value }
                                 }
                             },
-                            confirmButton = {
-                                TextButton(onClick = { showExpiryDialog = false }) { Text("Cancelar") }
-                            }
+                            onDismiss = { showExpiryDialog = false }
                         )
                     }
                 }
@@ -790,17 +798,30 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
                 var showResetDialog by remember { mutableStateOf(false) }
 
+                val resetInteraction = remember { MutableInteractionSource() }
+                val resetShape = rememberMorphingShape(
+                    interactionSource = resetInteraction,
+                    restCorner = 28.dp,
+                    pressedCorner = 14.dp
+                )
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { showResetDialog = true },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = resetShape,
+                        interactionSource = resetInteraction,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -811,6 +832,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 if (showResetDialog) {
                     AlertDialog(
                         onDismissRequest = { showResetDialog = false },
+                        icon = { Icon(Icons.Default.Refresh, contentDescription = null) },
                         title = { Text("Restablecer ajustes", fontWeight = FontWeight.Bold) },
                         text = {
                             Text("¿Estás seguro de que deseas restablecer la configuración del teclado a sus valores predeterminados? Tus temas personalizados, palabras aprendidas e historial del portapapeles no se borrarán.")
@@ -824,7 +846,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         Toast.makeText(context, "Ajustes restablecidos a valores predeterminados", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                             ) {
                                 Text("Restablecer", fontWeight = FontWeight.Bold)
                             }
@@ -841,6 +863,63 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 }
 
+/**
+- Diálogo de selección única reutilizable. La opción activa se resalta con un
+- contenedor tonal (secondaryContainer) con esquinas redondeadas.
+ */
+@Composable
+private fun RadioOptionDialog(
+    title: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    dismissLabel: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier.selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                options.forEach { (value, label) ->
+                    val isSelected = value == selected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                                else Color.Transparent
+                            )
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(value) }
+                            )
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = isSelected, onClick = null)
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = label,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                            else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(dismissLabel) }
+        }
+    )
+}
+
 @Composable
 fun CategoryHeader(title: String, icon: ImageVector? = null) {
     Row(
@@ -848,6 +927,7 @@ fun CategoryHeader(title: String, icon: ImageVector? = null) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 10.dp)
+            .semantics { heading() }
     ) {
         if (icon != null) {
             Surface(
@@ -875,20 +955,36 @@ fun CategoryHeader(title: String, icon: ImageVector? = null) {
     }
 }
 
+/**
+- Grupo de ajustes expresivo: contenedor de esquinas grandes (28dp) con tono
+- surfaceContainer. Usa [SettingsGap] entre elementos para lograr el aspecto
+- de lista segmentada.
+ */
 @Composable
 fun SettingsCardContainer(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp
+        shape = RoundedCornerShape(GroupCornerRadius),
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-            content()
-        }
+        Column(content = content)
     }
+}
+
+/**
+- Separador de lista segmentada: un hueco fino que deja ver el fondo de la
+- pantalla, en lugar de una línea divisoria.
+ */
+@Composable
+fun SettingsGap() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SegmentGapHeight)
+            .background(MaterialTheme.colorScheme.background)
+    )
 }
 
 @Composable
@@ -905,13 +1001,20 @@ fun SliderPreference(
 ) {
     val dataStore = ThemeUtils.getDataStore(context)
     val scope = rememberCoroutineScope()
-    val prefs by dataStore.data.collectAsState(initial = emptyPreferences())
-    val value = prefs[key] ?: defaultValue
+    val prefs by dataStore.data.collectAsState(initial = null)
+
+    if (prefs == null) {
+        // Reservar espacio visual mientras carga para evitar redimensiones bruscas
+        Box(modifier = Modifier.fillMaxWidth().height(104.dp))
+        return
+    }
+
+    val value = prefs!![key] ?: defaultValue
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
@@ -947,10 +1050,10 @@ fun SliderPreference(
             ) {
                 Text(
                     text = "$value$unit",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
         }
@@ -979,10 +1082,25 @@ fun SwitchPreference(
     context: Context,
     onCheckedChange: ((Boolean) -> Unit)? = null
 ) {
+    val isPreview = LocalInspectionMode.current
     val dataStore = ThemeUtils.getDataStore(context)
     val scope = rememberCoroutineScope()
-    val prefs by dataStore.data.collectAsState(initial = emptyPreferences())
-    val checked = prefs[key] ?: defaultValue
+    val prefs by dataStore.data.collectAsState(initial = null)
+
+    if (!isPreview && prefs == null) {
+        // Reservar espacio visual mientras carga
+        Box(modifier = Modifier.fillMaxWidth().height(72.dp))
+        return
+    }
+
+    val checked = if (isPreview) defaultValue else (prefs?.get(key) ?: defaultValue)
+
+    val onToggle: (Boolean) -> Unit = { newValue ->
+        scope.launch {
+            dataStore.edit { it[key] = newValue }
+            onCheckedChange?.invoke(newValue)
+        }
+    }
 
     ListItem(
         headlineContent = {
@@ -1014,25 +1132,28 @@ fun SwitchPreference(
         trailingContent = {
             Switch(
                 checked = checked,
-                onCheckedChange = { newValue ->
-                    scope.launch {
-                        dataStore.edit { it[key] = newValue }
-                        onCheckedChange?.invoke(newValue)
+                onCheckedChange = null,
+                thumbContent = if (checked) {
+                    {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize)
+                        )
                     }
-                }
+                } else null
             )
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.clickable {
-            val newValue = !checked
-            scope.launch {
-                dataStore.edit { it[key] = newValue }
-                onCheckedChange?.invoke(newValue)
-            }
-        }
+        modifier = Modifier.toggleable(
+            value = checked,
+            role = Role.Switch,
+            onValueChange = onToggle
+        )
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Preview(name = "Light Mode", showBackground = true, showSystemUi = true)
 @Preview(
     name = "Dark Mode",
@@ -1043,6 +1164,10 @@ fun SwitchPreference(
 @Composable
 fun PreviewSettingsScreen() {
     HexKeyboardTheme {
-        SettingsScreen(onBack = {})
+        MaterialExpressiveTheme(
+            colorScheme = MaterialTheme.colorScheme
+        ) {
+            SettingsScreen(onBack = {})
+        }
     }
 }

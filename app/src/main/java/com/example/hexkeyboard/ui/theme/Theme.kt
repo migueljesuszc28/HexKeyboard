@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -66,25 +67,27 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun HexKeyboardTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val appTheme by ThemeUtils.getAppThemeFlow(context).collectAsState(initial = "system")
+    val initialAppTheme = remember(context) { ThemeUtils.getAppThemeSync(context) }
+    val appTheme by ThemeUtils.getAppThemeFlow(context).collectAsState(initial = initialAppTheme)
 
-    val darkTheme = when (appTheme) {
+    val isDark = when (appTheme) {
         "light" -> false
         "dark" -> true
-        else -> isSystemInDarkTheme()
+        else -> darkTheme
     }
 
     val useDynamicColor = dynamicColor || appTheme == "m3_dynamic" || appTheme == "dynamic"
 
     val colorScheme = when {
         useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
+        isDark -> DarkColorScheme
         else -> LightColorScheme
     }
 
@@ -94,8 +97,8 @@ fun HexKeyboardTheme(
             val window = (view.context as? Activity)?.window
             if (window != null) {
                 val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.isAppearanceLightStatusBars = !darkTheme
-                insetsController.isAppearanceLightNavigationBars = !darkTheme
+                insetsController.isAppearanceLightStatusBars = !isDark
+                insetsController.isAppearanceLightNavigationBars = !isDark
             }
         }
     }

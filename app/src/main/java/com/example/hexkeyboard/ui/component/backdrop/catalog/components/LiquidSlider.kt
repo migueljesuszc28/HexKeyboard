@@ -13,7 +13,6 @@ package com.convx.music.ui.component.backdrop.catalog.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,9 +43,9 @@ import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberBackdrop
+import com.example.hexkeyboard.ui.component.backdrop.backdrops.rememberBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberCombinedBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.example.hexkeyboard.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.backdrop.catalog.utils.DampedDragAnimation
 import com.convx.music.ui.component.backdrop.drawBackdrop
 import com.convx.music.ui.component.backdrop.effects.blur
@@ -54,6 +53,7 @@ import com.convx.music.ui.component.backdrop.effects.lens
 import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.shadow.InnerShadow
 import com.convx.music.ui.component.backdrop.shadow.Shadow
+import com.example.hexkeyboard.ui.component.glassUsesDarkAppearance
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -65,7 +65,7 @@ fun LiquidSlider(
     backdrop: Backdrop,
     modifier: Modifier = Modifier
 ) {
-    val isLightTheme = !isSystemInDarkTheme()
+    val isLightTheme = !glassUsesDarkAppearance()
     val accentColor =
         if (isLightTheme) Color(0xFF0088FF)
         else Color(0xFF0091FF)

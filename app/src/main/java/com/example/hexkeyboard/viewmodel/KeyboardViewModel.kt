@@ -84,6 +84,27 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     private val _filteredEmojiList = MutableStateFlow<List<EmojiProvider.EmojiGridItem>>(emptyList())
     val filteredEmojiList: StateFlow<List<EmojiProvider.EmojiGridItem>> = _filteredEmojiList.asStateFlow()
 
+    // --- Estado Teclado Flotante ---
+    private val _isFloatingMode = MutableStateFlow(false)
+    val isFloatingMode: StateFlow<Boolean> = _isFloatingMode.asStateFlow()
+
+    private val _floatingOffsetX = MutableStateFlow(0f)
+    val floatingOffsetX: StateFlow<Float> = _floatingOffsetX.asStateFlow()
+
+    private val _floatingOffsetY = MutableStateFlow(0f)
+    val floatingOffsetY: StateFlow<Float> = _floatingOffsetY.asStateFlow()
+
+    private val _floatingScale = MutableStateFlow(0.85f)
+    val floatingScale: StateFlow<Float> = _floatingScale.asStateFlow()
+
+    private val _floatingCardRect = MutableStateFlow<android.graphics.Rect?>(null)
+    val floatingCardRect: StateFlow<android.graphics.Rect?> = _floatingCardRect.asStateFlow()
+
+    fun updateFloatingCardRect(rect: android.graphics.Rect) {
+        _floatingCardRect.value = rect
+        onActionRequested?.invoke(Action.UpdateFloatingCardRect(rect))
+    }
+
     // --- Callbacks para comunicación con el Service ---
     var onActionRequested: ((Action) -> Unit)? = null
 
@@ -99,9 +120,76 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
         object RefreshClipboard : Action()
         object SwitchToNextLanguage : Action()
         object ShowLanguagePicker : Action()
+        data class ToggleFloatingMode(val enabled: Boolean) : Action()
+        data class UpdateFloatingWindowPosition(val x: Float, val y: Float) : Action()
+        data class UpdateFloatingCardRect(val rect: android.graphics.Rect) : Action()
     }
 
     enum class SettingsType { GENERAL, THEMES, PERMISSIONS }
+
+    // --- Lógica de Negocio / UI ---
+
+    fun loadFloatingSettings(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            ThemeUtils.getDataStore(context).data.collect { prefs ->
+                _isFloatingMode.value = prefs[ThemeUtils.FLOATING_KEYBOARD_ENABLED] ?: false
+                _floatingOffsetX.value = prefs[ThemeUtils.FLOATING_KEYBOARD_X] ?: 0f
+                _floatingOffsetY.value = prefs[ThemeUtils.FLOATING_KEYBOARD_Y] ?: 0f
+                _floatingScale.value = prefs[ThemeUtils.FLOATING_KEYBOARD_SCALE] ?: 0.85f
+            }
+        }
+    }
+
+    fun setFloatingMode(enabled: Boolean, context: Context? = null) {
+        _isFloatingMode.value = enabled
+        if (context != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                ThemeUtils.getDataStore(context).edit { prefs ->
+                    prefs[ThemeUtils.FLOATING_KEYBOARD_ENABLED] = enabled
+                }
+            }
+        }
+        onActionRequested?.invoke(Action.ToggleFloatingMode(enabled))
+    }
+
+    fun toggleFloatingMode(context: Context) {
+        val newState = !_isFloatingMode.value
+        setFloatingMode(newState, context)
+        if (newState) {
+            setCurrentView("keyboard")
+        }
+    }
+
+    fun updateFloatingPosition(x: Float, y: Float, context: Context? = null) {
+        _floatingOffsetX.value = x
+        _floatingOffsetY.value = y
+        onActionRequested?.invoke(Action.UpdateFloatingWindowPosition(x, y))
+        if (context != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                ThemeUtils.getDataStore(context).edit { prefs ->
+                    prefs[ThemeUtils.FLOATING_KEYBOARD_X] = x
+                    prefs[ThemeUtils.FLOATING_KEYBOARD_Y] = y
+                }
+            }
+        }
+    }
+
+    fun updateFloatingScale(scale: Float, context: Context? = null) {
+        val clampedScale = scale.coerceIn(0.60f, 1.25f)
+        _floatingScale.value = clampedScale
+        if (context != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                ThemeUtils.getDataStore(context).edit { prefs ->
+                    prefs[ThemeUtils.FLOATING_KEYBOARD_SCALE] = clampedScale
+                }
+            }
+        }
+    }
+
+    fun resetFloatingPosition(context: Context? = null) {
+        updateFloatingPosition(0f, 0f, context)
+        updateFloatingScale(0.85f, context)
+    }
 
     // --- Lógica de Negocio / UI ---
 

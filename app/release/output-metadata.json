@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "dev.cozu2806.hexkeyboard",
+  "applicationId": "dev.cozu0628.hexkeyboard",
   "variantName": "release",
   "elements": [
     {
@@ -12,7 +12,7 @@
       "filters": [],
       "attributes": [],
       "versionCode": 1,
-      "versionName": "10.0.0",
+      "versionName": "10.6.2",
       "outputFile": "app-release.apk"
     }
   ],

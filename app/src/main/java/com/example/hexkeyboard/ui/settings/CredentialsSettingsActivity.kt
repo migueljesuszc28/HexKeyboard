@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,8 +35,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -120,7 +124,19 @@ class CredentialsSettingsActivity : FragmentActivity() {
                     }
                 }
 
-                val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+                val backInteraction = remember { MutableInteractionSource() }
+                val backShape = rememberMorphingShape(backInteraction, 24.dp, 14.dp)
+
+                val uploadInteraction = remember { MutableInteractionSource() }
+                val uploadShape = rememberMorphingShape(uploadInteraction, 24.dp, 14.dp)
+
+                val searchInteraction = remember { MutableInteractionSource() }
+                val searchShape = rememberMorphingShape(searchInteraction, 24.dp, 14.dp)
+
+                val fabInteraction = remember { MutableInteractionSource() }
+                val fabShape = rememberMorphingShape(fabInteraction, 28.dp, 14.dp)
+
+                val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
                 val isAuthenticated = isAuthenticatedState.value
                 val list = credentialsState.value
                 val filteredList = remember(list, searchQuery) {
@@ -139,12 +155,14 @@ class CredentialsSettingsActivity : FragmentActivity() {
                                 .background(brush = topBarMaskBrush)
                         ) {
                             Column {
-                                TopAppBar(
+                                LargeTopAppBar(
                                     title = { Text("Cuentas y Contraseñas", fontWeight = FontWeight.Bold) },
                                     navigationIcon = {
                                         FilledTonalIconButton(
                                             onClick = { finish() },
-                                            shape = CircleShape
+                                            shape = backShape,
+                                            interactionSource = backInteraction,
+                                            modifier = Modifier.padding(start = 4.dp).size(48.dp)
                                         ) {
                                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                                         }
@@ -155,7 +173,9 @@ class CredentialsSettingsActivity : FragmentActivity() {
                                                 onClick = {
                                                     importCsvLauncher.launch(arrayOf("text/comma-separated-values", "text/csv", "application/csv", "text/plain"))
                                                 },
-                                                shape = CircleShape
+                                                shape = uploadShape,
+                                                interactionSource = uploadInteraction,
+                                                modifier = Modifier.size(48.dp)
                                             ) {
                                                 Icon(Icons.Default.UploadFile, contentDescription = "Importar CSV Google")
                                             }
@@ -165,7 +185,9 @@ class CredentialsSettingsActivity : FragmentActivity() {
                                                     isSearchActive = !isSearchActive
                                                     if (!isSearchActive) searchQuery = ""
                                                 },
-                                                shape = CircleShape
+                                                shape = searchShape,
+                                                interactionSource = searchInteraction,
+                                                modifier = Modifier.padding(end = 4.dp).size(48.dp)
                                             ) {
                                                 Icon(
                                                     if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
@@ -220,15 +242,14 @@ class CredentialsSettingsActivity : FragmentActivity() {
                                 onClick = { showAddDialog = true },
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                                shape = CircleShape
+                                shape = fabShape,
+                                interactionSource = fabInteraction
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = "Añadir credencial")
                             }
                         }
                     }
                 ) { padding ->
-                    val requireBiometricKeyboard by CredentialsManager.getRequireBiometricKeyboardFlow(LocalContext.current).collectAsState(initial = false)
-
                     if (!isAuthenticated) {
                         Box(
                             modifier = Modifier
@@ -311,50 +332,16 @@ class CredentialsSettingsActivity : FragmentActivity() {
                                         Surface(
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(20.dp),
-                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                            tonalElevation = 1.dp
+                                            color = MaterialTheme.colorScheme.surfaceContainerLow
                                         ) {
-                                            Row(
-                                                modifier = Modifier.padding(16.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                                    modifier = Modifier.size(36.dp)
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            Icons.Default.Fingerprint,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                            modifier = Modifier.size(20.dp)
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(Modifier.width(12.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = "Requerir biometría en el teclado",
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 14.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Text(
-                                                        text = "Solicita huella o PIN al abrir las contraseñas en el teclado",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                                Switch(
-                                                    checked = requireBiometricKeyboard,
-                                                    onCheckedChange = { enabled ->
-                                                        lifecycleScope.launch {
-                                                            CredentialsManager.setRequireBiometricKeyboard(this@CredentialsSettingsActivity, enabled)
-                                                        }
-                                                    }
-                                                )
-                                            }
+                                            SwitchPreference(
+                                                title = "Requerir biometría en el teclado",
+                                                subtitle = "Solicita huella o PIN al abrir las contraseñas en el teclado",
+                                                key = booleanPreferencesKey("require_biometric_keyboard"),
+                                                defaultValue = false,
+                                                icon = Icons.Default.Fingerprint,
+                                                context = LocalContext.current
+                                            )
                                         }
                                     }
 
@@ -679,4 +666,35 @@ fun CredentialDialog(
         },
         shape = RoundedCornerShape(28.dp)
     )
+}
+
+@Preview(name = "Light Mode", showBackground = true, showSystemUi = true)
+@Preview(
+    name = "Dark Mode",
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+    showSystemUi = true
+)
+@Composable
+fun PreviewCredentialsSettingsScreen() {
+    HexKeyboardTheme {
+        Surface {
+            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                ) {
+                    SwitchPreference(
+                        title = "Requerir biometría en el teclado",
+                        subtitle = "Solicita huella o PIN al abrir las contraseñas en el teclado",
+                        key = booleanPreferencesKey("require_biometric_keyboard"),
+                        defaultValue = false,
+                        icon = Icons.Default.Fingerprint,
+                        context = LocalContext.current
+                    )
+                }
+            }
+        }
+    }
 }

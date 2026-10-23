@@ -8,10 +8,11 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,16 +22,18 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.hexkeyboard.data.repository.KeyboardTheme
@@ -38,6 +41,12 @@ import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
 import kotlinx.coroutines.launch
+
+// Importamos las funciones utilitarias de Material 3 Expressive que ya definiste en SettingsActivity
+import com.example.hexkeyboard.ui.settings.CategoryHeader
+import com.example.hexkeyboard.ui.settings.SettingsCardContainer
+import com.example.hexkeyboard.ui.settings.SettingsGap
+import com.example.hexkeyboard.ui.settings.rememberMorphingShape
 
 class ThemeSettingsActivity : ComponentActivity() {
 
@@ -77,7 +86,8 @@ fun ThemeSettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     val currentTheme by ThemeUtils.getKeyboardThemeFlow(context).collectAsState(initial = null)
     val themes by ThemeUtils.getAllThemesFlow(context).collectAsState(initial = emptyList())
     var showDeleteDialog by remember { mutableStateOf<KeyboardTheme?>(null) }
@@ -85,22 +95,55 @@ fun ThemeSettingsScreen(
     val systemThemes = remember(themes) { themes.filter { !it.id.startsWith("custom_") } }
     val customThemes = remember(themes) { themes.filter { it.id.startsWith("custom_") } }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Temas del Teclado", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    FilledTonalIconButton(
-                        onClick = onBack,
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás"
-                        )
-                    }
-                }
+    // Morphing Shapes usando tu función importada
+    val backInteraction = remember { MutableInteractionSource() }
+    val backShape = rememberMorphingShape(backInteraction, 24.dp, 14.dp)
+
+    val fabInteraction = remember { MutableInteractionSource() }
+    val fabShape = rememberMorphingShape(fabInteraction, 28.dp, 14.dp)
+
+    // Máscara superior corregida sin arrayOf()
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val isDark = surfaceColor.luminance() < 0.5f
+    val topBarMaskBrush = remember(isDark, surfaceColor) {
+        if (isDark) {
+            Brush.verticalGradient(
+                0.0f to Color.Black.copy(alpha = 0.55f),
+                0.6f to Color.Black.copy(alpha = 0.20f),
+                1.0f to Color.Transparent
             )
+        } else {
+            Brush.verticalGradient(
+                0.0f to surfaceColor.copy(alpha = 0.92f),
+                0.6f to surfaceColor.copy(alpha = 0.50f),
+                1.0f to Color.Transparent
+            )
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            Box(modifier = Modifier.fillMaxWidth().background(brush = topBarMaskBrush)) {
+                LargeTopAppBar(
+                    title = {
+                        Text("Temas del Teclado", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    navigationIcon = {
+                        FilledTonalIconButton(
+                            onClick = onBack,
+                            shape = backShape,
+                            interactionSource = backInteraction,
+                            modifier = Modifier.padding(start = 4.dp).size(48.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, scrolledContainerColor = Color.Transparent),
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -109,144 +152,108 @@ fun ThemeSettingsScreen(
                 text = { Text("Crear Tema", fontWeight = FontWeight.Bold) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
+                shape = fabShape,
+                interactionSource = fabInteraction
             )
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
+                .padding(top = padding.calculateTopPadding()),
+            contentPadding = PaddingValues(
+                bottom = padding.calculateBottomPadding() + 88.dp
+            )
         ) {
-            // Live Preview Hero Section (Fijo en la parte superior)
+            // Live Preview Hero Section
             currentTheme?.let { theme ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 2.dp
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
+                stickyHeader {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(top = 8.dp, bottom = 8.dp)
+                    ) {
+                        SettingsCardContainer {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                ) {
                                     Icon(
                                         Icons.Outlined.Palette,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(16.dp)
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Tema activo: ${theme.name}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Vista previa activa: ${theme.name}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        KeyboardPreview(
-                            theme = theme,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .wrapContentHeight()
-                        )
-                    }
-                }
-            }
-
-            // Lista con Scroll optimizado para seleccionar temas
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 88.dp)
-            ) {
-                // System Themes
-                item {
-                    ThemeSectionHeader("Temas Predeterminados", Icons.Outlined.Palette)
-                }
-
-                items(
-                    items = systemThemes,
-                    key = { it.id },
-                    contentType = { "theme_item" }
-                ) { theme ->
-                    ThemeItem(
-                        theme = theme,
-                        isSelected = theme.id == currentTheme?.id,
-                        onSelect = {
-                            scope.launch {
-                                ThemeUtils.saveThemeSelection(context, theme.id)
-                            }
-                        },
-                        onEdit = { onEditTheme(theme.id) },
-                        onDelete = { showDeleteDialog = theme }
-                    )
-                }
-
-                // Custom Themes Section
-                item {
-                    ThemeSectionHeader("Mis Temas Personalizados", Icons.Default.Brush)
-                }
-
-                if (customThemes.isEmpty()) {
-                    item {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            tonalElevation = 1.dp
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Aún no has creado temas personalizados. Pulsa 'Crear Tema' para diseñar tu propio tema.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                KeyboardPreview(
+                                    theme = theme,
+                                    modifier = Modifier.fillMaxWidth().wrapContentHeight()
                                 )
                             }
                         }
                     }
-                } else {
-                    items(
-                        items = customThemes,
-                        key = { it.id },
-                        contentType = { "theme_item" }
-                    ) { theme ->
+                }
+            }
+
+            // Temas Predeterminados
+            item { CategoryHeader("Temas Predeterminados", Icons.Outlined.Palette) }
+            item {
+                SettingsCardContainer {
+                    systemThemes.forEachIndexed { index, theme ->
                         ThemeItem(
                             theme = theme,
                             isSelected = theme.id == currentTheme?.id,
-                            onSelect = {
-                                scope.launch {
-                                    ThemeUtils.saveThemeSelection(context, theme.id)
-                                }
-                            },
+                            onSelect = { scope.launch { ThemeUtils.saveThemeSelection(context, theme.id) } },
                             onEdit = { onEditTheme(theme.id) },
                             onDelete = { showDeleteDialog = theme }
                         )
+                        if (index < systemThemes.lastIndex) SettingsGap()
+                    }
+                }
+            }
+
+            // Temas Personalizados
+            item { CategoryHeader("Mis Temas", Icons.Default.Brush) }
+            item {
+                SettingsCardContainer {
+                    if (customThemes.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Aún no has creado temas personalizados.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        customThemes.forEachIndexed { index, theme ->
+                            ThemeItem(
+                                theme = theme,
+                                isSelected = theme.id == currentTheme?.id,
+                                onSelect = { scope.launch { ThemeUtils.saveThemeSelection(context, theme.id) } },
+                                onEdit = { onEditTheme(theme.id) },
+                                onDelete = { showDeleteDialog = theme }
+                            )
+                            if (index < customThemes.lastIndex) SettingsGap()
+                        }
                     }
                 }
             }
         }
     }
 
+    // Diálogo de eliminación
     showDeleteDialog?.let { theme ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
@@ -273,38 +280,6 @@ fun ThemeSettingsScreen(
 }
 
 @Composable
-fun ThemeSectionHeader(title: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp)
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-@Composable
 fun ThemeItem(
     theme: KeyboardTheme,
     isSelected: Boolean,
@@ -314,67 +289,64 @@ fun ThemeItem(
 ) {
     val isCustom = theme.id.startsWith("custom_")
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) 
-               else MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = if (isSelected) 2.dp else 1.dp,
-        onClick = onSelect
-    ) {
-        ListItem(
-            headlineContent = {
-                Text(
-                    text = theme.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
-                )
-            },
-            leadingContent = {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(theme.backgroundColor),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("⬡", color = Color(theme.keyTextColor), fontWeight = FontWeight.Bold)
-                    }
+    ListItem(
+        headlineContent = {
+            Text(
+                text = theme.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+            )
+        },
+        leadingContent = {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = Color(theme.backgroundColor),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("⬡", color = Color(theme.keyTextColor), fontWeight = FontWeight.Bold)
                 }
-            },
-            trailingContent = {
-                if (isCustom) {
-                    Row {
-                        IconButton(onClick = onEdit) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
-                        }
-                        IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                } else if (isSelected) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
+            }
+        },
+        trailingContent = {
+            if (isCustom) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isSelected) {
                         Icon(
                             Icons.Default.Check,
                             contentDescription = "Seleccionado",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .size(16.dp)
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(end = 12.dp).size(20.dp)
                         )
                     }
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            )
-        )
-    }
+            } else if (isSelected) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "Seleccionado",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(4.dp).size(16.dp)
+                    )
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f) else Color.Transparent
+        ),
+        modifier = Modifier.clickable(onClick = onSelect)
+    )
 }
 
 @Preview(name = "Light Mode", showBackground = true, showSystemUi = true)

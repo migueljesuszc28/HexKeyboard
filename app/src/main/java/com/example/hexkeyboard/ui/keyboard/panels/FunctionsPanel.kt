@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.FitScreen
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -43,7 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.example.hexkeyboard.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.example.hexkeyboard.R
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
@@ -71,6 +73,9 @@ fun FunctionsPanel(
     val currentLocaleFlow = remember(viewModel) { viewModel?.currentLocale ?: kotlinx.coroutines.flow.MutableStateFlow("es") }
     val currentLocale by currentLocaleFlow.collectAsState("es")
     val isEn = currentLocale == "en"
+
+    val isFloatingFlow = remember(viewModel) { viewModel?.isFloatingMode ?: kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val isFloatingMode by isFloatingFlow.collectAsState(false)
 
     val backdrop = rememberLayerBackdrop()
     val savedGlassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
@@ -180,6 +185,20 @@ fun FunctionsPanel(
                             label = if (isEn) "Language" else "Idioma",
                             onClick = {
                                 viewModel?.setCurrentView("languages", context)
+                            },
+                            theme = theme
+                        )
+                    }
+                    item {
+                        FunctionItem(
+                            icon = if (isFloatingMode) Icons.Outlined.FitScreen else Icons.Outlined.AspectRatio,
+                            label = if (isFloatingMode) {
+                                context.getKeyboardString(R.string.floating_keyboard_dock, currentLocale)
+                            } else {
+                                context.getKeyboardString(R.string.floating_keyboard_title, currentLocale)
+                            },
+                            onClick = {
+                                viewModel?.toggleFloatingMode(context)
                             },
                             theme = theme
                         )

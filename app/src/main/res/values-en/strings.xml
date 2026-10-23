@@ -7,6 +7,8 @@
     <string name="functions_button_description">More features</string>
     <string name="functions_panel_description">Functions panel</string>
     <string name="keyboard_view_description">Hexagonal keyboard</string>
+    <string name="floating_keyboard_title">Floating</string>
+    <string name="floating_keyboard_dock">Dock</string>
 
     <string name="settings_title">Keyboard Settings</string>
 

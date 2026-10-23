@@ -109,6 +109,11 @@ class PredictionEngine(private val context: Context) {
         this.keyCenters = centers
     }
 
+    fun resetCalibration() {
+        calibrationManager.reset()
+        predictionCache.evictAll()
+    }
+
     fun setLayoutType(type: String) {
         predictionCache.evictAll()
     }

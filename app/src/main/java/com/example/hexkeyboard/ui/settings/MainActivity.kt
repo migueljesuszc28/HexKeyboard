@@ -1,8 +1,8 @@
 package com.example.hexkeyboard.ui.settings
 
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
@@ -11,31 +11,39 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.hexkeyboard.R
+import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import com.example.hexkeyboard.ui.theme.HexKeyboardTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -44,275 +52,396 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableMaxRefreshRate()
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         )
-        
+
         setContent {
             HexKeyboardTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .imePadding(),
-                        onEnableClick = {
-                            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-                        },
-                        onSelectClick = {
-                            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                            imm.showInputMethodPicker()
-                        },
-                        onSettingsClick = {
-                            startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
-                        }
-                    )
-                }
+                MainScreen(
+                    onEnableClick = {
+                        startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                    },
+                    onSelectClick = {
+                        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                        imm.showInputMethodPicker()
+                    },
+                    onSettingsClick = {
+                        startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                    }
+                )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    modifier: Modifier = Modifier,
     onEnableClick: () -> Unit,
     onSelectClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
-    ) {
-        // --- CABECERA DE BIENVENIDA / HERO CARD ---
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-            tonalElevation = 2.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(72.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_hexagon),
-                            contentDescription = "Hexagon Logo",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(42.dp)
-                        )
-                    }
-                }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isPreview = LocalInspectionMode.current
 
-                Spacer(modifier = Modifier.height(16.dp))
+    var isImeEnabled by remember { mutableStateOf(false) }
+    var isImeSelected by remember { mutableStateOf(false) }
 
-                Text(
-                    text = "Hex Keyboard",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
+    fun checkImeState() {
+        if (isPreview) return
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        val enabledList = imm?.enabledInputMethodList ?: emptyList()
+        isImeEnabled = enabledList.any { it.packageName == context.packageName }
 
-        // --- PASOS DE CONFIGURACIÓN RÁPIDA ---
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, bottom = 12.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(16.dp)
-                    )
+        val defaultIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        isImeSelected = defaultIme?.contains(context.packageName) == true
+    }
+
+    LaunchedEffect(Unit) {
+        checkImeState()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME || event == Lifecycle.Event.ON_START) {
+                checkImeState()
+                // Re-comprobar tras breves retrasos porque la configuración del sistema tarda unos ms en actualizarse
+                scope.launch {
+                    delay(250)
+                    checkImeState()
+                    delay(500)
+                    checkImeState()
                 }
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Configuración rápida",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
         }
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 1.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                SetupStepButton(
-                    stepNumber = "1",
-                    text = "Habilitar teclado en Ajustes",
-                    icon = Icons.Default.Settings,
-                    onClick = onEnableClick,
-                    isTonal = true
-                )
-
-                SetupStepButton(
-                    stepNumber = "2",
-                    text = "Seleccionar Hex Keyboard",
-                    icon = Icons.Default.Keyboard,
-                    onClick = onSelectClick,
-                    isTonal = true
-                )
-
-                SetupStepButton(
-                    stepNumber = "3",
-                    text = "Personalizar y Ajustes",
-                    icon = Icons.Outlined.Palette,
-                    onClick = onSettingsClick,
-                    isTonal = false
-                )
-            }
-        }
-
-        // --- PRUEBA DEL TECLADO ---
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, bottom = 12.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Keyboard,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Probar teclado",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 1.dp
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                var textState by remember { mutableStateOf("") }
-
-                OutlinedTextField(
-                    value = textState,
-                    onValueChange = { textState = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.test_keyboard_hint)) },
-                    placeholder = { Text("Escribe aqui para probar...") },
-                    shape = RoundedCornerShape(16.dp),
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                )
-            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
+
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val isDark = surfaceColor.luminance() < 0.5f
+
+    val activity = context as? ComponentActivity
+    DisposableEffect(isDark, activity) {
+        activity?.enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { isDark },
+            navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { isDark }
+        )
+        onDispose {}
+    }
+
+    val topBarMaskBrush = remember(isDark, surfaceColor) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to Color.Black.copy(alpha = 0.55f),
+                    0.6f to Color.Black.copy(alpha = 0.20f),
+                    1.0f to Color.Transparent
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to surfaceColor.copy(alpha = 0.92f),
+                    0.6f to surfaceColor.copy(alpha = 0.50f),
+                    1.0f to Color.Transparent
+                )
+            )
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.imePadding(),
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp,
+                    bottom = padding.calculateBottomPadding() + 32.dp
+                )
+            ) {
+            // --- HEROCARD / CABECERA EXPRESIVA DE BIENVENIDA ---
+            item {
+                SettingsCardContainer {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(72.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_hexagon),
+                                    contentDescription = "Hexagon Logo",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "Hex Keyboard",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Teclado hexagonal optimizado, inteligente y expresivo",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Badge con estado dinámico
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isImeEnabled && isImeSelected) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                            } else {
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isImeEnabled && isImeSelected) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = if (isImeEnabled && isImeSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isImeEnabled && isImeSelected) "Teclado activo y listo" else "Configuración requerida",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isImeEnabled && isImeSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- CONFIGURACIÓN RÁPIDA ---
+            item { CategoryHeader("Configuración Rápida", Icons.Default.Tune) }
+            item {
+                SettingsCardContainer {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SetupStepButton(
+                            stepNumber = "1",
+                            text = "Habilitar teclado en Ajustes",
+                            subtitle = if (isImeEnabled) "Habilitado en el sistema" else "Toca para habilitar en Ajustes de entrada",
+                            icon = Icons.Default.Settings,
+                            isCompleted = isImeEnabled,
+                            isTonal = true,
+                            onClick = onEnableClick
+                        )
+
+                        SetupStepButton(
+                            stepNumber = "2",
+                            text = "Seleccionar Hex Keyboard",
+                            subtitle = if (isImeSelected) "Seleccionado como teclado activo" else "Toca para elegir como teclado predeterminado",
+                            icon = Icons.Default.Keyboard,
+                            isCompleted = isImeSelected,
+                            isTonal = true,
+                            onClick = onSelectClick
+                        )
+
+                        SetupStepButton(
+                            stepNumber = "3",
+                            text = "Personalizar e Idiomas",
+                            subtitle = "Temas, fuentes, idioma y cristal líquido",
+                            icon = Icons.Outlined.Palette,
+                            isCompleted = false,
+                            isTonal = false,
+                            onClick = onSettingsClick
+                        )
+                    }
+                }
+            }
+
+            // --- PRUEBA DEL TECLADO ---
+            item { CategoryHeader("Probar Teclado", Icons.Default.Keyboard) }
+            item {
+                SettingsCardContainer {
+                    Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        var textState by remember { mutableStateOf("") }
+
+                        OutlinedTextField(
+                            value = textState,
+                            onValueChange = { textState = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            placeholder = {
+                                Text(
+                                    "Escribe aquí...",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(18.dp),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                if (textState.isNotEmpty()) {
+                                    IconButton(onClick = { textState = "" }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Limpiar",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // Sombra / máscara de degradado superior sobre la barra de estado
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp)
+                .background(brush = topBarMaskBrush)
+        )
+    }
+}
 }
 
 @Composable
 fun SetupStepButton(
     stepNumber: String,
     text: String,
+    subtitle: String? = null,
     icon: ImageVector,
-    onClick: () -> Unit,
-    isTonal: Boolean
+    isCompleted: Boolean = false,
+    isTonal: Boolean = true,
+    onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val buttonShape = rememberMorphingShape(
+        interactionSource = interactionSource,
+        restCorner = 20.dp,
+        pressedCorner = 10.dp
+    )
+
     val modifier = Modifier
         .fillMaxWidth()
-        .height(56.dp)
+        .height(64.dp)
 
     if (isTonal) {
         FilledTonalButton(
             onClick = onClick,
             modifier = modifier,
-            shape = RoundedCornerShape(16.dp),
+            shape = buttonShape,
+            interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
-            StepButtonContent(stepNumber, text, icon)
+            StepButtonContent(stepNumber, text, subtitle, icon, isCompleted)
         }
     } else {
         Button(
             onClick = onClick,
             modifier = modifier,
-            shape = RoundedCornerShape(16.dp),
+            shape = buttonShape,
+            interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
-            StepButtonContent(stepNumber, text, icon)
+            StepButtonContent(stepNumber, text, subtitle, icon, isCompleted)
         }
     }
 }
 
 @Composable
-fun StepButtonContent(stepNumber: String, text: String, icon: ImageVector) {
+fun StepButtonContent(
+    stepNumber: String,
+    text: String,
+    subtitle: String?,
+    icon: ImageVector,
+    isCompleted: Boolean
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
-            modifier = Modifier.size(28.dp)
+            color = if (isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+            modifier = Modifier.size(32.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = stepNumber,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isCompleted) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Completado",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                } else {
+                    Text(
+                        text = stepNumber,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Icon(
             imageVector = icon,
             contentDescription = null,

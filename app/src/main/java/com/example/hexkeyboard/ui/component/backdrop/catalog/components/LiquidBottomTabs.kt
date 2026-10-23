@@ -20,7 +20,6 @@ package com.convx.music.ui.component.backdrop.catalog.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -58,7 +57,7 @@ import androidx.compose.ui.util.lerp
 import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberCombinedBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.example.hexkeyboard.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.backdrop.catalog.utils.DampedDragAnimation
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.backdrop.drawBackdrop
@@ -68,6 +67,7 @@ import com.convx.music.ui.component.backdrop.effects.vibrancy
 import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.shadow.InnerShadow
 import com.convx.music.ui.component.backdrop.shadow.Shadow
+import com.example.hexkeyboard.ui.component.glassUsesDarkAppearance
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -87,7 +87,7 @@ fun LiquidBottomTabs(
     height: Dp = 64.dp,
     content: @Composable RowScope.() -> Unit
 ) {
-    val isLightTheme = !isSystemInDarkTheme()
+    val isLightTheme = !glassUsesDarkAppearance()
     val accentColor =
         if (isLightTheme) Color(0xFF0088FF)
         else Color(0xFF0091FF)
