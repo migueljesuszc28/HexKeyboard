@@ -25,10 +25,10 @@
 <p align="center">
   <img src="art/screenshots/main.jpg" width="28%" alt="Vista Principal" />
   <img src="art/screenshots/settings.jpg" width="28%" alt="Ajustes y Personalización" />
-  <img src="art/screenshots/themes.png" width="28%" alt="Pantalla de Temas" />
+  <img src="art/screenshots/themes.jpg" width="28%" alt="Pantalla de Temas" />
   <img src="art/screenshots/keyboard.jpg" width="28%" alt="Vista Principal del Teclado Hexagonal" />
-  <img src="art/screenshots/symbols.png" width="28%" alt="Panel de Símbolos" />
-  <img src="art/screenshots/fonts.png" width="28%" alt="Panel de Fuentes" />
+  <img src="art/screenshots/symbols.jpg" width="28%" alt="Panel de Símbolos" />
+  <img src="art/screenshots/fonts.jpg" width="28%" alt="Panel de Fuentes" />
   <img src="art/screenshots/emojis.jpg" width="28%" alt="Panel de Emojis" />
 </p>
 
