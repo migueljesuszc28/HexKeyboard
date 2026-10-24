@@ -223,16 +223,13 @@ fun FloatingKeyboardContainer(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(26.dp)
+                                .height(28.dp)
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onDoubleTap = {
                                             notifyUserInteraction()
                                             FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                             viewModel.resetFloatingPosition(context)
-                                        },
-                                        onTap = {
-                                            notifyUserInteraction()
                                         }
                                     )
                                 }
@@ -240,8 +237,8 @@ fun FloatingKeyboardContainer(
                                     detectDragGestures(
                                         onDragStart = {
                                             notifyUserInteraction()
-                                            dragAccumX = clampedX
-                                            dragAccumY = clampedY
+                                            dragAccumX = offsetX
+                                            dragAccumY = offsetY
                                             FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                         },
                                         onDrag = { change, dragAmount ->
@@ -303,7 +300,7 @@ private fun CornerHandlesOverlay(
     modifier: Modifier = Modifier
 ) {
     val strokeWidthPx = with(LocalDensity.current) { 3.5.dp.toPx() }
-    val cornerSizePx = with(LocalDensity.current) { 18.dp.toPx() }
+    val cornerSizePx = with(LocalDensity.current) { 16.dp.toPx() }
 
     Box(
         modifier = modifier
@@ -312,8 +309,8 @@ private fun CornerHandlesOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .offset(x = (-4).dp, y = 4.dp)
-                .size(32.dp)
+                .offset(x = (-12).dp, y = 12.dp)
+                .size(24.dp)
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
@@ -340,8 +337,8 @@ private fun CornerHandlesOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .offset(x = 4.dp, y = 4.dp)
-                .size(32.dp)
+                .offset(x = 12.dp, y = 12.dp)
+                .size(24.dp)
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
@@ -367,8 +364,8 @@ private fun CornerHandlesOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .offset(x = (-4).dp, y = (-4).dp)
-                .size(32.dp)
+                .offset(x = (-12).dp, y = (-12).dp)
+                .size(24.dp)
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
@@ -395,8 +392,8 @@ private fun CornerHandlesOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset(x = 4.dp, y = (-4).dp)
-                .size(32.dp)
+                .offset(x = 12.dp, y = (-12).dp)
+                .size(24.dp)
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()

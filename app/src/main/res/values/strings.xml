@@ -94,4 +94,6 @@
     <string name="menu_unpin">Desfijar</string>
     <string name="menu_edit">Editar</string>
     <string name="menu_delete">Borrar</string>
+    <string name="setting_auto_floating_landscape">Teclado flotante en horizontal</string>
+    <string name="setting_auto_floating_landscape_summary">Activar automáticamente el modo flotante al girar el dispositivo a horizontal</string>
 </resources>

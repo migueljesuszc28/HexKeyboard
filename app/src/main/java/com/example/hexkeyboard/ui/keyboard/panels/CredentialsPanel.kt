@@ -39,6 +39,7 @@ import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
+import com.example.hexkeyboard.ui.keyboard.components.rememberMorphingShape
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -296,6 +297,20 @@ fun CredentialKeyboardCard(
     val context = LocalContext.current
     var showPassword by remember { mutableStateOf(false) }
 
+    val userBtnInteraction = remember { MutableInteractionSource() }
+    val userBtnShape = rememberMorphingShape(
+        interactionSource = userBtnInteraction,
+        restCorner = 12.dp,
+        pressedCorner = 6.dp
+    )
+
+    val passBtnInteraction = remember { MutableInteractionSource() }
+    val passBtnShape = rememberMorphingShape(
+        interactionSource = passBtnInteraction,
+        restCorner = 12.dp,
+        pressedCorner = 6.dp
+    )
+
     val cardBgColor = if (theme.keysOpacity >= 0.95f) {
         Color(theme.keyBackgroundColor).copy(alpha = 1.0f)
     } else {
@@ -310,13 +325,13 @@ fun CredentialKeyboardCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = cardBgColor,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         tonalElevation = if (theme.id == "glass") 0.dp else 2.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp)
+                .padding(12.dp)
         ) {
             Text(
                 text = item.title,
@@ -324,7 +339,7 @@ fun CredentialKeyboardCard(
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -335,9 +350,11 @@ fun CredentialKeyboardCard(
                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                         onInsert(item.username)
                     },
+                    interactionSource = userBtnInteraction,
+                    shape = userBtnShape,
                     modifier = Modifier
                         .weight(1f)
-                        .height(32.dp),
+                        .height(34.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = buttonBgColor,
                         contentColor = Color(theme.keyTextColor)
@@ -355,9 +372,11 @@ fun CredentialKeyboardCard(
                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                         onInsert(item.password)
                     },
+                    interactionSource = passBtnInteraction,
+                    shape = passBtnShape,
                     modifier = Modifier
                         .weight(1f)
-                        .height(32.dp),
+                        .height(34.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = buttonBgColor,
                         contentColor = Color(theme.keyTextColor)

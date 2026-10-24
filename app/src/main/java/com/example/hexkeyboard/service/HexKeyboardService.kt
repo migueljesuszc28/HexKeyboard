@@ -331,6 +331,7 @@ class HexKeyboardService : InputMethodService(),
     private val currentWordTouchPoints = mutableListOf<TouchPoint>()
     private var autoCorrectForField = true
     private var allowPersonalizedLearning = true
+    private var isAutoLandscapeFloating = false
 
     private fun learnFromInputSafely(word: String, prev1: String? = null, prev2: String? = null) {
         if (allowPersonalizedLearning) {
@@ -399,6 +400,34 @@ class HexKeyboardService : InputMethodService(),
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         ThemeUtils.notifyDynamicColorsChanged()
+        handleOrientationFloatingMode(newConfig)
+    }
+
+    private fun handleOrientationFloatingMode(config: Configuration) {
+        serviceScope.launch {
+            val prefs = dataStore.data.first()
+            val autoLandscape = prefs[ThemeUtils.AUTO_FLOATING_IN_LANDSCAPE] ?: true
+            val isFloating = viewModel.isFloatingMode.value
+
+            if (autoLandscape) {
+                if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    if (!isFloating) {
+                        isAutoLandscapeFloating = true
+                        withContext(Dispatchers.Main) {
+                            viewModel.setFloatingMode(true)
+                        }
+                    }
+                } else if (config.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    if (isAutoLandscapeFloating) {
+                        isAutoLandscapeFloating = false
+                        val portraitFloatingEnabled = prefs[ThemeUtils.FLOATING_KEYBOARD_ENABLED] ?: false
+                        withContext(Dispatchers.Main) {
+                            viewModel.setFloatingMode(portraitFloatingEnabled)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype) {
@@ -546,6 +575,9 @@ class HexKeyboardService : InputMethodService(),
                 KeyboardViewModel.Action.SwitchToNextLanguage -> switchToNextLanguage()
                 KeyboardViewModel.Action.ShowLanguagePicker -> showLanguagePicker()
                 is KeyboardViewModel.Action.ToggleFloatingMode -> {
+                    if (!action.enabled) {
+                        isAutoLandscapeFloating = false
+                    }
                     updateImeWindowForFloatingMode(action.enabled)
                 }
                 is KeyboardViewModel.Action.UpdateFloatingWindowPosition -> {
@@ -567,22 +599,44 @@ class HexKeyboardService : InputMethodService(),
             outInsets.contentTopInsets = decorHeight
             outInsets.visibleTopInsets = decorHeight
 
+            val density = resources.displayMetrics.density
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
+
             val cardRect = viewModel.floatingCardRect.value
             if (cardRect != null && !cardRect.isEmpty) {
                 outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
-                outInsets.touchableRegion.set(cardRect)
+
+                if (viewModel.clipboardItemWithOptions.value != null) {
+                    // Si el menú de opciones del portapapeles está activo, capturar toda la pantalla
+                    outInsets.touchableRegion.set(0, 0, screenWidth, screenHeight)
+                } else {
+                    // Margen superior holgado (110dp) para cubrir los emergentes de long press de teclas y el arrastre de dedos hacia arriba
+                    val topMarginPx = (110 * density).toInt()
+                    val sideMarginPx = (20 * density).toInt()
+
+                    val expandedRect = android.graphics.Rect(
+                        maxOf(0, cardRect.left - sideMarginPx),
+                        maxOf(0, cardRect.top - topMarginPx),
+                        minOf(screenWidth, cardRect.right + sideMarginPx),
+                        minOf(screenHeight, cardRect.bottom + sideMarginPx)
+                    )
+                    outInsets.touchableRegion.set(expandedRect)
+                }
             } else {
                 outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
-                val density = resources.displayMetrics.density
                 val cardWidthPx = (310 * density).toInt()
                 val cardHeightPx = (280 * density).toInt()
-                val centerX = (resources.displayMetrics.widthPixels / 2)
-                val centerY = (resources.displayMetrics.heightPixels / 2)
+                val centerX = screenWidth / 2
+                val centerY = screenHeight / 2
+                val topMarginPx = (110 * density).toInt()
+                val sideMarginPx = (20 * density).toInt()
+
                 outInsets.touchableRegion.set(
-                    centerX - cardWidthPx / 2,
-                    centerY - cardHeightPx / 2,
-                    centerX + cardWidthPx / 2,
-                    centerY + cardHeightPx / 2
+                    maxOf(0, centerX - cardWidthPx / 2 - sideMarginPx),
+                    maxOf(0, centerY - cardHeightPx / 2 - topMarginPx),
+                    minOf(screenWidth, centerX + cardWidthPx / 2 + sideMarginPx),
+                    minOf(screenHeight, centerY + cardHeightPx / 2 + sideMarginPx)
                 )
             }
         }
@@ -700,6 +754,8 @@ class HexKeyboardService : InputMethodService(),
         updateImeWindowForFloatingMode(isFloating)
 
         val config = resources.configuration
+        handleOrientationFloatingMode(config)
+
         val isCompactMultiWindow = config.screenWidthDp in 1..520 || config.screenHeightDp in 1..480
         if (isCompactMultiWindow) {
             serviceScope.launch {

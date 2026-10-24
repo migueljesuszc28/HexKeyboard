@@ -57,6 +57,7 @@ import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBorderStroke
+import com.example.hexkeyboard.ui.keyboard.components.rememberMorphingShape
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 
@@ -251,6 +252,12 @@ fun FunctionItem(
     theme: KeyboardTheme
 ) {
     val context = LocalContext.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = rememberMorphingShape(
+        interactionSource = interactionSource,
+        restCorner = 18.dp,
+        pressedCorner = 10.dp
+    )
     val bgColor = if (theme.keysOpacity >= 0.95f) Color(theme.keyBackgroundColor).copy(alpha = 1.0f) else Color(theme.keyBackgroundColor).copy(alpha = theme.keysOpacity)
     val iconColor = Color(theme.keyboardIconTint)
     val textColor = Color(theme.keyTextColor)
@@ -259,21 +266,22 @@ fun FunctionItem(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxWidth()
-            .bounceClick(
-                onClick = {
-                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                    onClick()
-                },
-                onLongClick = onLongClick
-            )
+        modifier = Modifier.fillMaxWidth()
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = shape,
             color = bgColor,
             border = borderStroke,
-            modifier = Modifier.size(56.dp)
+            modifier = Modifier
+                .size(56.dp)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {
+                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                        onClick()
+                    }
+                )
         ) {
             Box(contentAlignment = Alignment.Center) {
                 when (icon) {

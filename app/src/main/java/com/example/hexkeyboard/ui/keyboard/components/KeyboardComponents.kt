@@ -43,7 +43,31 @@ import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.launch
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
+
 val LocalKeyBounceEnabled = staticCompositionLocalOf { true }
+
+/**
+ * Returns a [Shape] (RoundedCornerShape) that animates its corner radius
+ * with an expressive fast spatial spring when pressed.
+ */
+@Composable
+fun rememberMorphingShape(
+    interactionSource: MutableInteractionSource,
+    restCorner: Dp = 18.dp,
+    pressedCorner: Dp = 10.dp
+): Shape {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val corner by animateDpAsState(
+        targetValue = if (pressed) pressedCorner else restCorner,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f),
+        label = "expressiveShapeMorph"
+    )
+    return RoundedCornerShape(corner.value.coerceAtLeast(0f).dp)
+}
 
 @Composable
 fun rememberKeyBorderStroke(theme: KeyboardTheme): BorderStroke? {

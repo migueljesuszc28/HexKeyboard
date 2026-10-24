@@ -48,6 +48,7 @@ import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBorderStroke
+import com.example.hexkeyboard.ui.keyboard.components.rememberMorphingShape
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -149,10 +150,18 @@ fun LanguagePanel(
                     }
 
                     items(listOf("es" to context.getKeyboardString(R.string.lang_spanish, primaryLang), "en" to context.getKeyboardString(R.string.lang_english, primaryLang))) { (code, name) ->
+                        val itemInteractionSource = remember { MutableInteractionSource() }
+                        val itemShape = rememberMorphingShape(
+                            interactionSource = itemInteractionSource,
+                            restCorner = 16.dp,
+                            pressedCorner = 10.dp
+                        )
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .bounceClick(
+                                .clickable(
+                                    interactionSource = itemInteractionSource,
+                                    indication = null,
                                     onClick = {
                                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                         scope.launch {
@@ -163,7 +172,7 @@ fun LanguagePanel(
                                     }
                                 ),
                             color = cardColor,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = itemShape,
                             border = borderStroke,
                             tonalElevation = cardElevation
                         ) {
@@ -204,10 +213,18 @@ fun LanguagePanel(
                     }
 
                     items(listOf("" to context.getKeyboardString(R.string.lang_disabled, primaryLang), "es" to context.getKeyboardString(R.string.lang_spanish, primaryLang), "en" to context.getKeyboardString(R.string.lang_english, primaryLang))) { (code, name) ->
+                        val secItemInteractionSource = remember { MutableInteractionSource() }
+                        val secItemShape = rememberMorphingShape(
+                            interactionSource = secItemInteractionSource,
+                            restCorner = 16.dp,
+                            pressedCorner = 10.dp
+                        )
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .bounceClick(
+                                .clickable(
+                                    interactionSource = secItemInteractionSource,
+                                    indication = null,
                                     onClick = {
                                         FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
                                         scope.launch {
@@ -219,7 +236,7 @@ fun LanguagePanel(
                                     }
                                 ),
                             color = cardColor,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = secItemShape,
                             border = borderStroke,
                             tonalElevation = cardElevation
                         ) {

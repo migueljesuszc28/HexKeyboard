@@ -1,6 +1,7 @@
 package com.example.hexkeyboard.viewmodel
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -131,12 +133,19 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     fun loadFloatingSettings(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            ThemeUtils.getDataStore(context).data.collect { prefs ->
+            val prefs = ThemeUtils.getDataStore(context).data.first()
+            val config = context.resources.configuration
+            val autoLandscape = prefs[ThemeUtils.AUTO_FLOATING_IN_LANDSCAPE] ?: true
+            val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            if (autoLandscape && isLandscape) {
+                _isFloatingMode.value = true
+            } else {
                 _isFloatingMode.value = prefs[ThemeUtils.FLOATING_KEYBOARD_ENABLED] ?: false
-                _floatingOffsetX.value = prefs[ThemeUtils.FLOATING_KEYBOARD_X] ?: 0f
-                _floatingOffsetY.value = prefs[ThemeUtils.FLOATING_KEYBOARD_Y] ?: 0f
-                _floatingScale.value = prefs[ThemeUtils.FLOATING_KEYBOARD_SCALE] ?: 0.85f
             }
+            _floatingOffsetX.value = prefs[ThemeUtils.FLOATING_KEYBOARD_X] ?: 0f
+            _floatingOffsetY.value = prefs[ThemeUtils.FLOATING_KEYBOARD_Y] ?: 0f
+            _floatingScale.value = prefs[ThemeUtils.FLOATING_KEYBOARD_SCALE] ?: 0.85f
         }
     }
 

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -40,6 +41,7 @@ import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBorderStroke
+import com.example.hexkeyboard.ui.keyboard.components.rememberMorphingShape
 import com.example.hexkeyboard.ui.settings.PermissionActivity
 import com.example.hexkeyboard.ui.settings.themes.ThemeSettingsActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
@@ -95,7 +97,8 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 2.dp),
+                        .padding(horizontal = 2.dp)
+                        .animateContentSize(animationSpec = spring(dampingRatio = 0.75f, stiffness = 600f)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isListening) {
@@ -315,6 +318,13 @@ fun GboardCapsule(
         return
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = rememberMorphingShape(
+        interactionSource = interactionSource,
+        restCorner = 18.dp,
+        pressedCorner = 10.dp
+    )
+
     val baseColor = Color(theme.keyBackgroundColor)
     val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
         Color.Transparent
@@ -338,7 +348,7 @@ fun GboardCapsule(
                 onClick = onClick
             ),
         color = bgColor,
-        shape = CircleShape,
+        shape = shape,
         border = borderStroke
     ) {
         Box(
@@ -368,6 +378,13 @@ fun ShortcutIconCapsule(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = rememberMorphingShape(
+        interactionSource = interactionSource,
+        restCorner = 18.dp,
+        pressedCorner = 10.dp
+    )
+
     val baseColor = Color(theme.keyBackgroundColor)
     val bgColor = if (baseColor.alpha == 0f || baseColor == Color.Transparent) {
         Color.Transparent
@@ -384,7 +401,7 @@ fun ShortcutIconCapsule(
             .height(34.dp)
             .bounceClick(onClick = onClick),
         color = bgColor,
-        shape = CircleShape,
+        shape = shape,
         border = borderStroke
     ) {
         Box(

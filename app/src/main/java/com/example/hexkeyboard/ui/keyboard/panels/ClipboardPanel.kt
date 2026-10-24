@@ -62,6 +62,7 @@ import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
 import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBorderStroke
+import com.example.hexkeyboard.ui.keyboard.components.rememberMorphingShape
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -173,6 +174,12 @@ fun ClipboardPanel(
                         verticalItemSpacing = 8.dp
                     ) {
                         items(history, key = { "${it.timestamp}_${it.text.hashCode()}" }) { item ->
+                            val cardInteractionSource = remember { MutableInteractionSource() }
+                            val cardShape = rememberMorphingShape(
+                                interactionSource = cardInteractionSource,
+                                restCorner = 16.dp,
+                                pressedCorner = 10.dp
+                            )
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -186,11 +193,11 @@ fun ClipboardPanel(
                                             FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
                                             onLongPress(item) 
                                         },
-                                        interactionSource = remember { MutableInteractionSource() },
+                                        interactionSource = cardInteractionSource,
                                         indication = null
                                     ),
                                 color = cardColor,
-                                shape = RoundedCornerShape(14.dp),
+                                shape = cardShape,
                                 border = borderStroke,
                                 tonalElevation = cardElevation
                             ) {

@@ -720,6 +720,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.RestartAlt,
                         context = context
                     )
+                    SettingsGap()
+                    SwitchPreference(
+                        title = stringResource(R.string.setting_auto_floating_landscape),
+                        subtitle = stringResource(R.string.setting_auto_floating_landscape_summary),
+                        key = ThemeUtils.AUTO_FLOATING_IN_LANDSCAPE,
+                        defaultValue = true,
+                        icon = Icons.Default.ScreenRotation,
+                        context = context
+                    )
                 }
             }
 

@@ -6,6 +6,7 @@ import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -186,22 +187,24 @@ fun BoxScope.PanelsSection(viewModel: KeyboardViewModel, theme: KeyboardTheme, b
     AnimatedContent(
         targetState = currentView,
         transitionSpec = {
+            val expressiveFloatSpring = spring<Float>(dampingRatio = 0.78f, stiffness = 450f)
+            val expressiveIntOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.78f, stiffness = 450f)
             if (targetState != "keyboard") {
                 (slideInVertically(
                     initialOffsetY = { (it * 0.15f).toInt() },
-                    animationSpec = tween(220)
-                ) + fadeIn(animationSpec = tween(220))).togetherWith(
+                    animationSpec = expressiveIntOffsetSpring
+                ) + fadeIn(animationSpec = expressiveFloatSpring)).togetherWith(
                     fadeOut(animationSpec = tween(180)) + slideOutVertically(
                         targetOffsetY = { (it * 0.15f).toInt() },
-                        animationSpec = tween(180)
+                        animationSpec = expressiveIntOffsetSpring
                     )
                 )
             } else {
-                (fadeIn(animationSpec = tween(200))).togetherWith(
+                (fadeIn(animationSpec = expressiveFloatSpring)).togetherWith(
                     slideOutVertically(
                         targetOffsetY = { (it * 0.15f).toInt() },
-                        animationSpec = tween(180)
-                    ) + fadeOut(animationSpec = tween(180))
+                        animationSpec = expressiveIntOffsetSpring
+                    ) + fadeOut(animationSpec = expressiveFloatSpring)
                 )
             }
         },

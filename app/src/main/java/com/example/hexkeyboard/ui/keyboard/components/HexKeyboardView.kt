@@ -1041,9 +1041,16 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val layout = currentPopupLayout ?: return
         if (!layout.isLongPress) return
 
-        // Convertir coordenadas de pantalla global a la vista local del popup
-        val localX = x - layout.popupX
-        val localY = y - layout.popupY
+        // Obtener la posición en pantalla de HexKeyboardView para calcular el desplazamiento local del popup
+        val viewLocation = IntArray(2)
+        getLocationInWindow(viewLocation)
+
+        // Convertir coordenadas de HexKeyboardView a la vista local del popup
+        val popupXInView = layout.popupX - viewLocation[0]
+        val popupYInView = layout.popupY - viewLocation[1]
+
+        val localX = x - popupXInView
+        val localY = y - popupYInView
 
         // Búsqueda por Hitbox / Bounding Box de la celda con tolerancia cómoda
         var newIndex = layout.cells.indexOfFirst { cell ->
@@ -1053,7 +1060,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
 
         // Si el dedo está dentro del área del popup pero entre celdas, elegir la celda más cercana
-        if (newIndex == -1 && localY >= -50f && localY <= layout.height + 150f) {
+        if (newIndex == -1 && localY >= -60f && localY <= layout.height + 150f) {
             var minDist = Float.MAX_VALUE
             layout.cells.forEachIndexed { i, cell ->
                 val dx = localX - cell.centerX

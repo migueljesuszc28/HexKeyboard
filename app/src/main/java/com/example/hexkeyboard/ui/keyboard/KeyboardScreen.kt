@@ -1,7 +1,10 @@
 package com.example.hexkeyboard.ui.keyboard
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import kotlinx.coroutines.CoroutineScope
+import com.example.hexkeyboard.logic.managers.ClipboardItem
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hexkeyboard.R
+import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
@@ -54,6 +58,7 @@ import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.ui.keyboard.components.FloatingKeyboardContainer
 import com.example.hexkeyboard.ui.keyboard.components.LocalKeyBounceEnabled
 import com.example.hexkeyboard.ui.keyboard.components.rememberKeyBounceEnabled
+import com.example.hexkeyboard.ui.keyboard.components.rememberMorphingShape
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -197,12 +202,28 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                     if (isFullPanel && !isSearchActive) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(280.dp)
+                                .matchParentSize()
                                 .clip(RoundedCornerShape(20.dp))
                         ) {
                             PanelsSection(viewModel, keyboardTheme, 0, 0)
                         }
+                    }
+
+                    if (clipboardItemWithOptions != null) {
+                        val currentLocale by viewModel.currentLocale.collectAsState()
+                        ClipboardOptionsMenuOverlay(
+                            item = clipboardItemWithOptions!!,
+                            keyboardTheme = keyboardTheme,
+                            currentLocale = currentLocale,
+                            context = context,
+                            service = service,
+                            scope = scope,
+                            viewModel = viewModel,
+                            isFloating = true,
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(20.dp))
+                        )
                     }
                 }
             }
@@ -362,180 +383,202 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         }
                     }
                 }
+
+                if (clipboardItemWithOptions != null) {
+                    val currentLocale by viewModel.currentLocale.collectAsState()
+                    ClipboardOptionsMenuOverlay(
+                        item = clipboardItemWithOptions!!,
+                        keyboardTheme = keyboardTheme,
+                        currentLocale = currentLocale,
+                        context = context,
+                        service = service,
+                        scope = scope,
+                        viewModel = viewModel,
+                        isFloating = false,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(glassShape)
+                    )
+                }
             }
         }
+    }
+}
 
-        // Full-Keyboard Dimming Scrim & Gboard Popup Menu when long-pressing clipboard item
-        if (clipboardItemWithOptions != null) {
-            val item = clipboardItemWithOptions!!
-            val currentLocale by viewModel.currentLocale.collectAsState()
+@Composable
+private fun ClipboardOptionsMenuOverlay(
+    item: com.example.hexkeyboard.logic.managers.ClipboardItem,
+    keyboardTheme: KeyboardTheme,
+    currentLocale: String,
+    context: Context,
+    service: HexKeyboardService?,
+    scope: CoroutineScope,
+    viewModel: KeyboardViewModel,
+    isFloating: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val menuBgColor = if (keyboardTheme.keysOpacity >= 0.95f) {
+        Color(keyboardTheme.keyBackgroundColor).copy(alpha = 1.0f)
+    } else {
+        Color(keyboardTheme.keyBackgroundColor).copy(alpha = keyboardTheme.keysOpacity.coerceAtLeast(0.85f))
+    }
 
-            val menuBgColor = if (keyboardTheme.keysOpacity >= 0.95f) {
-                Color(keyboardTheme.keyBackgroundColor).copy(alpha = 1.0f)
-            } else {
-                Color(keyboardTheme.keyBackgroundColor).copy(alpha = keyboardTheme.keysOpacity.coerceAtLeast(0.85f))
-            }
-
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { viewModel.setClipboardItemWithOptions(null) },
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedVisibility(
+            visible = true,
+            enter = scaleIn(
+                initialScale = 0.80f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+            exit = scaleOut(
+                targetScale = 0.85f,
+                animationSpec = spring(stiffness = Spring.StiffnessHigh)
+            ) + fadeOut(animationSpec = tween(120))
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { viewModel.setClipboardItemWithOptions(null) },
+                    .padding(horizontal = if (isFloating) 6.dp else 12.dp)
+                    .clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
-                AnimatedVisibility(
-                    visible = true,
-                    enter = scaleIn(
-                        initialScale = 0.80f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
-                    exit = scaleOut(
-                        targetScale = 0.85f,
-                        animationSpec = spring(stiffness = Spring.StiffnessHigh)
-                    ) + fadeOut(animationSpec = tween(120))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isFloating) 185.dp else 195.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (isFloating) 6.dp else 10.dp)
                 ) {
-                    Box(
+                    // Columna Izquierda: Menú de Acciones estilo Gboard
+                    Surface(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .clickable(enabled = false) {},
-                        contentAlignment = Alignment.Center
+                            .width(if (isFloating) 125.dp else 145.dp)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = menuBgColor,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 12.dp,
+                        border = BorderStroke(1.dp, Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
                     ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(195.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Row 1: Pegar
+                            ClipboardMenuRow(
+                                icon = Icons.AutoMirrored.Outlined.Assignment,
+                                label = context.getKeyboardString(R.string.menu_paste, currentLocale),
+                                tint = Color(keyboardTheme.keyTextColor)
                             ) {
-                                // Columna Izquierda: Menú de Acciones estilo Gboard
-                                Surface(
-                                    modifier = Modifier
-                                        .width(145.dp)
-                                        .fillMaxHeight(),
-                                    shape = RoundedCornerShape(18.dp),
-                                    color = menuBgColor,
-                                tonalElevation = 6.dp,
-                                shadowElevation = 12.dp,
-                                border = BorderStroke(1.dp, Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
+                                viewModel.onClipboardItemClick(item)
+                                viewModel.setClipboardItemWithOptions(null)
+                            }
+
+                            HorizontalDivider(color = Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
+
+                            // Row 2: Fijar / Desfijar
+                            ClipboardMenuRow(
+                                icon = if (item.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                                label = if (item.isPinned) context.getKeyboardString(R.string.menu_unpin, currentLocale) else context.getKeyboardString(R.string.menu_pin, currentLocale),
+                                tint = Color(keyboardTheme.keyTextColor)
                             ) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth()
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
+                                scope.launch {
+                                    ClipboardHistoryManager.togglePin(context, item)
+                                    service?.refreshClipboardHistory(triggerSuggestionsUpdate = true)
+                                }
+                                viewModel.setClipboardItemWithOptions(null)
+                            }
+
+                            if (!item.isImage) {
+                                HorizontalDivider(color = Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
+
+                                // Row 3: Editar
+                                ClipboardMenuRow(
+                                    icon = Icons.Outlined.Edit,
+                                    label = context.getKeyboardString(R.string.menu_edit, currentLocale),
+                                    tint = Color(keyboardTheme.keyTextColor)
                                 ) {
-                                    // Row 1: Pegar
-                                    ClipboardMenuRow(
-                                        icon = Icons.AutoMirrored.Outlined.Assignment,
-                                        label = context.getKeyboardString(R.string.menu_paste, currentLocale),
-                                        tint = Color(keyboardTheme.keyTextColor)
-                                    ) {
-                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.KEY_CLICK)
-                                        viewModel.onClipboardItemClick(item)
-                                        viewModel.setClipboardItemWithOptions(null)
+                                    FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
+                                    val intent = Intent(context, ClipboardEditActivity::class.java).apply {
+                                        putExtra("item_text", item.text)
+                                        putExtra("item_timestamp", item.timestamp)
+                                        putExtra("item_image_uri", item.imageUri)
+                                        putExtra("item_mime_type", item.mimeType)
+                                        putExtra("item_is_pinned", item.isPinned)
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     }
-
-                                    HorizontalDivider(color = Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
-
-                                    // Row 2: Fijar / Desfijar
-                                    ClipboardMenuRow(
-                                        icon = if (item.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                                        label = if (item.isPinned) context.getKeyboardString(R.string.menu_unpin, currentLocale) else context.getKeyboardString(R.string.menu_pin, currentLocale),
-                                        tint = Color(keyboardTheme.keyTextColor)
-                                    ) {
-                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
-                                        scope.launch {
-                                            ClipboardHistoryManager.togglePin(context, item)
-                                            service?.refreshClipboardHistory(triggerSuggestionsUpdate = true)
-                                        }
-                                        viewModel.setClipboardItemWithOptions(null)
-                                    }
-
-                                    if (!item.isImage) {
-                                        HorizontalDivider(color = Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
-
-                                        // Row 3: Editar
-                                        ClipboardMenuRow(
-                                            icon = Icons.Outlined.Edit,
-                                            label = context.getKeyboardString(R.string.menu_edit, currentLocale),
-                                            tint = Color(keyboardTheme.keyTextColor)
-                                        ) {
-                                            FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.TICK)
-                                            val intent = Intent(context, ClipboardEditActivity::class.java).apply {
-                                                putExtra("item_text", item.text)
-                                                putExtra("item_timestamp", item.timestamp)
-                                                putExtra("item_image_uri", item.imageUri)
-                                                putExtra("item_mime_type", item.mimeType)
-                                                putExtra("item_is_pinned", item.isPinned)
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            }
-                                            context.startActivity(intent)
-                                            viewModel.setClipboardItemWithOptions(null)
-                                        }
-                                    }
-
-                                    HorizontalDivider(color = Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
-
-                                    // Row 4: Borrar
-                                    ClipboardMenuRow(
-                                        icon = Icons.Outlined.Delete,
-                                        label = context.getKeyboardString(R.string.menu_delete, currentLocale),
-                                        tint = Color.Red
-                                    ) {
-                                        FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
-                                        scope.launch {
-                                            if (service != null) {
-                                                service.deleteClipboardItem(item)
-                                            } else {
-                                                ClipboardHistoryManager.deleteItem(context, item)
-                                            }
-                                        }
-                                        viewModel.setClipboardItemWithOptions(null)
-                                    }
+                                    context.startActivity(intent)
+                                    viewModel.setClipboardItemWithOptions(null)
                                 }
                             }
 
-                            // Columna Derecha: Tarjeta de Vista Previa del Texto / Imagen Copiada
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                shape = RoundedCornerShape(18.dp),
-                                color = menuBgColor,
-                                tonalElevation = 6.dp,
-                                shadowElevation = 12.dp,
-                                border = BorderStroke(1.dp, Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
+                            HorizontalDivider(color = Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
+
+                            // Row 4: Borrar
+                            ClipboardMenuRow(
+                                icon = Icons.Outlined.Delete,
+                                label = context.getKeyboardString(R.string.menu_delete, currentLocale),
+                                tint = Color.Red
                             ) {
-                                Box(
+                                FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.DELETE)
+                                scope.launch {
+                                    if (service != null) {
+                                        service.deleteClipboardItem(item)
+                                    } else {
+                                        ClipboardHistoryManager.deleteItem(context, item)
+                                    }
+                                }
+                                viewModel.setClipboardItemWithOptions(null)
+                            }
+                        }
+                    }
+
+                    // Columna Derecha: Tarjeta de Vista Previa del Texto / Imagen Copiada
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = menuBgColor,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 12.dp,
+                        border = BorderStroke(1.dp, Color(keyboardTheme.keyTextColor).copy(alpha = 0.12f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(14.dp)
+                        ) {
+                            if (item.isImage && !item.imageUri.isNullOrEmpty()) {
+                                ClipboardImageThumbnail(
+                                    imageUriString = item.imageUri,
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(14.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
                                 ) {
-                                    if (item.isImage && !item.imageUri.isNullOrEmpty()) {
-                                        ClipboardImageThumbnail(
-                                            imageUriString = item.imageUri,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(RoundedCornerShape(12.dp))
-                                        )
-                                    } else {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .verticalScroll(rememberScrollState())
-                                        ) {
-                                            Text(
-                                                text = item.text,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = Color(keyboardTheme.keyTextColor),
-                                                lineHeight = 20.sp
-                                            )
-                                        }
-                                    }
+                                    Text(
+                                        text = item.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(keyboardTheme.keyTextColor),
+                                        lineHeight = 20.sp
+                                    )
                                 }
                             }
                         }
@@ -555,11 +598,16 @@ fun ClipboardMenuRow(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val shape = rememberMorphingShape(
+        interactionSource = interactionSource,
+        restCorner = 14.dp,
+        pressedCorner = 8.dp
+    )
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.93f else 1f,
+        targetValue = if (isPressed) 0.94f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = 0.6f,
+            stiffness = 800f
         ),
         label = "expressive_menu_row_bounce"
     )
@@ -576,7 +624,7 @@ fun ClipboardMenuRow(
                 scaleX = scale
                 scaleY = scale
             }
-            .background(rowBgColor, shape = RoundedCornerShape(8.dp))
+            .background(rowBgColor, shape = shape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
