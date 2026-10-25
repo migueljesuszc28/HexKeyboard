@@ -132,13 +132,14 @@ object ThemeUtils {
     val GLASS_CHROMATIC_ABERRATION = booleanPreferencesKey("glass_chromatic_aberration")
     val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
 
-    // Floating Keyboard Keys
+    // Floating & Split Keyboard Keys
     val FLOATING_KEYBOARD_ENABLED = booleanPreferencesKey("floating_keyboard_enabled")
     val FLOATING_KEYBOARD_X = floatPreferencesKey("floating_keyboard_x")
     val FLOATING_KEYBOARD_Y = floatPreferencesKey("floating_keyboard_y")
     val FLOATING_KEYBOARD_SCALE = floatPreferencesKey("floating_keyboard_scale")
     val AUTO_FLOATING_IN_MULTIWINDOW = booleanPreferencesKey("auto_floating_in_multiwindow")
     val AUTO_FLOATING_IN_LANDSCAPE = booleanPreferencesKey("auto_floating_in_landscape")
+    val SPLIT_KEYBOARD_ENABLED = booleanPreferencesKey("split_keyboard_enabled")
 
     fun getDataStore(context: Context) = context.dataStore
 

@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.automirrored.outlined.CallMerge
+import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.outlined.AspectRatio
@@ -41,6 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +81,14 @@ fun FunctionsPanel(
 
     val isFloatingFlow = remember(viewModel) { viewModel?.isFloatingMode ?: kotlinx.coroutines.flow.MutableStateFlow(false) }
     val isFloatingMode by isFloatingFlow.collectAsState(false)
+
+    val isSplitFlow = remember(viewModel) { viewModel?.isSplitMode ?: kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val isSplitMode by isSplitFlow.collectAsState(false)
+
+    val dataStore = remember { ThemeUtils.getDataStore(context) }
+    val layoutTypeFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default" } }
+    val layoutType by layoutTypeFlow.collectAsState("default")
+    val isQwerty = layoutType == "qwerty"
 
     val backdrop = rememberLayerBackdrop()
     val savedGlassConfigFlow = remember { ThemeUtils.getGlassEffectConfigFlow(context) }
@@ -192,6 +204,20 @@ fun FunctionsPanel(
                     }
                     item {
                         FunctionItem(
+                            icon = if (isQwerty) painterResource(R.drawable.ic_hexagon) else painterResource(R.drawable.ic_keyboard),
+                            label = if (isQwerty) {
+                                context.getKeyboardString(R.string.fn_layout_hexagonal, currentLocale)
+                            } else {
+                                context.getKeyboardString(R.string.fn_layout_qwerty, currentLocale)
+                            },
+                            onClick = {
+                                viewModel?.toggleLayoutType(context)
+                            },
+                            theme = theme
+                        )
+                    }
+                    item {
+                        FunctionItem(
                             icon = if (isFloatingMode) Icons.Outlined.FitScreen else Icons.Outlined.AspectRatio,
                             label = if (isFloatingMode) {
                                 context.getKeyboardString(R.string.floating_keyboard_dock, currentLocale)
@@ -200,6 +226,20 @@ fun FunctionsPanel(
                             },
                             onClick = {
                                 viewModel?.toggleFloatingMode(context)
+                            },
+                            theme = theme
+                        )
+                    }
+                    item {
+                        FunctionItem(
+                            icon = if (isSplitMode) Icons.AutoMirrored.Outlined.CallMerge else Icons.AutoMirrored.Outlined.CallSplit,
+                            label = if (isSplitMode) {
+                                context.getKeyboardString(R.string.split_keyboard_unsplit, currentLocale)
+                            } else {
+                                context.getKeyboardString(R.string.fn_split_keyboard, currentLocale)
+                            },
+                            onClick = {
+                                viewModel?.toggleSplitMode(context)
                             },
                             theme = theme
                         )

@@ -105,6 +105,16 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             }
         }
 
+    var isSplitMode: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                engine.isSplitMode = value
+                if (width > 0) buildLayout(width.toFloat())
+                invalidate()
+            }
+        }
+
     private var showKeyPopup: Boolean = true
     private var showLongPressIndicators: Boolean = true
         set(value) {
@@ -291,7 +301,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     private fun getHeightFactor(): Float {
-        return 0.7f + (cachedKeyboardHeight / 100f) * 0.6f
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val baseFactor = 0.7f + (cachedKeyboardHeight / 100f) * 0.6f
+        return if (isLandscape) baseFactor * 0.78f else baseFactor
     }
 
     var sharedTypeface: Typeface = Typeface.DEFAULT
@@ -373,8 +385,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val w = MeasureSpec.getSize(wMS)
         if (w <= 0) { setMeasuredDimension(0, 0); return }
         val f = getHeightFactor(); engine.heightFactor = f
-        val r = if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC) engine.getNumericR(w.toFloat()) else engine.getHexR(w.toFloat())
-        val rows = if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC) 3f else 4f
+        val isQwertyPureNumeric = layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && layoutType == "qwerty"
+        val r = if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && !isQwertyPureNumeric) engine.getNumericR(w.toFloat()) else engine.getHexR(w.toFloat())
+        val rows = if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && !isQwertyPureNumeric) 3f else 4f
         val dr = r * keyScale; val dry = dr * f
         val tp = r * 0.05f * f
         val h = (tp + 2 * dry + rows * r * 1.5f * f + r * 0.15f * f).toInt()
@@ -642,13 +655,33 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             val px = width / 2f
             val py = height / 2f
 
+            val targetKey = key ?: popupVisibleKey
+            val mainKeyTextSize = if (targetKey != null) {
+                if (targetKey.isRectangular || layoutType == "qwerty") {
+                    min(targetKey.rx * 1.55f, targetKey.ry * 0.95f)
+                } else {
+                    min(targetKey.rx, targetKey.ry) * 0.62f
+                }
+            } else {
+                min(width, height) * 0.22f
+            }
+
             if (!layout.isLongPress) {
                 val cell = layout.cells.firstOrNull() ?: return
                 val prx = width * 0.44f
                 val pry = height * 0.44f
-                val textSize = min(prx, pry) * 0.7f
+                val textSize = if (targetKey != null) mainKeyTextSize * 1.05f else min(prx, pry) * 0.7f
 
-                renderer.updateHexPath(localPopupHexPath, px, py, prx, pry)
+                val isRect = popupVisibleKey?.isRectangular == true || layoutType == "qwerty"
+                if (isRect) {
+                    val cr = min(prx, pry) * 0.4f
+                    val rect = RectF(px - prx, py - pry, px + prx, py + pry)
+                    localPopupHexPath.reset()
+                    localPopupHexPath.addRoundRect(rect, cr, cr, Path.Direction.CW)
+                } else {
+                    renderer.updateHexPath(localPopupHexPath, px, py, prx, pry)
+                }
+
                 canvas.withTranslation(0f, 6f) {
                     renderer.pShadow.color = renderer.colorPopupShadow
                     drawPath(localPopupHexPath, renderer.pShadow)
@@ -681,22 +714,34 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     canvas.drawPath(localPopupPath, renderer.pStroke)
                 }
 
-                val textSize = min(width, height) * 0.22f
-                renderer.pPopupText.textSize = textSize
-
                 val themeId = keyboardTheme?.id ?: ""
                 val highlightColor = if (themeId.contains("dark") || themeId == "terminal") "#4285F4".toColorInt() else renderer.colorPopupSelectedBg
 
                 layout.cells.forEachIndexed { i, cell ->
                     val kx = cell.centerX
                     val ky = cell.centerY
+
+                    val cellTextSize = if (cell.label.length > 1) {
+                        min(mainKeyTextSize * 0.8f, cell.bounds.width() * 0.4f)
+                    } else {
+                        mainKeyTextSize
+                    }
+                    renderer.pPopupText.textSize = cellTextSize
+
                     val ty = ky - (renderer.pPopupText.ascent() + renderer.pPopupText.descent()) / 2f
 
                     if (i == selectedIndex) {
                         val sW = cell.bounds.width()
                         val sH = cell.bounds.height()
-                        renderer.updateHexPath(localPopupHexPath, kx, ky, sW * 0.48f, sH * 0.48f)
-                        canvas.drawPath(localPopupHexPath, renderer.pPress.apply { color = highlightColor })
+                        val isRect = popupVisibleKey?.isRectangular == true || layoutType == "qwerty"
+                        if (isRect) {
+                            val cr = min(sW, sH) * 0.25f
+                            val rect = RectF(kx - sW * 0.48f, ky - sH * 0.48f, kx + sW * 0.48f, ky + sH * 0.48f)
+                            canvas.drawRoundRect(rect, cr, cr, renderer.pPress.apply { color = highlightColor })
+                        } else {
+                            renderer.updateHexPath(localPopupHexPath, kx, ky, sW * 0.48f, sH * 0.48f)
+                            canvas.drawPath(localPopupHexPath, renderer.pPress.apply { color = highlightColor })
+                        }
                         renderer.pPopupText.color = renderer.colorPopupSelectedText
                     } else {
                         renderer.pPopupText.color = renderer.colorPopupText
@@ -789,6 +834,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private val hidePopupRunnable = Runnable {
         try { if (popupWindow?.isShowing == true) popupWindow?.dismiss() } catch (e: Exception) { Log.e("HexKB", "Error dismissing popup", e) }
         popupVisibleKey = null
+        currentPopupLayout = null
     }
 
     private fun getPopupOffsetY(key: HexLayoutEngine.Key, isLongPress: Boolean, h: Int): Int {
@@ -803,6 +849,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         if (!showKeyPopup || windowToken == null) return
         handler.removeCallbacks(hidePopupRunnable)
 
+        val previousKey = currentPopupLayout?.key
         val layout = buildPopupLayoutInfo(key, isLongPress)
         currentPopupLayout = layout
 
@@ -837,7 +884,12 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         popupContentView?.invalidate()
 
         if (popupWindow?.isShowing == true) {
-            popupWindow?.update(layout.popupX, layout.popupY, layout.width, layout.height)
+            if (!isLongPress && previousKey != null && previousKey != key) {
+                popupWindow?.dismiss()
+                popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, layout.popupX, layout.popupY)
+            } else {
+                popupWindow?.update(layout.popupX, layout.popupY, layout.width, layout.height)
+            }
         } else {
             popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, layout.popupX, layout.popupY)
         }
@@ -845,11 +897,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     private fun hidePopup(immediate: Boolean = false) {
         handler.removeCallbacks(hidePopupRunnable)
-        if (immediate || popupContentView?.isLongPress == true) {
-            hidePopupRunnable.run()
-        } else {
-            handler.postDelayed(hidePopupRunnable, 80L)
-        }
+        hidePopupRunnable.run()
     }
 
     private var currentImeAction: Int = EditorInfo.IME_ACTION_NONE

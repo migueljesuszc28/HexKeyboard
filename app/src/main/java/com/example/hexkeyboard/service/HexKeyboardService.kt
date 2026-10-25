@@ -611,9 +611,9 @@ class HexKeyboardService : InputMethodService(),
                     // Si el menú de opciones del portapapeles está activo, capturar toda la pantalla
                     outInsets.touchableRegion.set(0, 0, screenWidth, screenHeight)
                 } else {
-                    // Margen superior holgado (110dp) para cubrir los emergentes de long press de teclas y el arrastre de dedos hacia arriba
-                    val topMarginPx = (110 * density).toInt()
-                    val sideMarginPx = (20 * density).toInt()
+                    // Margen superior holgado (300dp) para cubrir emergentes grandes de long press de emojis y teclas
+                    val topMarginPx = (300 * density).toInt()
+                    val sideMarginPx = (40 * density).toInt()
 
                     val expandedRect = android.graphics.Rect(
                         maxOf(0, cardRect.left - sideMarginPx),
@@ -629,8 +629,8 @@ class HexKeyboardService : InputMethodService(),
                 val cardHeightPx = (280 * density).toInt()
                 val centerX = screenWidth / 2
                 val centerY = screenHeight / 2
-                val topMarginPx = (110 * density).toInt()
-                val sideMarginPx = (20 * density).toInt()
+                val topMarginPx = (300 * density).toInt()
+                val sideMarginPx = (40 * density).toInt()
 
                 outInsets.touchableRegion.set(
                     maxOf(0, centerX - cardWidthPx / 2 - sideMarginPx),

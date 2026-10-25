@@ -90,6 +90,10 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     private val _isFloatingMode = MutableStateFlow(false)
     val isFloatingMode: StateFlow<Boolean> = _isFloatingMode.asStateFlow()
 
+    // --- Estado Teclado Dividido ---
+    private val _isSplitMode = MutableStateFlow(false)
+    val isSplitMode: StateFlow<Boolean> = _isSplitMode.asStateFlow()
+
     private val _floatingOffsetX = MutableStateFlow(0f)
     val floatingOffsetX: StateFlow<Float> = _floatingOffsetX.asStateFlow()
 
@@ -146,6 +150,7 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
             _floatingOffsetX.value = prefs[ThemeUtils.FLOATING_KEYBOARD_X] ?: 0f
             _floatingOffsetY.value = prefs[ThemeUtils.FLOATING_KEYBOARD_Y] ?: 0f
             _floatingScale.value = prefs[ThemeUtils.FLOATING_KEYBOARD_SCALE] ?: 0.85f
+            _isSplitMode.value = prefs[ThemeUtils.SPLIT_KEYBOARD_ENABLED] ?: false
         }
     }
 
@@ -164,9 +169,31 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     fun toggleFloatingMode(context: Context) {
         val newState = !_isFloatingMode.value
         setFloatingMode(newState, context)
-        if (newState) {
-            setCurrentView("keyboard")
+        setCurrentView("keyboard")
+    }
+
+    fun toggleSplitMode(context: Context) {
+        val newState = !_isSplitMode.value
+        _isSplitMode.value = newState
+        viewModelScope.launch(Dispatchers.IO) {
+            ThemeUtils.getDataStore(context).edit { prefs ->
+                prefs[ThemeUtils.SPLIT_KEYBOARD_ENABLED] = newState
+            }
         }
+        setCurrentView("keyboard")
+    }
+
+    fun toggleLayoutType(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val dataStore = ThemeUtils.getDataStore(context)
+            val prefs = dataStore.data.first()
+            val currentLayout = prefs[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default"
+            val newLayout = if (currentLayout == "qwerty") "default" else "qwerty"
+            dataStore.edit { prefs ->
+                prefs[ThemeUtils.KEYBOARD_LAYOUT_TYPE] = newLayout
+            }
+        }
+        setCurrentView("keyboard")
     }
 
     fun updateFloatingPosition(x: Float, y: Float, context: Context? = null) {

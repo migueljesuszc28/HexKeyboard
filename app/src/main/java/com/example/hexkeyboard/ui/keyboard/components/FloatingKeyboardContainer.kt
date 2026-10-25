@@ -52,6 +52,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.example.hexkeyboard.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.example.hexkeyboard.data.repository.KeyboardTheme
@@ -67,6 +72,7 @@ fun FloatingKeyboardContainer(
     viewModel: KeyboardViewModel,
     theme: KeyboardTheme,
     modifier: Modifier = Modifier,
+    backgroundImage: Bitmap? = null,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -193,21 +199,74 @@ fun FloatingKeyboardContainer(
                 Box(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Capa de fondo Liquid Glass / Transparencia si aplica el tema glass
+                    val img = backgroundImage
+                    val hasImg = img != null && !img.isRecycled
+
+                    // Capa 1: Renderizado de la Imagen de Fondo (si el tema incluye imagen)
+                    if (hasImg) {
+                        Image(
+                            bitmap = img!!.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(cardShape)
+                                .alpha(theme.backgroundOpacity),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
+                    // Capa 2: Tinta de color o Capa Glass
                     if (isGlassTheme) {
                         val isDarkText = Color(theme.keyTextColor).luminance() < 0.5f
+                        val ambientBg = if (isDarkText) {
+                            Color.White.copy(alpha = 0.22f)
+                        } else {
+                            Color(0xFF1E1E24).copy(alpha = 0.60f)
+                        }
+
+                        // Registramos la capa base ambiental en el backdrop antes del muestreo de liquidGlass
                         Box(
                             modifier = Modifier
                                 .matchParentSize()
                                 .layerBackdrop(backdrop)
+                        ) {
+                            if (hasImg) {
+                                Image(
+                                    bitmap = img!!.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .alpha(theme.backgroundOpacity),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(ambientBg)
+                                )
+                            }
+                        }
+
+                        // Muestreo del efecto Liquid Glass sobre el backdrop registrado
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
                                 .liquidGlass(
                                     config = glassConfig.copy(
-                                        surfaceOpacity = 0.12f,
-                                        surfaceTintColor = if (isDarkText) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
+                                        surfaceOpacity = 0.16f,
+                                        surfaceTintColor = if (isDarkText) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.15f)
                                     ),
                                     shape = cardShape,
                                     applyEdgeEffects = true
                                 )
+                        )
+                    } else if (theme.backgroundImageUri != null) {
+                        // Tinta de contraste para asegurar legibilidad cuando hay imagen de fondo
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(Color(theme.backgroundColor).copy(alpha = 1f - theme.backgroundOpacity))
                         )
                     }
 

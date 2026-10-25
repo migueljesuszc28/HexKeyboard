@@ -79,9 +79,11 @@
     <string name="setting_keyboard_language_title">Select Primary Language</string>
     <string name="setting_secondary_language">Secondary Language (Bilingual)</string>
     <string name="setting_secondary_language_title">Select Secondary Language</string>
-    <string name="setting_layout_type">Key Layout</string>
+    <string name="setting_layout_type">Keyboard layout</string>
     <string name="setting_layout_default">Default (Hexagonal Optimization)</string>
     <string name="setting_layout_qwerty">QWERTY (Classic)</string>
+    <string name="fn_layout_qwerty">QWERTY</string>
+    <string name="fn_layout_hexagonal">Hexagonal</string>
     <string name="btn_cancel">Cancel</string>
 
     <!-- Empty States & Floating Menus -->
@@ -96,4 +98,7 @@
     <string name="menu_delete">Delete</string>
     <string name="setting_auto_floating_landscape">Floating keyboard in landscape</string>
     <string name="setting_auto_floating_landscape_summary">Automatically activate floating mode when rotating device to landscape</string>
+    <string name="split_keyboard_title">Split</string>
+    <string name="split_keyboard_unsplit">Merge</string>
+    <string name="fn_split_keyboard">Split keyboard</string>
 </resources>

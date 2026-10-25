@@ -33,9 +33,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hexkeyboard.R
@@ -155,6 +157,11 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val glassShape = remember { RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp) }
     val keyBounceEnabled = rememberKeyBounceEnabled()
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isWideScreen = configuration.screenWidthDp > 600
+    val maxDockedWidth = if (isLandscape || isWideScreen) 580.dp else Dp.Unspecified
+
     CompositionLocalProvider(
         LocalKeyBounceEnabled provides keyBounceEnabled,
         LocalAppBackdrop provides keyboardBackdrop,
@@ -164,7 +171,8 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             FloatingKeyboardContainer(
                 viewModel = viewModel,
                 theme = keyboardTheme,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                backgroundImage = blurredBitmap ?: backgroundBitmap
             ) {
                 Box(
                     modifier = Modifier
@@ -231,9 +239,15 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight()
-                    .clip(glassShape)
+                    .wrapContentHeight(),
+                contentAlignment = Alignment.BottomCenter
             ) {
+                Box(
+                    modifier = Modifier
+                        .then(if (maxDockedWidth != Dp.Unspecified) Modifier.widthIn(max = maxDockedWidth) else Modifier.fillMaxWidth())
+                        .wrapContentHeight()
+                        .clip(glassShape)
+                ) {
                 // Capa 1: Registro del Backdrop (Imagen de fondo o Gradiente Ambiental para el tema Glass)
                 val img = blurredBitmap ?: backgroundBitmap
                 Box(
@@ -403,6 +417,7 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
             }
         }
     }
+}
 }
 
 @Composable

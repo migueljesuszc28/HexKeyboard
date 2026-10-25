@@ -48,6 +48,7 @@ fun KeyboardMainSection(
     val isCredentialsSearchActive by viewModel.isCredentialsSearchActive.collectAsState()
     val isSearchActive = isEmojiSearchActive || isCredentialsSearchActive
     val currentLocale by viewModel.currentLocale.collectAsState()
+    val isSplitMode by viewModel.isSplitMode.collectAsState()
     val keyboardVisible = currentView == "keyboard" || isSearchActive
 
     val context = LocalContext.current
@@ -88,6 +89,7 @@ fun KeyboardMainSection(
                 this.longPressAlternatives = service?.longPressAlternatives ?: emptyMap()
                 this.language = currentLocale
                 this.layoutType = layoutType
+                this.isSplitMode = isSplitMode
                 service?.mHexKeyboardView = this
                 this.drawBackground = !hasBackgroundImage
                 listener = object : HexKeyboardView.Listener {
@@ -125,6 +127,7 @@ fun KeyboardMainSection(
             view.keyboardTheme = theme
             view.language = currentLocale
             view.layoutType = layoutType
+            view.isSplitMode = isSplitMode
             view.drawBackground = !hasBackgroundImage
             view.visibility = if (keyboardVisible) View.VISIBLE else View.INVISIBLE
 

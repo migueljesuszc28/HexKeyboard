@@ -79,9 +79,11 @@
     <string name="setting_keyboard_language_title">Seleccionar idioma principal</string>
     <string name="setting_secondary_language">Idioma secundario (Bilingüe)</string>
     <string name="setting_secondary_language_title">Seleccionar idioma secundario</string>
-    <string name="setting_layout_type">Distribución de Teclas</string>
+    <string name="setting_layout_type">Distribución del teclado</string>
     <string name="setting_layout_default">Predeterminada (Optimización Hexagonal)</string>
     <string name="setting_layout_qwerty">QWERTY (Clásica)</string>
+    <string name="fn_layout_qwerty">QWERTY</string>
+    <string name="fn_layout_hexagonal">Hexagonal</string>
     <string name="btn_cancel">Cancelar</string>
 
     <!-- Estados Vacíos y Menús Flotantes -->
@@ -96,4 +98,7 @@
     <string name="menu_delete">Borrar</string>
     <string name="setting_auto_floating_landscape">Teclado flotante en horizontal</string>
     <string name="setting_auto_floating_landscape_summary">Activar automáticamente el modo flotante al girar el dispositivo a horizontal</string>
+    <string name="split_keyboard_title">Dividido</string>
+    <string name="split_keyboard_unsplit">Unir</string>
+    <string name="fn_split_keyboard">Teclado dividido</string>
 </resources>

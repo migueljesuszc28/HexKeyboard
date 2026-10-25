@@ -10,7 +10,9 @@ import android.view.inputmethod.EditorInfo
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
+import androidx.compose.material.icons.filled.KeyboardCapslock
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.KeyboardCapslock
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathNode
@@ -148,6 +150,9 @@ class HexRenderer(private val context: Context) {
     }
 
     // Icons
+    val iconShift: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_shift) }
+    val iconShiftActive: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_shift_active) }
+    val iconShiftFilled: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_shift_filled) }
     val iconDelete: Drawable? by lazy { imageVectorToDrawable(Icons.AutoMirrored.Outlined.Backspace) }
     val iconDeleteFilled: Drawable? by lazy { imageVectorToDrawable(Icons.AutoMirrored.Filled.Backspace) }
     val iconEnter: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_enter) }
@@ -281,17 +286,19 @@ class HexRenderer(private val context: Context) {
         val individualColor = themeObj.individualKeyColors[key.value]
         val activeBgColor: Int
 
+        val isSpecialKey = key.type in listOf(
+            HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER,
+            HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI,
+            HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD,
+            HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.DELETE
+        ) || (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && key.type == HexLayoutEngine.KeyType.CHAR && (key.value.isEmpty() || !key.value.first().isDigit()))
+
         val fill = when {
             pressed -> { pPress.color = colorPress; pPress }
             key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> { pFill.color = colorShiftActive; pFill }
             key.type == HexLayoutEngine.KeyType.SHIFT -> { pFill.color = colorShiftInactive; pFill }
             individualColor != null -> { pFill.color = individualColor; pFill }
-            key.type in listOf(
-                HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER,
-                HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI,
-                HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD,
-                HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.DELETE
-            ) -> { pSpec.color = colorSpec; pSpec }
+            isSpecialKey -> { pSpec.color = colorSpec; pSpec }
             else -> { pFill.color = colorFill; pFill }
         }
         activeBgColor = fill.color
@@ -326,14 +333,18 @@ class HexRenderer(private val context: Context) {
         val isDeleteWithText = key.type == HexLayoutEngine.KeyType.DELETE && overrideCx != null
 
         when (key.type) {
-            HexLayoutEngine.KeyType.SHIFT -> customLabel = context.getKeyboardString(R.string.key_label_shift, language)
+            HexLayoutEngine.KeyType.SHIFT -> {
+                if (!key.isRectangular) {
+                    customLabel = context.getKeyboardString(R.string.key_label_shift, language)
+                }
+            }
             HexLayoutEngine.KeyType.DELETE -> {
                 if (isDeleteWithText) {
                     customLabel = context.getKeyboardString(R.string.key_label_delete, language)
                 }
             }
             HexLayoutEngine.KeyType.ENTER -> {
-                if (isEnterWithText) {
+                if (isEnterWithText && !key.isRectangular) {
                     customLabel = when (currentImeAction) {
                         EditorInfo.IME_ACTION_GO -> context.getKeyboardString(R.string.key_action_go, language)
                         EditorInfo.IME_ACTION_SEARCH -> context.getKeyboardString(R.string.key_action_search, language)
@@ -349,7 +360,13 @@ class HexRenderer(private val context: Context) {
         }
 
         val sz = if (customLabel != null) {
-            min(key.rx, key.ry) * 0.45f
+            if (key.isRectangular) key.ry * 0.52f else min(key.rx, key.ry) * 0.45f
+        } else if (key.isRectangular) {
+            if (key.type == HexLayoutEngine.KeyType.TOGGLE) {
+                min(key.rx * 1.1f, key.ry * 0.65f)
+            } else {
+                min(key.rx * 1.55f, key.ry * 0.95f)
+            }
         } else {
             min(key.rx, key.ry) * 0.62f
         }
@@ -362,10 +379,15 @@ class HexRenderer(private val context: Context) {
 
         val dr = if (customLabel != null) {
             null
-        } else if (themeObj.id == "default" && (key.type == HexLayoutEngine.KeyType.ENTER && layoutMode != HexLayoutEngine.LayoutMode.PURE_NUMERIC)) {
+        } else if (themeObj.id == "default" && (key.type == HexLayoutEngine.KeyType.ENTER && layoutMode != HexLayoutEngine.LayoutMode.PURE_NUMERIC && !key.isRectangular)) {
             null
         } else {
             when (key.type) {
+                HexLayoutEngine.KeyType.SHIFT -> when {
+                    capsLock -> iconShiftFilled
+                    shifted -> iconShiftActive
+                    else -> iconShift
+                }
                 HexLayoutEngine.KeyType.DELETE -> if (pressed) iconDeleteFilled else iconDelete
                 HexLayoutEngine.KeyType.ENTER -> {
                     when (currentImeAction) {
@@ -389,18 +411,26 @@ class HexRenderer(private val context: Context) {
         val isLightBg = ColorUtils.calculateLuminance(activeBgColor) > 0.5
         val isLightText = ColorUtils.calculateLuminance(colorText) > 0.5
         val textColorCalculated = if (isKeyTextColorCustom) {
-            colorText
+            if (isLightBg) Color.BLACK else colorText
         } else if (isLightBg == isLightText) {
             if (isLightBg) Color.BLACK else Color.WHITE
+        } else if (isLightBg) {
+            Color.BLACK
         } else {
             colorText
         }
 
         if (dr != null) {
-            val s = (min(key.rx, key.ry) * 1.0f).toInt()
+            val s = if (key.isRectangular) {
+                (min(key.rx * 1.45f, key.ry * 1.15f)).toInt()
+            } else {
+                (min(key.rx, key.ry) * 1.15f).toInt()
+            }
             dr.setBounds((drawCx - s / 2).toInt(), (key.cy - s / 2).toInt(), (drawCx + s / 2).toInt(), (key.cy + s / 2).toInt())
             val tint = when {
-                individualColor != null -> Color.WHITE
+                individualColor != null -> if (isLightBg) Color.BLACK else Color.WHITE
+                key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> if (isLightBg) Color.BLACK else Color.WHITE
+                isLightBg -> Color.BLACK
                 key.type in listOf(HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.LANGUAGE) -> colorIcon
                 else -> textColorCalculated
             }
