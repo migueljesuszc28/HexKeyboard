@@ -686,7 +686,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     SliderPreference(
                         title = "Tamaño del Pop-Up",
                         key = ThemeUtils.POPUP_SCALE,
-                        defaultValue = 110,
+                        defaultValue = 80,
                         min = 40,
                         max = 150,
                         context = context
@@ -740,7 +740,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         title = "Guardar capturas de pantalla",
                         subtitle = "Detecta capturas de pantalla recientes y las guarda en el historial",
                         key = ThemeUtils.AUTO_COPY_SCREENSHOTS,
-                        defaultValue = true,
+                        defaultValue = false,
                         icon = Icons.Default.CameraAlt,
                         context = context,
                         onCheckedChange = { enabled ->

@@ -187,6 +187,7 @@ class LongPressPopupManager(private val context: Context) {
                 typeface
             )
             setLayoutInfo(layoutInfo, initialIndex)
+            requestLayout()
         }
 
         popupWindow?.width = w

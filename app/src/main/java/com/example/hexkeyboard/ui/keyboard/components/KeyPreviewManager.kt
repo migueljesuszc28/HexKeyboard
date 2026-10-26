@@ -31,6 +31,7 @@ class KeyPreviewManager(private val context: Context) {
     private var popupWindow: PopupWindow? = null
     private var previewView: KeyPreviewView? = null
     private var exitAnimator: ValueAnimator? = null
+    private var hexRenderer: HexRenderer? = null
 
     private var currentKey: HexLayoutEngine.Key? = null
     var isEnabled: Boolean = true
@@ -43,6 +44,7 @@ class KeyPreviewManager(private val context: Context) {
     private var typeface: Typeface = Typeface.DEFAULT
 
     fun updateTheme(renderer: HexRenderer, theme: KeyboardTheme?) {
+        this.hexRenderer = renderer
         val bg = if (renderer.colorPopupBg != 0) renderer.colorPopupBg else (theme?.popupBackgroundColor ?: Color.WHITE)
         val text = if (renderer.colorPopupText != 0) renderer.colorPopupText else (theme?.popupTextColor ?: Color.BLACK)
         popupBgColor = if (bg != 0) bg else Color.WHITE
@@ -50,7 +52,7 @@ class KeyPreviewManager(private val context: Context) {
         popupStrokeColor = if (renderer.strokeWidth > 0) renderer.colorStroke else Color.TRANSPARENT
         popupShadowColor = if (renderer.colorPopupShadow != 0) renderer.colorPopupShadow else "#40000000".toColorInt()
         typeface = renderer.sharedTypeface
-        previewView?.updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface)
+        previewView?.updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface, renderer)
     }
 
     /**
@@ -108,11 +110,12 @@ class KeyPreviewManager(private val context: Context) {
         }
 
         previewView?.apply {
-            updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface)
+            updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface, hexRenderer)
             setPreviewData(label, isRect, prx, pry)
             alpha = 1.0f
             scaleX = 1.0f
             scaleY = 1.0f
+            requestLayout()
         }
 
         popupWindow?.width = w
@@ -194,6 +197,7 @@ class KeyPreviewManager(private val context: Context) {
         private var isRect: Boolean = false
         private var prx: Float = 0f
         private var pry: Float = 0f
+        private var renderer: HexRenderer? = null
 
         private val path = Path()
         private val rectF = RectF()
@@ -206,12 +210,13 @@ class KeyPreviewManager(private val context: Context) {
             maskFilter = android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL)
         }
 
-        fun updateTheme(bgColor: Int, textColor: Int, strokeColor: Int, shadowColor: Int, tf: Typeface) {
+        fun updateTheme(bgColor: Int, textColor: Int, strokeColor: Int, shadowColor: Int, tf: Typeface, renderer: HexRenderer? = null) {
             pBg.color = if (bgColor != 0) bgColor else Color.WHITE
             pText.color = if (textColor != 0) textColor else Color.BLACK
             pText.typeface = tf
             pStroke.color = strokeColor
             pShadow.color = if (shadowColor != 0) shadowColor else "#40000000".toColorInt()
+            if (renderer != null) this.renderer = renderer
         }
 
         fun setPreviewData(label: String, isRect: Boolean, prx: Float, pry: Float) {
@@ -239,9 +244,15 @@ class KeyPreviewManager(private val context: Context) {
             val cy = h / 2f
 
             path.reset()
-            val cr = min(w, h) * 0.35f
-            rectF.set(6f, 6f, w - 6f, h - 6f)
-            path.addRoundRect(rectF, cr, cr, Path.Direction.CW)
+            val r = renderer
+            if (isRect || r == null) {
+                val cr = min(prx, pry) * 0.4f
+                rectF.set(cx - prx, cy - pry, cx + prx, cy + pry)
+                path.addRoundRect(rectF, cr, cr, Path.Direction.CW)
+            } else {
+                // MODO HEXAGONAL EXACTO: Utiliza prx y pry manteniendo la proporción exacta de la tecla
+                r.updateHexPath(path, cx, cy, prx, pry)
+            }
 
             // Dibujar sombra desplazada M3
             canvas.withTranslation(0f, 4f) {
@@ -257,7 +268,7 @@ class KeyPreviewManager(private val context: Context) {
             }
 
             // Dibujar carácter
-            pText.textSize = min(w, h) * 0.52f
+            pText.textSize = min(prx, pry) * 1.15f
             val ty = cy - (pText.ascent() + pText.descent()) / 2f
             canvas.drawText(label, cx, ty, pText)
         }
