@@ -34,6 +34,10 @@ fun KeyboardPreview(
     onKeyClick: ((HexLayoutEngine.Key) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val prefs by ThemeUtils.getDataStore(context).data.collectAsState(initial = emptyPreferences())
+    val layoutType = prefs[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default"
+    val bottomOffset = prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
+
     var backgroundImage by remember(theme.backgroundImageUri) { mutableStateOf<Bitmap?>(null) }
     var backgroundBlurImage by remember(theme.backgroundImageUri, theme.backgroundBlur) { mutableStateOf<Bitmap?>(null) }
 
@@ -101,6 +105,7 @@ fun KeyboardPreview(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT
                         )
+                        this.layoutType = layoutType
                         listener = object : HexKeyboardView.Listener {
                             override fun onChar(text: String) {}
                             override fun onDelete() {}
@@ -118,13 +123,12 @@ fun KeyboardPreview(
                         view.keyboardTheme = theme
                         view.drawBackground = false
                     }
+                    if (view.layoutType != layoutType) {
+                        view.layoutType = layoutType
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             )
-            
-            // Bottom Margin
-            val prefs by ThemeUtils.getDataStore(context).data.collectAsState(initial = emptyPreferences())
-            val bottomOffset = prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 0
             
             if (bottomOffset > 0) {
                 Spacer(modifier = Modifier.height(bottomOffset.dp))

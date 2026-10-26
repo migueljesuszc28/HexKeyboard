@@ -251,6 +251,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     }
 
     fun resetState() {
+        hidePopup(immediate = true)
         layoutMode = HexLayoutEngine.LayoutMode.ALPHA
         symbolPage = "basic"
         if (width > 0) buildLayout(width.toFloat())
@@ -298,6 +299,20 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         keysBitmap = null
         popupWindow = null
         popupContentView = null
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (visibility != VISIBLE) {
+            hidePopup(immediate = true)
+        }
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) {
+            hidePopup(immediate = true)
+        }
     }
 
     private fun getHeightFactor(): Float {
@@ -366,11 +381,14 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private val initialPointerKeys = mutableMapOf<Int, HexLayoutEngine.Key>()
     private val pointerStartTime = mutableMapOf<Int, Long>()
     private val handler = Handler(Looper.getMainLooper())
+    private var customPopupOnSelect: ((String) -> Unit)? = null
+    private var isHybridLongPress = false
+    private var hasDraggedSinceLongPress = false
     private var longPressTriggered = false
     private var longPressStarted = false
     private val longPressTimeout: Long get() = cachedLongPressTimeout
     private val longPressRunnable = Runnable {
-        pressedKey?.let { if (it.alternatives.isNotEmpty() && !isGestureActive) { longPressStarted = true; popupVisibleKey = it; popupSelectedIndex = 0; showPopup(it, isLongPress = true) } }
+        pressedKey?.let { if (it.alternatives.isNotEmpty() && !isGestureActive) { longPressStarted = true; isHybridLongPress = false; hasDraggedSinceLongPress = false; popupVisibleKey = it; popupSelectedIndex = 0; showPopup(it, isLongPress = true) } }
     }
     private var deleteRepeatRunnable: Runnable? = null
     private var lastShiftClickTime = 0L
@@ -492,6 +510,48 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         needsRedraw = false
     }
 
+    private val localPreviewHexPath = Path()
+
+    private fun drawSingleKeyPreview(canvas: Canvas, key: HexLayoutEngine.Key) {
+        if (!showKeyPopup || key.type != HexLayoutEngine.KeyType.CHAR) return
+        val label = if (shifted && key.value.length == 1 && key.value[0].isLetter()) key.display.uppercase() else key.display
+        val prx = key.rx * 1.25f
+        val pry = key.ry * 1.25f
+        val cx = key.cx.coerceIn(prx + 8f, (width.toFloat() - prx - 8f).coerceAtLeast(prx + 8f))
+        val cy = (key.cy - key.ry * 2.1f).coerceAtLeast(pry + 8f)
+        val isRect = key.isRectangular || layoutType == "qwerty"
+
+        localPreviewHexPath.reset()
+        if (isRect) {
+            val cr = min(prx, pry) * 0.35f
+            val rect = RectF(cx - prx, cy - pry, cx + prx, cy + pry)
+            localPreviewHexPath.addRoundRect(rect, cr, cr, Path.Direction.CW)
+        } else {
+            renderer.updateHexPath(localPreviewHexPath, cx, cy, prx, pry)
+        }
+
+        canvas.withTranslation(0f, 4f) {
+            renderer.pShadow.color = renderer.colorPopupShadow
+            drawPath(localPreviewHexPath, renderer.pShadow)
+        }
+        renderer.pPopupBg.color = renderer.colorPopupBg
+        canvas.drawPath(localPreviewHexPath, renderer.pPopupBg)
+        if (renderer.strokeWidth > 0) {
+            renderer.pStroke.color = renderer.colorStroke
+            renderer.pStroke.strokeWidth = 2f
+            canvas.drawPath(localPreviewHexPath, renderer.pStroke)
+        }
+        val mainKeyTextSize = if (isRect) {
+            min(key.rx * 1.6f, key.ry * 1.0f)
+        } else {
+            min(key.rx, key.ry) * 0.65f
+        }
+        renderer.pPopupText.textSize = mainKeyTextSize * 1.15f
+        val ty = cy - (renderer.pPopupText.ascent() + renderer.pPopupText.descent()) / 2f
+        renderer.pPopupText.color = renderer.colorPopupText
+        canvas.drawText(label, cx, ty, renderer.pPopupText)
+    }
+
     override fun onDraw(canvas: Canvas) {
         val theme = keyboardTheme ?: return
         if (drawBackground) {
@@ -504,6 +564,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 drawKey(canvas, key)
             }
         }
+
+//        if (popupVisibleKey != null && !longPressStarted && showKeyPopup) {
+//            drawSingleKeyPreview(canvas, popupVisibleKey!!)
+//        }
 
         if (isGestureActive && gesturePoints.size >= 2) {
             drawSmoothGestureTrail(canvas, 1f)
@@ -750,6 +814,58 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 }
             }
         }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            val layout = currentPopupLayout ?: return super.onTouchEvent(event)
+            if (!layout.isLongPress) return super.onTouchEvent(event)
+
+            val x = event.x
+            val y = event.y
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    var newIndex = layout.cells.indexOfFirst { cell ->
+                        val expandedRect = RectF(cell.bounds)
+                        expandedRect.inset(-24f, -24f)
+                        expandedRect.contains(x, y)
+                    }
+                    if (newIndex == -1) {
+                        var minDist = Float.MAX_VALUE
+                        layout.cells.forEachIndexed { i, cell ->
+                            val dx = x - cell.centerX
+                            val dy = y - cell.centerY
+                            val dist = dx * dx + dy * dy
+                            if (dist < minDist) {
+                                minDist = dist
+                                newIndex = i
+                            }
+                        }
+                    }
+                    if (newIndex != -1 && newIndex != popupSelectedIndex) {
+                        popupSelectedIndex = newIndex
+                        selectedIndex = newIndex
+                        triggerVibration(FeedbackManager.HapticType.TICK)
+                        invalidate()
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    val a = getPopupAlternatives(layout.key)
+                    if (popupSelectedIndex in a.indices) {
+                        triggerVibration()
+                        val v = a[popupSelectedIndex]
+                        if (customPopupOnSelect != null) {
+                            val cb = customPopupOnSelect
+                            customPopupOnSelect = null
+                            cb?.invoke(v)
+                        } else {
+                            listener?.onLongPressSelect(v)
+                        }
+                    }
+                    hidePopup()
+                }
+            }
+            return true
+        }
     }
 
     private fun getPopupAlternatives(key: HexLayoutEngine.Key): List<String> {
@@ -765,6 +881,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val prx = key.rx * keyScale * 1.1f * popupScale
         val pry = key.ry * keyScale * 1.1f * popupScale
         val screenWidth = context.resources.displayMetrics.widthPixels
+        val screenHeight = context.resources.displayMetrics.heightPixels
 
         if (!isLongPress) {
             val w = (prx * 2.5f).toInt()
@@ -820,12 +937,18 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
             val location = IntArray(2)
             getLocationInWindow(location)
-            var x = (location[0] + key.cx - w / 2f).toInt()
-            val y = location[1] + getPopupOffsetY(key, true, h)
+            val anchorScreenX = location[0] + key.cx
+            val anchorScreenY = location[1] + key.cy
 
-            // Anclaje inteligente en bordes
-            if (x < 0) x = 0
-            if (x + w > screenWidth) x = screenWidth - w
+            var x = (anchorScreenX - w / 2f).toInt()
+            var y = (anchorScreenY - key.ry * (1.1f + 0.2f * popupScale) - h).toInt()
+
+
+
+            // Flotación libre y restricción de bordes de pantalla
+            if (x < 16) x = 16
+            if (x + w > screenWidth - 16) x = screenWidth - w - 16
+
 
             return PopupLayoutInfo(key, true, cells, w, h, x, y)
         }
@@ -835,6 +958,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         try { if (popupWindow?.isShowing == true) popupWindow?.dismiss() } catch (e: Exception) { Log.e("HexKB", "Error dismissing popup", e) }
         popupVisibleKey = null
         currentPopupLayout = null
+        customPopupOnSelect = null
     }
 
     private fun getPopupOffsetY(key: HexLayoutEngine.Key, isLongPress: Boolean, h: Int): Int {
@@ -845,21 +969,105 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
     }
 
-    private fun showPopup(key: HexLayoutEngine.Key, isLongPress: Boolean = false) {
-        if (!showKeyPopup || windowToken == null) return
+    fun showPopupForAlternatives(
+        screenX: Float,
+        screenY: Float,
+        rx: Float = 40f,
+        ry: Float = 40f,
+        mainSymbol: String,
+        alternatives: List<String>,
+        onSelect: (String) -> Unit
+    ) {
+        if (windowToken == null || alternatives.isEmpty()) return
         handler.removeCallbacks(hidePopupRunnable)
 
-        val previousKey = currentPopupLayout?.key
+        val location = IntArray(2)
+        getLocationInWindow(location)
+        val localCx = screenX - location[0]
+        val localCy = screenY - location[1]
+
+        val dummyKey = HexLayoutEngine.Key(
+            display = mainSymbol,
+            type = HexLayoutEngine.KeyType.CHAR,
+            value = mainSymbol,
+            alternatives = alternatives,
+            cx = localCx,
+            cy = localCy,
+            rx = rx,
+            ry = ry,
+            isRectangular = true
+        )
+        customPopupOnSelect = onSelect
+        isHybridLongPress = true
+        longPressStarted = true
+        hasDraggedSinceLongPress = false
+        pressedKey = dummyKey
+        popupVisibleKey = dummyKey
+        showPopup(dummyKey, isLongPress = true)
+    }
+
+    fun onLongPressDrag(screenX: Float, screenY: Float) {
+        val layout = currentPopupLayout ?: return
+        if (!layout.isLongPress) return
+
+        val location = IntArray(2)
+        getLocationInWindow(location)
+        val localX = screenX - location[0]
+        val localY = screenY - location[1]
+
+        val distFromStart = hypot(localX - gestureStartX, localY - gestureStartY)
+        if (distFromStart > 16f) hasDraggedSinceLongPress = true
+        handlePopupSelection(localX, localY)
+    }
+
+    fun onLongPressRelease() {
+        val layout = currentPopupLayout ?: return
+        val key = popupVisibleKey ?: return
+        if (isHybridLongPress && !hasDraggedSinceLongPress) {
+            longPressStarted = false
+        } else {
+            val a = getPopupAlternatives(key)
+            if (popupSelectedIndex in a.indices) {
+                triggerVibration()
+                val v = a[popupSelectedIndex]
+                if (customPopupOnSelect != null) {
+                    val cb = customPopupOnSelect
+                    customPopupOnSelect = null
+                    cb?.invoke(v)
+                } else {
+                    when (key.type) {
+                        HexLayoutEngine.KeyType.LANGUAGE -> if (v == "🌐") (context as? HexKeyboardService)?.showLanguagePicker() else (context as? HexKeyboardService)?.switchToNextLanguage()
+                        HexLayoutEngine.KeyType.TOGGLE -> switchLayoutByValue(v)
+                        HexLayoutEngine.KeyType.SYMBOL_PAGE -> { if (v.toIntOrNull() != null) switchSymbolPageByValue(v) else fireKey(key) }
+                        HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (v.toIntOrNull() ?: 1) - 1; buildLayout(width.toFloat()); invalidate() }
+                        else -> listener?.onLongPressSelect(v)
+                    }
+                }
+            }
+            hidePopup()
+            longPressStarted = false
+        }
+    }
+
+    private fun showPopup(key: HexLayoutEngine.Key, isLongPress: Boolean = false) {
+        if (!showKeyPopup || windowToken == null) return
+        if (!isLongPress) {
+            popupVisibleKey = key
+            invalidate()
+            return
+        }
+        handler.removeCallbacks(hidePopupRunnable)
+
         val layout = buildPopupLayoutInfo(key, isLongPress)
         currentPopupLayout = layout
 
         if (popupWindow == null) {
-            popupContentView = KeyPopupView(context).apply { setLayerType(LAYER_TYPE_SOFTWARE, null) }
+            popupContentView = KeyPopupView(context)
             popupWindow = PopupWindow(popupContentView, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 elevation = 20f
-                isTouchable = false
-                isOutsideTouchable = false
-                setBackgroundDrawable(null)
+                isTouchable = true
+                isOutsideTouchable = true
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                 inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
                 isClippingEnabled = false
                 animationStyle = 0
@@ -867,15 +1075,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
 
         val alts = getPopupAlternatives(key)
-        val initialIndex = if (isLongPress) {
-            val idx = alts.indexOf(key.display)
-            if (idx != -1) idx else 0
-        } else {
-            -1
-        }
+        val idx = alts.indexOf(key.display)
+        val initialIndex = if (idx != -1) idx else 0
 
         popupContentView?.key = key
-        popupContentView?.isLongPress = isLongPress
+        popupContentView?.isLongPress = true
         popupContentView?.selectedIndex = initialIndex
         popupSelectedIndex = initialIndex
 
@@ -884,20 +1088,21 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         popupContentView?.invalidate()
 
         if (popupWindow?.isShowing == true) {
-            if (!isLongPress && previousKey != null && previousKey != key) {
-                popupWindow?.dismiss()
-                popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, layout.popupX, layout.popupY)
-            } else {
-                popupWindow?.update(layout.popupX, layout.popupY, layout.width, layout.height)
-            }
+            popupWindow?.update(layout.popupX, layout.popupY, layout.width, layout.height)
         } else {
             popupWindow?.showAtLocation(this, Gravity.NO_GRAVITY, layout.popupX, layout.popupY)
         }
     }
 
-    private fun hidePopup(immediate: Boolean = false) {
+    fun hidePopup(immediate: Boolean = false) {
         handler.removeCallbacks(hidePopupRunnable)
-        hidePopupRunnable.run()
+        popupVisibleKey = null
+        if (popupWindow?.isShowing == true) {
+            try { popupWindow?.dismiss() } catch (e: Exception) { Log.e("HexKB", "Error dismissing popup", e) }
+        }
+        currentPopupLayout = null
+        customPopupOnSelect = null
+        invalidate()
     }
 
     private var currentImeAction: Int = EditorInfo.IME_ACTION_NONE
@@ -918,6 +1123,23 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
         when (action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                if (currentPopupLayout != null && popupVisibleKey != null && !longPressStarted) {
+                    handlePopupSelection(x, y)
+                    val a = getPopupAlternatives(popupVisibleKey!!)
+                    if (popupSelectedIndex in a.indices) {
+                        triggerVibration()
+                        val v = a[popupSelectedIndex]
+                        if (customPopupOnSelect != null) {
+                            customPopupOnSelect?.invoke(v)
+                            customPopupOnSelect = null
+                        } else {
+                            listener?.onLongPressSelect(v)
+                        }
+                    }
+                    hidePopup()
+                    return true
+                }
+                hasDraggedSinceLongPress = false
                 if (keys.isEmpty() && width > 0) buildLayout(width.toFloat())
                 if (e.pointerCount > 1 || activePointers.size >= 1) {
                     isGestureActive = false
@@ -951,7 +1173,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             }
             MotionEvent.ACTION_MOVE -> {
                 val isSingleTouch = e.pointerCount == 1 && activePointers.size <= 1
-                if (popupVisibleKey != null && longPressStarted && pointerId == e.getPointerId(0)) handlePopupSelection(x, y)
+                if (popupVisibleKey != null && longPressStarted && pointerId == e.getPointerId(0)) {
+                    val distFromStart = hypot(x - gestureStartX, y - gestureStartY)
+                    if (distFromStart > 16f) hasDraggedSinceLongPress = true
+                    handlePopupSelection(x, y)
+                }
                 else if (pressedKey?.type == HexLayoutEngine.KeyType.SPACE && pointerId == e.getPointerId(0)) {
                     val deltaX = x - lastScrollX
                     if (abs(deltaX) > 20) {
@@ -960,16 +1186,17 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     }
                 } else if (pointerId == e.getPointerId(0) && pressedKey?.type == HexLayoutEngine.KeyType.CHAR && !longPressStarted && !isScrollingCursor && !longPressTriggered) {
                     val deltaY = y - lastScrollY; val deltaX = x - gestureStartX; val totalDist = sqrt(deltaX * deltaX + (y - gestureStartY) * (y - gestureStartY))
+                    val gestureMinDist = (pressedKey?.rx ?: 50f) * 2.2f
                     if (pressedKey?.value == "n") {
                         if (deltaY < -80f && abs(deltaY) > 2.0f * abs(deltaX)) {
                             longPressTriggered = true; isGestureActive = false; gesturePath.reset(); gesturePoints.clear(); cancelKeyLongPress(); hidePopup()
                             triggerVibration(FeedbackManager.HapticType.LONG_PRESS); triggerSound()
                             listener?.onChar(if (shifted || capsLock) "Ñ" else "ñ"); if (shifted && !capsLock) shifted = false
                             invalidate()
-                        } else if (!isGestureActive && gestureTypingEnabled && isSingleTouch && totalDist > gestureThreshold) {
+                        } else if (!isGestureActive && gestureTypingEnabled && isSingleTouch && totalDist > gestureMinDist) {
                             isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                         }
-                    } else if (!isGestureActive && gestureTypingEnabled && isSingleTouch && totalDist > gestureThreshold) {
+                    } else if (!isGestureActive && gestureTypingEnabled && isSingleTouch && totalDist > gestureMinDist) {
                         isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                     }
                     if (isGestureActive && isSingleTouch) {
@@ -991,7 +1218,12 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 for (i in 0 until e.pointerCount) {
                     val pid = e.getPointerId(i)
                     if (pid == e.getPointerId(0) && (longPressStarted || isScrollingCursor || longPressTriggered || isGestureActive || pressedKey?.value == "n")) continue
-                    val px = e.getX(i); val py = e.getY(i); val oldHit = activePointers[pid]; val newHit = hitTest(px, py)
+                    val px = e.getX(i); val py = e.getY(i)
+                    val oldHit = activePointers[pid]
+                    val initialHit = initialPointerKeys[pid]
+                    val distFromStart = hypot(px - gestureStartX, py - gestureStartY)
+                    val minMoveThreshold = (initialHit?.rx ?: 40f) * 0.85f
+                    val newHit = if (distFromStart > minMoveThreshold) hitTest(px, py) else (oldHit ?: initialHit)
                     if (newHit != oldHit && newHit != null) {
                         oldHit?.isPressed = false
                         if (!(oldHit in spaceKeys && newHit in spaceKeys) && !(oldHit in shiftKeys && newHit in shiftKeys) && !(oldHit in deleteKeys && newHit in deleteKeys)) {
@@ -1021,7 +1253,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             val firstP = gesturePoints.firstOrNull()
                             val lastP = gesturePoints.lastOrNull()
                             val netDist = if (firstP != null && lastP != null) hypot(lastP.x - firstP.x, lastP.y - firstP.y) else 0f
-                            if (gesturePoints.size >= 4 && netDist >= gestureThreshold) {
+                            if (gesturePoints.size >= 5 && netDist >= gestureThreshold * 1.2f) {
                                 listener?.onGesture(ArrayList(gesturePoints))
                             } else {
                                 fireKey(hit)
@@ -1029,20 +1261,32 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             isGestureActive = false; gesturePath.reset(); gesturePoints.clear(); invalidate()
                         } else if (popupVisibleKey != null && longPressStarted) {
                             val a = getPopupAlternatives(popupVisibleKey!!)
-                            if (popupSelectedIndex in a.indices) {
-                                triggerVibration(); val v = a[popupSelectedIndex]
-                                when (popupVisibleKey!!.type) {
-                                    HexLayoutEngine.KeyType.LANGUAGE -> if (v == "🌐") (context as? HexKeyboardService)?.showLanguagePicker() else (context as? HexKeyboardService)?.switchToNextLanguage()
-                                    HexLayoutEngine.KeyType.TOGGLE -> switchLayoutByValue(v)
-                                    HexLayoutEngine.KeyType.SYMBOL_PAGE -> { if (v.toIntOrNull() != null) switchSymbolPageByValue(v) else fireKey(popupVisibleKey!!) }
-                                    HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (v.toIntOrNull() ?: 1) - 1; buildLayout(width.toFloat()); invalidate() }
-                                    else -> listener?.onLongPressSelect(v)
+                            if (isHybridLongPress && !hasDraggedSinceLongPress) {
+                                // Modo híbrido para Panel de Emojis: si soltó sin arrastrar, mantener abierto el popup
+                                longPressStarted = false
+                            } else {
+                                if (popupSelectedIndex in a.indices) {
+                                    triggerVibration(); val v = a[popupSelectedIndex]
+                                    if (customPopupOnSelect != null) {
+                                        customPopupOnSelect?.invoke(v)
+                                        customPopupOnSelect = null
+                                    } else {
+                                        when (popupVisibleKey!!.type) {
+                                            HexLayoutEngine.KeyType.LANGUAGE -> if (v == "🌐") (context as? HexKeyboardService)?.showLanguagePicker() else (context as? HexKeyboardService)?.switchToNextLanguage()
+                                            HexLayoutEngine.KeyType.TOGGLE -> switchLayoutByValue(v)
+                                            HexLayoutEngine.KeyType.SYMBOL_PAGE -> { if (v.toIntOrNull() != null) switchSymbolPageByValue(v) else fireKey(popupVisibleKey!!) }
+                                            HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (v.toIntOrNull() ?: 1) - 1; buildLayout(width.toFloat()); invalidate() }
+                                            else -> listener?.onLongPressSelect(v)
+                                        }
+                                    }
                                 }
+                                hidePopup()
+                                longPressStarted = false
                             }
-                            hidePopup()
                         } else { if (!longPressTriggered) { fireKey(hit); performClick() }; hidePopup() }
                         pressedKey = null; longPressTriggered = false; longPressStarted = false; isScrollingCursor = false
                     } else fireKey(hit)
+                    popupVisibleKey = null
                     activePointers.remove(pointerId); initialPointerKeys.remove(pointerId); updateGroupPressStates(); invalidate()
                 }
             }

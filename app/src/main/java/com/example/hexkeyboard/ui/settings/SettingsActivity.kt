@@ -686,7 +686,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     SliderPreference(
                         title = "Tamaño del Pop-Up",
                         key = ThemeUtils.POPUP_SCALE,
-                        defaultValue = 95,
+                        defaultValue = 110,
                         min = 40,
                         max = 150,
                         context = context

@@ -316,7 +316,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -529,7 +529,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -646,7 +646,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -770,13 +770,9 @@ class HexLayoutEngine {
         val drHalf = (colW / 4.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
-
-        val opRowHeight = (3.0f * qwertyRowHeight) / 4.0f
-        val dryOp = (opRowHeight / 2.0f) * 0.78f * keyScale
-        fun cyOp(i: Int) = (i + 0.5f) * opRowHeight
 
         fun getColX(c: Float): Float {
             if (gapWidth <= 0f) {
@@ -789,11 +785,11 @@ class HexLayoutEngine {
             }
         }
 
-        // --- Column 0 (top 3 rows height): +, -, *, / ---
-        keys += Key("+", KeyType.CHAR, "+", emptyList(), cx = getColX(0f), cy = cyOp(0), rx = dr, ry = dryOp, keyScale = keyScale, isRectangular = true)
-        keys += Key("-", KeyType.CHAR, "-", emptyList(), cx = getColX(0f), cy = cyOp(1), rx = dr, ry = dryOp, keyScale = keyScale, isRectangular = true)
-        keys += Key("*", KeyType.CHAR, "*", emptyList(), cx = getColX(0f), cy = cyOp(2), rx = dr, ry = dryOp, keyScale = keyScale, isRectangular = true)
-        keys += Key("/", KeyType.CHAR, "/", emptyList(), cx = getColX(0f), cy = cyOp(3), rx = dr, ry = dryOp, keyScale = keyScale, isRectangular = true)
+        // --- Column 0: + (row 0), - (row 1), * / (row 2), ABC (row 3) ---
+        keys += Key("+", KeyType.CHAR, "+", emptyList(), cx = getColX(0f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
+        keys += Key("-", KeyType.CHAR, "-", emptyList(), cx = getColX(0f), cy = ry(1), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
+        keys += Key("*", KeyType.CHAR, "*", emptyList(), cx = getColX(-0.25f), cy = ry(2), rx = drHalf, ry = dry, keyScale = keyScale, isRectangular = true)
+        keys += Key("/", KeyType.CHAR, "/", emptyList(), cx = getColX(0.25f), cy = ry(2), rx = drHalf, ry = dry, keyScale = keyScale, isRectangular = true)
 
         // --- Row 0: 1 2 3 % ---
         keys += Key("1", KeyType.CHAR, "1", longPressAlternatives['1'] ?: emptyList(), cx = getColX(1f), cy = ry(0), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
@@ -838,7 +834,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
