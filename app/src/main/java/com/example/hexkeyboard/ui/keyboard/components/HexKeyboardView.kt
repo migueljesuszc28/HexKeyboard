@@ -565,9 +565,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             }
         }
 
-//        if (popupVisibleKey != null && !longPressStarted && showKeyPopup) {
-//            drawSingleKeyPreview(canvas, popupVisibleKey!!)
-//        }
+        if (popupVisibleKey != null && !longPressStarted && showKeyPopup) {
+            drawSingleKeyPreview(canvas, popupVisibleKey!!)
+        }
 
         if (isGestureActive && gesturePoints.size >= 2) {
             drawSmoothGestureTrail(canvas, 1f)
