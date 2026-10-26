@@ -179,7 +179,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private var gestureStartX = 0f
     private var gestureStartY = 0f
     private var lastLiveGestureTime = 0L
-    private val gestureThreshold get() = if (keys.isNotEmpty()) (keys.first().rx * 0.45f).coerceAtLeast(40f) else 50f
+    private val gestureThreshold get() = if (keys.isNotEmpty()) (keys.first().rx * 1.8f).coerceAtLeast(80f) else 80f
 
     var livePredictedWord: String = ""
         set(value) {
@@ -919,6 +919,11 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         when (action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 if (keys.isEmpty() && width > 0) buildLayout(width.toFloat())
+                if (e.pointerCount > 1 || activePointers.size >= 1) {
+                    isGestureActive = false
+                    gesturePath.reset()
+                    gesturePoints.clear()
+                }
                 val hit = hitTest(x, y)
                 if (hit != null) {
                     activePointers[pointerId] = hit
@@ -945,6 +950,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 }
             }
             MotionEvent.ACTION_MOVE -> {
+                val isSingleTouch = e.pointerCount == 1 && activePointers.size <= 1
                 if (popupVisibleKey != null && longPressStarted && pointerId == e.getPointerId(0)) handlePopupSelection(x, y)
                 else if (pressedKey?.type == HexLayoutEngine.KeyType.SPACE && pointerId == e.getPointerId(0)) {
                     val deltaX = x - lastScrollX
@@ -960,13 +966,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             triggerVibration(FeedbackManager.HapticType.LONG_PRESS); triggerSound()
                             listener?.onChar(if (shifted || capsLock) "Ñ" else "ñ"); if (shifted && !capsLock) shifted = false
                             invalidate()
-                        } else if (!isGestureActive && gestureTypingEnabled && totalDist > gestureThreshold) {
+                        } else if (!isGestureActive && gestureTypingEnabled && isSingleTouch && totalDist > gestureThreshold) {
                             isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                         }
-                    } else if (!isGestureActive && gestureTypingEnabled && totalDist > gestureThreshold) {
+                    } else if (!isGestureActive && gestureTypingEnabled && isSingleTouch && totalDist > gestureThreshold) {
                         isGestureActive = true; cancelKeyLongPress(); popupVisibleKey = null; hidePopup()
                     }
-                    if (isGestureActive) {
+                    if (isGestureActive && isSingleTouch) {
                         val lastP = gesturePoints.lastOrNull()
                         if (lastP == null || hypot(x - lastP.x, y - lastP.y) > 8f) {
                             gesturePoints.add(PointF(x, y))
@@ -1012,7 +1018,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     if (pointerId == e.getPointerId(0)) {
                         cancelKeyLongPress(); cancelDeleteRepeat()
                         if (isGestureActive) {
-                            if (gesturePoints.size >= 4) {
+                            val firstP = gesturePoints.firstOrNull()
+                            val lastP = gesturePoints.lastOrNull()
+                            val netDist = if (firstP != null && lastP != null) hypot(lastP.x - firstP.x, lastP.y - firstP.y) else 0f
+                            if (gesturePoints.size >= 4 && netDist >= gestureThreshold) {
                                 listener?.onGesture(ArrayList(gesturePoints))
                             } else {
                                 fireKey(hit)

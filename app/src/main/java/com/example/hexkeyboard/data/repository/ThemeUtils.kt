@@ -434,11 +434,11 @@ object ThemeUtils {
             // Fallback si no hay soporte dinámico
             return getDefaultTheme(context)
         }
-
-        val backgroundColor = colorScheme.surface.toArgb()
-        val keyBackgroundColor = colorScheme.surfaceContainerHigh.toArgb()
+// surfaceBright surfacecontainerlowest  fondo: surfacecontainer o surfacecontainerlow
+        val backgroundColor = colorScheme.surfaceContainerHigh.toArgb()
+        val keyBackgroundColor = colorScheme.surfaceBright.toArgb()
         val actionkeybackground = colorScheme.secondaryContainer.toArgb()
-        val keyBackgroundPressedColor = colorScheme.surfaceContainer.toArgb()
+        val keyBackgroundPressedColor = colorScheme.surfaceBright.toArgb()
         val keyTextColor = colorScheme.onSurface.toArgb()
         val keyboardIconTint = colorScheme.onSurfaceVariant.toArgb()
         val keyShiftActiveColor = colorScheme.primary.toArgb()

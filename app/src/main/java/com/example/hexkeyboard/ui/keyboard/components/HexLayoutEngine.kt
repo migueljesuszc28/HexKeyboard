@@ -565,7 +565,7 @@ class HexLayoutEngine {
         val symW = symAvailW / 8.0f
         val drSym = (symW / 2.0f) * keyScale
 
-        val row2Syms = listOf("*", "\"", "'", ":", ";", "!", "?", "/")
+        val row2Syms = listOf("%", "*", "\"", "'", ":", ";", "!", "?")
         row2Syms.forEachIndexed { i, l ->
             val colX = (i + 0.5f) * symW
             keys += Key(l, KeyType.CHAR, l, if (l.length == 1) longPressAlternatives[l[0]] ?: emptyList() else emptyList(), cx = colX, cy = ry(2), rx = drSym, ry = dry, keyScale = keyScale, isRectangular = true)
@@ -813,9 +813,10 @@ class HexLayoutEngine {
         keys += Key("9", KeyType.CHAR, "9", longPressAlternatives['9'] ?: emptyList(), cx = getColX(3f), cy = ry(2), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
         keys += Key("⌫", KeyType.DELETE, "DELETE", emptyList(), cx = getColX(4f), cy = ry(2), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
 
-        // --- Row 3: ABC , 0 = . ↩ ---
+        // --- Row 3: ABC , # 0 = . ↩ ---
         keys += Key("ABC", KeyType.TOGGLE, "?123", listOf("#+=", "𝔉"), cx = getColX(0f), cy = ry(3), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
-        keys += Key(",", KeyType.CHAR, ",", emptyList(), cx = getColX(1f), cy = ry(3), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
+        keys += Key(",", KeyType.CHAR, ",", emptyList(), cx = getColX(0.75f), cy = ry(3), rx = drHalf, ry = dry, keyScale = keyScale, isRectangular = true)
+        keys += Key("#", KeyType.CHAR, "#", emptyList(), cx = getColX(1.25f), cy = ry(3), rx = drHalf, ry = dry, keyScale = keyScale, isRectangular = true)
         keys += Key("0", KeyType.CHAR, "0", longPressAlternatives['0'] ?: emptyList(), cx = getColX(2f), cy = ry(3), rx = dr, ry = dry, keyScale = keyScale, isRectangular = true)
         keys += Key("=", KeyType.CHAR, "=", emptyList(), cx = getColX(2.75f), cy = ry(3), rx = drHalf, ry = dry, keyScale = keyScale, isRectangular = true)
         keys += Key(".", KeyType.CHAR, ".", longPressAlternatives['.'] ?: emptyList(), cx = getColX(3.25f), cy = ry(3), rx = drHalf, ry = dry, keyScale = keyScale, isRectangular = true)

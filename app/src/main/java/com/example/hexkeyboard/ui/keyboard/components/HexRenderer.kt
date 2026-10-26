@@ -164,6 +164,7 @@ class HexRenderer(private val context: Context) {
     val iconEmojiFilled: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_emoji_filled) }
     val iconPuzzle: Drawable? by lazy { imageVectorToDrawable(Icons.Outlined.Extension) }
     val iconLanguage: Drawable? by lazy { ContextCompat.getDrawable(context, android.R.drawable.ic_menu_mapmode) }
+    val iconSpace: Drawable? by lazy { ContextCompat.getDrawable(context, R.drawable.ic_space) }
 
     // Colors
     var colorFill = 0
@@ -404,6 +405,7 @@ class HexRenderer(private val context: Context) {
                 HexLayoutEngine.KeyType.CLIPBOARD -> null
                 HexLayoutEngine.KeyType.FUNCTIONS -> iconPuzzle
                 HexLayoutEngine.KeyType.LANGUAGE -> iconLanguage
+                HexLayoutEngine.KeyType.SPACE -> if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC) iconSpace else null
                 else -> null
             }
         }
