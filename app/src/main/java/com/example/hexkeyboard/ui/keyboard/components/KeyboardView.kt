@@ -11,7 +11,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withSave
 import androidx.core.graphics.withTranslation
 import androidx.core.net.toUri
@@ -22,14 +21,14 @@ import androidx.dynamicanimation.animation.SpringForce
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.service.KeyboardService
 import kotlinx.coroutines.*
 import kotlin.math.*
 
-class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+class KeyboardView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
-    private val engine = HexLayoutEngine()
-    private val renderer = HexRenderer(context)
+    private val engine = KeyboardLayoutEngine()
+    private val renderer = KeyboardRenderer(context)
 
     init {
         isClickable = true
@@ -44,7 +43,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         fun onEnter()
         fun onLongPressSelect(char: String)
         fun onSymbolPageChange(page: String)
-        fun onKeyClick(key: HexLayoutEngine.Key) {}
+        fun onKeyClick(key: KeyboardLayoutEngine.Key) {}
         fun onGesture(points: List<PointF>) {}
         fun onLiveGesture(points: List<PointF>) {}
         fun onLayoutUpdated(keyCenters: Map<Char, PointF>) {}
@@ -56,7 +55,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             if (field != value) {
                 field = value
                 if (!value) capsLock = false
-                if ((layoutMode == HexLayoutEngine.LayoutMode.FONTS) && (width > 0)) buildLayout(width.toFloat())
+                if ((layoutMode == KeyboardLayoutEngine.LayoutMode.FONTS) && (width > 0)) buildLayout(width.toFloat())
                 invalidate()
             }
         }
@@ -69,7 +68,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             }
         }
 
-    var layoutMode = HexLayoutEngine.LayoutMode.ALPHA
+    var layoutMode = KeyboardLayoutEngine.LayoutMode.ALPHA
         set(value) {
             if (field != value) {
                 field = value
@@ -251,7 +250,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     fun resetState() {
         hidePopup(immediate = true)
-        layoutMode = HexLayoutEngine.LayoutMode.ALPHA
+        layoutMode = KeyboardLayoutEngine.LayoutMode.ALPHA
         symbolPage = "basic"
         if (width > 0) buildLayout(width.toFloat())
         invalidate()
@@ -330,12 +329,12 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         renderer.clearCaches()
     }
 
-    inner class UIKey(val key: HexLayoutEngine.Key) {
+    inner class UIKey(val key: KeyboardLayoutEngine.Key) {
         private val springAnim = SpringAnimation(this, object : FloatPropertyCompat<UIKey>("scale") {
             override fun getValue(k: UIKey): Float = k.key.currentScale
             override fun setValue(k: UIKey, value: Float) {
                 k.key.currentScale = value
-                this@HexKeyboardView.invalidate()
+                this@KeyboardView.invalidate()
             }
         }).apply {
             spring = SpringForce().apply {
@@ -350,18 +349,18 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             } else {
                 springAnim.cancel()
                 key.currentScale = 1.0f
-                this@HexKeyboardView.invalidate()
+                this@KeyboardView.invalidate()
             }
         }
     }
 
-    private val keys = mutableListOf<HexLayoutEngine.Key>()
-    val allKeys: List<HexLayoutEngine.Key> = keys
-    private val uiKeyMap = mutableMapOf<HexLayoutEngine.Key, UIKey>()
-    private val spaceKeys = mutableListOf<HexLayoutEngine.Key>()
-    private val shiftKeys = mutableListOf<HexLayoutEngine.Key>()
-    private val deleteKeys = mutableListOf<HexLayoutEngine.Key>()
-    private val enterKeys = mutableListOf<HexLayoutEngine.Key>()
+    private val keys = mutableListOf<KeyboardLayoutEngine.Key>()
+    val allKeys: List<KeyboardLayoutEngine.Key> = keys
+    private val uiKeyMap = mutableMapOf<KeyboardLayoutEngine.Key, UIKey>()
+    private val spaceKeys = mutableListOf<KeyboardLayoutEngine.Key>()
+    private val shiftKeys = mutableListOf<KeyboardLayoutEngine.Key>()
+    private val deleteKeys = mutableListOf<KeyboardLayoutEngine.Key>()
+    private val enterKeys = mutableListOf<KeyboardLayoutEngine.Key>()
 
     private var unifiedShiftCenterX = 0f
     private var unifiedDeleteCenterX = 0f
@@ -375,10 +374,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     private val keyPreviewManager = KeyPreviewManager(context)
     private val longPressPopupManager = LongPressPopupManager(context)
 
-    private var pressedKey: HexLayoutEngine.Key? = null
-    private var popupVisibleKey: HexLayoutEngine.Key? = null
-    private val activePointers = mutableMapOf<Int, HexLayoutEngine.Key>()
-    private val initialPointerKeys = mutableMapOf<Int, HexLayoutEngine.Key>()
+    private var pressedKey: KeyboardLayoutEngine.Key? = null
+    private var popupVisibleKey: KeyboardLayoutEngine.Key? = null
+    private val activePointers = mutableMapOf<Int, KeyboardLayoutEngine.Key>()
+    private val initialPointerKeys = mutableMapOf<Int, KeyboardLayoutEngine.Key>()
     private val pointerStartTime = mutableMapOf<Int, Long>()
     private val handler = Handler(Looper.getMainLooper())
     private var customPopupOnSelect: ((String) -> Unit)? = null
@@ -415,9 +414,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         val w = MeasureSpec.getSize(wMS)
         if (w <= 0) { setMeasuredDimension(0, 0); return }
         val f = getHeightFactor(); engine.heightFactor = f
-        val isQwertyPureNumeric = layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && layoutType == "qwerty"
-        val r = if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && !isQwertyPureNumeric) engine.getNumericR(w.toFloat()) else engine.getHexR(w.toFloat())
-        val rows = if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && !isQwertyPureNumeric) 3f else 4f
+        val isQwertyPureNumeric = layoutMode == KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC && layoutType == "qwerty"
+        val r = if (layoutMode == KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC && !isQwertyPureNumeric) engine.getNumericR(w.toFloat()) else engine.getHexR(w.toFloat())
+        val rows = if (layoutMode == KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC && !isQwertyPureNumeric) 3f else 4f
         val dr = r * keyScale; val dry = dr * f
         val tp = r * 0.05f * f
         val h = (tp + 2 * dry + rows * r * 1.5f * f + r * 0.15f * f).toInt()
@@ -435,10 +434,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         keys.addAll(newKeys)
         keys.forEach { uiKeyMap[it] = UIKey(it) }
 
-        spaceKeys.addAll(keys.filter { it.type == HexLayoutEngine.KeyType.SPACE })
-        shiftKeys.addAll(keys.filter { it.type == HexLayoutEngine.KeyType.SHIFT })
-        deleteKeys.addAll(keys.filter { it.type == HexLayoutEngine.KeyType.DELETE })
-        enterKeys.addAll(keys.filter { it.type == HexLayoutEngine.KeyType.ENTER })
+        spaceKeys.addAll(keys.filter { it.type == KeyboardLayoutEngine.KeyType.SPACE })
+        shiftKeys.addAll(keys.filter { it.type == KeyboardLayoutEngine.KeyType.SHIFT })
+        deleteKeys.addAll(keys.filter { it.type == KeyboardLayoutEngine.KeyType.DELETE })
+        enterKeys.addAll(keys.filter { it.type == KeyboardLayoutEngine.KeyType.ENTER })
 
         if (shiftKeys.size >= 2) {
             val half = shiftKeys.find { it.isHalfLeft }
@@ -469,7 +468,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
     fun getKeyCenters(): Map<Char, PointF> {
         val map = mutableMapOf<Char, PointF>()
         for (key in keys) {
-            if (key.type == HexLayoutEngine.KeyType.CHAR && key.value.isNotEmpty()) {
+            if (key.type == KeyboardLayoutEngine.KeyType.CHAR && key.value.isNotEmpty()) {
                 val c = key.value.first().lowercaseChar()
                 map[c] = PointF(key.cx, key.cy)
             }
@@ -497,12 +496,12 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         longPressPopupManager.updateTheme(renderer, keyboardTheme)
     }
 
-    private fun getGroupCenter(key: HexLayoutEngine.Key): Float? {
+    private fun getGroupCenter(key: KeyboardLayoutEngine.Key): Float? {
         return when (key.type) {
-            HexLayoutEngine.KeyType.SPACE -> if (spaceKeys.size >= 2) unifiedSpaceCenterX else null
-            HexLayoutEngine.KeyType.SHIFT -> if (shiftKeys.size >= 2) unifiedShiftCenterX else null
-            HexLayoutEngine.KeyType.DELETE -> if (deleteKeys.size >= 2) unifiedDeleteCenterX else null
-            HexLayoutEngine.KeyType.ENTER -> if (enterKeys.size >= 2) unifiedEnterCenterX else null
+            KeyboardLayoutEngine.KeyType.SPACE -> if (spaceKeys.size >= 2) unifiedSpaceCenterX else null
+            KeyboardLayoutEngine.KeyType.SHIFT -> if (shiftKeys.size >= 2) unifiedShiftCenterX else null
+            KeyboardLayoutEngine.KeyType.DELETE -> if (deleteKeys.size >= 2) unifiedDeleteCenterX else null
+            KeyboardLayoutEngine.KeyType.ENTER -> if (enterKeys.size >= 2) unifiedEnterCenterX else null
             else -> null
         }
     }
@@ -629,8 +628,8 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         canvas.drawText(text, cx, textY, pFloatingText)
     }
 
-    private fun drawKey(canvas: Canvas, key: HexLayoutEngine.Key) {
-        val isSpace = key.type == HexLayoutEngine.KeyType.SPACE
+    private fun drawKey(canvas: Canvas, key: KeyboardLayoutEngine.Key) {
+        val isSpace = key.type == KeyboardLayoutEngine.KeyType.SPACE
         val pressed = when {
             isSpace -> spacePressed && popupVisibleKey == null
             key in shiftKeys -> shiftPressed && popupVisibleKey == null
@@ -653,14 +652,14 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         }
     }
 
-    fun showKeyPreview(key: HexLayoutEngine.Key) {
-        if (!showKeyPopup || key.type != HexLayoutEngine.KeyType.CHAR) return
+    fun showKeyPreview(key: KeyboardLayoutEngine.Key, pointerId: Int = 0) {
+        if (!showKeyPopup || key.type != KeyboardLayoutEngine.KeyType.CHAR) return
         val loc = IntArray(2)
         getLocationInWindow(loc)
         val windowX = loc[0] + key.cx
         val windowY = loc[1] + key.cy
         val label = if (shifted && key.value.length == 1 && key.value[0].isLetter()) key.display.uppercase() else key.display
-        keyPreviewManager.showPreview(this, key, windowX, windowY, label, key.isRectangular || layoutType == "qwerty", popupScale)
+        keyPreviewManager.showPreview(this, key, windowX, windowY, label, key.isRectangular || layoutType == "qwerty", popupScale, pointerId)
     }
 
     fun showPopupForAlternatives(
@@ -673,9 +672,9 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
         onSelect: (String) -> Unit
     ) {
         if (windowToken == null || alternatives.isEmpty()) return
-        val dummyKey = HexLayoutEngine.Key(
+        val dummyKey = KeyboardLayoutEngine.Key(
             display = mainSymbol,
-            type = HexLayoutEngine.KeyType.CHAR,
+            type = KeyboardLayoutEngine.KeyType.CHAR,
             value = mainSymbol,
             alternatives = alternatives,
             cx = screenX,
@@ -710,10 +709,10 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
             } else {
                 pressedKey?.let { key ->
                     when (key.type) {
-                        HexLayoutEngine.KeyType.LANGUAGE -> if (selectedChar == "🌐") (context as? HexKeyboardService)?.showLanguagePicker() else (context as? HexKeyboardService)?.switchToNextLanguage()
-                        HexLayoutEngine.KeyType.TOGGLE -> switchLayoutByValue(selectedChar)
-                        HexLayoutEngine.KeyType.SYMBOL_PAGE -> { if (selectedChar.toIntOrNull() != null) switchSymbolPageByValue(selectedChar) else fireKey(key) }
-                        HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (selectedChar.toIntOrNull() ?: 1) - 1; buildLayout(width.toFloat()); invalidate() }
+                        KeyboardLayoutEngine.KeyType.LANGUAGE -> if (selectedChar == "🌐") (context as? KeyboardService)?.showLanguagePicker() else (context as? KeyboardService)?.switchToNextLanguage()
+                        KeyboardLayoutEngine.KeyType.TOGGLE -> switchLayoutByValue(selectedChar)
+                        KeyboardLayoutEngine.KeyType.SYMBOL_PAGE -> { if (selectedChar.toIntOrNull() != null) switchSymbolPageByValue(selectedChar) else fireKey(key) }
+                        KeyboardLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (selectedChar.toIntOrNull() ?: 1) - 1; buildLayout(width.toFloat()); invalidate() }
                         else -> listener?.onLongPressSelect(selectedChar)
                     }
                 } ?: listener?.onLongPressSelect(selectedChar)
@@ -778,7 +777,7 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     initialPointerKeys[pointerId] = hit
                     hit.isPressed = true
                     pointerStartTime[pointerId] = System.currentTimeMillis()
-                    if (hit.type != HexLayoutEngine.KeyType.DELETE) { triggerVibration(); triggerSound() }
+                    if (hit.type != KeyboardLayoutEngine.KeyType.DELETE) { triggerVibration(); triggerSound() }
                     if (pointerId == e.getPointerId(0)) {
                         val currentPressed = pressedKey
                         val isSameGroup = (currentPressed in spaceKeys && hit in spaceKeys) ||
@@ -790,10 +789,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                         pressedKey = hit; animateKeyToScale(hit, 0.85f)
                         lastScrollX = x; lastScrollY = y; gestureStartX = x; gestureStartY = y; gesturePoints.clear(); gesturePath.reset(); gesturePoints.add(PointF(x, y)); gesturePath.moveTo(x, y)
                         isGestureActive = false; isScrollingCursor = false; longPressTriggered = false; longPressStarted = false
-                        if (showKeyPopup && hit.type == HexLayoutEngine.KeyType.CHAR) { showKeyPreview(hit) }
+                        if (showKeyPopup && hit.type == KeyboardLayoutEngine.KeyType.CHAR) { showKeyPreview(hit, pointerId) }
                         if (hit.alternatives.isNotEmpty()) handler.postDelayed(longPressRunnable, longPressTimeout)
-                    } else animateKeyToScale(hit, 0.85f)
-                    if (hit.type == HexLayoutEngine.KeyType.DELETE || hit.isHalfRight) { listener?.onDelete(); startDeleteRepeat() }
+                    } else {
+                        animateKeyToScale(hit, 0.85f)
+                        if (showKeyPopup && hit.type == KeyboardLayoutEngine.KeyType.CHAR) { showKeyPreview(hit, pointerId) }
+                    }
+                    if (hit.type == KeyboardLayoutEngine.KeyType.DELETE || hit.isHalfRight) { listener?.onDelete(); startDeleteRepeat() }
                     invalidate()
                 }
             }
@@ -806,13 +808,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                     if (distFromStart > 16f) hasDraggedSinceLongPress = true
                     longPressPopupManager.onDrag(loc[0] + x, loc[1] + y)
                 }
-                else if (pressedKey?.type == HexLayoutEngine.KeyType.SPACE && pointerId == e.getPointerId(0)) {
+                else if (pressedKey?.type == KeyboardLayoutEngine.KeyType.SPACE && pointerId == e.getPointerId(0)) {
                     val deltaX = x - lastScrollX
                     if (abs(deltaX) > 20) {
-                        isScrollingCursor = true; (context as? HexKeyboardService)?.moveCursor(if (deltaX > 0) 1 else -1)
+                        isScrollingCursor = true; (context as? KeyboardService)?.moveCursor(if (deltaX > 0) 1 else -1)
                         lastScrollX = x; invalidate()
                     }
-                } else if (pointerId == e.getPointerId(0) && pressedKey?.type == HexLayoutEngine.KeyType.CHAR && !longPressStarted && !isScrollingCursor && !longPressTriggered) {
+                } else if (pointerId == e.getPointerId(0) && pressedKey?.type == KeyboardLayoutEngine.KeyType.CHAR && !longPressStarted && !isScrollingCursor && !longPressTriggered) {
                     val deltaY = y - lastScrollY; val deltaX = x - gestureStartX; val totalDist = sqrt(deltaX * deltaX + (y - gestureStartY) * (y - gestureStartY))
                     val gestureMinDist = (pressedKey?.rx ?: 50f) * 2.2f
                     if (pressedKey?.value == "n") {
@@ -860,16 +862,20 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                         activePointers[pid] = newHit; newHit.isPressed = true
                         updateGroupPressStates()
                         if (pid == e.getPointerId(0)) {
-                            if (pressedKey?.type == HexLayoutEngine.KeyType.DELETE || pressedKey?.isHalfRight == true) cancelDeleteRepeat()
+                            if (pressedKey?.type == KeyboardLayoutEngine.KeyType.DELETE || pressedKey?.isHalfRight == true) cancelDeleteRepeat()
                             pressedKey = newHit
                             if (!(oldHit in spaceKeys && newHit in spaceKeys)) {
                                 cancelKeyLongPress()
-                                if (showKeyPopup && newHit.type == HexLayoutEngine.KeyType.CHAR) {
-                                    showKeyPreview(newHit)
+                                if (showKeyPopup && newHit.type == KeyboardLayoutEngine.KeyType.CHAR) {
+                                    showKeyPreview(newHit, pid)
                                 } else {
-                                    keyPreviewManager.dismissPreview(immediate = false)
+                                    keyPreviewManager.dismissPreviewForPointer(pid, immediate = false)
                                 }
                                 if (newHit.alternatives.isNotEmpty() && !longPressStarted) handler.postDelayed(longPressRunnable, longPressTimeout)
+                            }
+                        } else {
+                            if (showKeyPopup && newHit.type == KeyboardLayoutEngine.KeyType.CHAR) {
+                                showKeyPreview(newHit, pid)
                             }
                         }
                         invalidate()
@@ -896,10 +902,13 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                             onLongPressRelease()
                         } else {
                             if (!longPressTriggered) { fireKey(hit); performClick() }
-                            keyPreviewManager.dismissPreview(immediate = false)
+                            keyPreviewManager.dismissPreviewForPointer(pointerId, immediate = false)
                         }
                         pressedKey = null; longPressTriggered = false; longPressStarted = false; isScrollingCursor = false
-                    } else fireKey(hit)
+                    } else {
+                        fireKey(hit)
+                        keyPreviewManager.dismissPreviewForPointer(pointerId, immediate = false)
+                    }
                     activePointers.remove(pointerId); initialPointerKeys.remove(pointerId); updateGroupPressStates(); invalidate()
                 }
             }
@@ -908,13 +917,14 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
                 activePointers.clear(); initialPointerKeys.clear(); pointerStartTime.clear(); spacePressed = false; shiftPressed = false; deletePressed = false; enterPressed = false
                 isGestureActive = false; gesturePath.reset(); gesturePoints.clear(); cancelKeyLongPress(); cancelDeleteRepeat()
                 hidePopup(immediate = true)
+                keyPreviewManager.dismissAllPreviews(immediate = true)
                 pressedKey = null; longPressTriggered = false; longPressStarted = false; isScrollingCursor = false; invalidate()
             }
         }
         return true
     }
 
-    private fun animateKeyToScale(key: HexLayoutEngine.Key?, target: Float) {
+    private fun animateKeyToScale(key: KeyboardLayoutEngine.Key?, target: Float) {
         if (key == null) return
         when (key) {
             in spaceKeys -> spaceKeys.forEach { uiKeyMap[it]?.animateToScale(target) }
@@ -943,54 +953,54 @@ class HexKeyboardView(context: Context, attrs: AttributeSet? = null) : View(cont
 
     private fun switchLayoutByValue(value: String) {
         layoutMode = when (value) {
-            "ABC" -> HexLayoutEngine.LayoutMode.ALPHA
-            "?123" -> HexLayoutEngine.LayoutMode.NUMERIC
-            "123" -> HexLayoutEngine.LayoutMode.PURE_NUMERIC
-            "#+=" -> HexLayoutEngine.LayoutMode.SYMBOLS
-            "𝔉" -> HexLayoutEngine.LayoutMode.FONTS
+            "ABC" -> KeyboardLayoutEngine.LayoutMode.ALPHA
+            "?123" -> KeyboardLayoutEngine.LayoutMode.NUMERIC
+            "123" -> KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC
+            "#+=" -> KeyboardLayoutEngine.LayoutMode.SYMBOLS
+            "𝔉" -> KeyboardLayoutEngine.LayoutMode.FONTS
             else -> return
         }
     }
 
 
 
-    private fun hitTest(x: Float, y: Float): HexLayoutEngine.Key? {
+    private fun hitTest(x: Float, y: Float): KeyboardLayoutEngine.Key? {
         if (keys.isEmpty()) return null
         val isNGestureActive = longPressTriggered && pressedKey?.value == "n"
         return engine.findKeyAt(x, y, if (isNGestureActive) keys.filter { it.value !in keysToIgnoreDuringNGesture } else keys)
     }
 
-    private fun fireKey(key: HexLayoutEngine.Key, touchX: Float = key.cx, touchY: Float = key.cy) {
+    private fun fireKey(key: KeyboardLayoutEngine.Key, touchX: Float = key.cx, touchY: Float = key.cy) {
         listener?.onKeyClick(key)
         when (key.type) {
-            HexLayoutEngine.KeyType.LANGUAGE -> (context as? HexKeyboardService)?.switchToNextLanguage()
-            HexLayoutEngine.KeyType.SHIFT -> {
+            KeyboardLayoutEngine.KeyType.LANGUAGE -> (context as? KeyboardService)?.switchToNextLanguage()
+            KeyboardLayoutEngine.KeyType.SHIFT -> {
                 val n = System.currentTimeMillis()
                 if (n - lastShiftClickTime <= doubleClickThreshold) { capsLock = true; shifted = true }
                 else { if (capsLock) { capsLock = false; shifted = false } else shifted = !shifted }
                 lastShiftClickTime = n; invalidate()
             }
-            HexLayoutEngine.KeyType.ENTER -> listener?.onEnter()
-            HexLayoutEngine.KeyType.SPACE -> listener?.onChar(" ")
-            HexLayoutEngine.KeyType.TOGGLE -> {
+            KeyboardLayoutEngine.KeyType.ENTER -> listener?.onEnter()
+            KeyboardLayoutEngine.KeyType.SPACE -> listener?.onChar(" ")
+            KeyboardLayoutEngine.KeyType.TOGGLE -> {
                 layoutMode = when (layoutMode) {
-                    HexLayoutEngine.LayoutMode.ALPHA -> HexLayoutEngine.LayoutMode.NUMERIC
-                    HexLayoutEngine.LayoutMode.NUMERIC -> HexLayoutEngine.LayoutMode.ALPHA
-                    HexLayoutEngine.LayoutMode.SYMBOLS -> HexLayoutEngine.LayoutMode.ALPHA
-                    HexLayoutEngine.LayoutMode.PURE_NUMERIC -> HexLayoutEngine.LayoutMode.ALPHA
-                    HexLayoutEngine.LayoutMode.FONTS -> HexLayoutEngine.LayoutMode.ALPHA
+                    KeyboardLayoutEngine.LayoutMode.ALPHA -> KeyboardLayoutEngine.LayoutMode.NUMERIC
+                    KeyboardLayoutEngine.LayoutMode.NUMERIC -> KeyboardLayoutEngine.LayoutMode.ALPHA
+                    KeyboardLayoutEngine.LayoutMode.SYMBOLS -> KeyboardLayoutEngine.LayoutMode.ALPHA
+                    KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC -> KeyboardLayoutEngine.LayoutMode.ALPHA
+                    KeyboardLayoutEngine.LayoutMode.FONTS -> KeyboardLayoutEngine.LayoutMode.ALPHA
                 }
-                if (layoutMode == HexLayoutEngine.LayoutMode.ALPHA) (context as? HexKeyboardService)?.updateShiftState()
+                if (layoutMode == KeyboardLayoutEngine.LayoutMode.ALPHA) (context as? KeyboardService)?.updateShiftState()
             }
-            HexLayoutEngine.KeyType.SYMBOL_PAGE -> {
+            KeyboardLayoutEngine.KeyType.SYMBOL_PAGE -> {
                 val pages = symbolPages.keys.toList()
                 if (pages.isNotEmpty()) {
                     val i = pages.indexOf(symbolPage); symbolPage = pages[(i + 1) % pages.size]
                     listener?.onSymbolPageChange(symbolPage); buildLayout(width.toFloat()); invalidate()
                 }
             }
-            HexLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (fontPage + 1) % 10; buildLayout(width.toFloat()); invalidate() }
-            HexLayoutEngine.KeyType.CHAR -> {
+            KeyboardLayoutEngine.KeyType.FONT_PAGE -> { fontPage = (fontPage + 1) % 10; buildLayout(width.toFloat()); invalidate() }
+            KeyboardLayoutEngine.KeyType.CHAR -> {
                 val o = if (shifted && key.value.length == 1 && key.value[0].isLetter()) key.value.uppercase() else key.value
                 listener?.onChar(o)
                 listener?.onCharWithPoint(o, touchX, touchY)

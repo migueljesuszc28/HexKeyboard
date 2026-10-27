@@ -16,22 +16,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.datastore.preferences.core.emptyPreferences
 import com.example.hexkeyboard.data.repository.KeyboardTheme
-import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
-import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
+import com.example.hexkeyboard.ui.keyboard.components.KeyboardView
+import com.example.hexkeyboard.ui.keyboard.components.KeyboardLayoutEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 @Composable
 fun KeyboardPreview(
     theme: KeyboardTheme,
     modifier: Modifier = Modifier,
-    onKeyClick: ((HexLayoutEngine.Key) -> Unit)? = null
+    onKeyClick: ((KeyboardLayoutEngine.Key) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val prefs by ThemeUtils.getDataStore(context).data.collectAsState(initial = emptyPreferences())
@@ -100,19 +99,19 @@ fun KeyboardPreview(
             // Keyboard Keys
             AndroidView(
                 factory = { ctx ->
-                    HexKeyboardView(ctx).apply {
+                    KeyboardView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT
                         )
                         this.layoutType = layoutType
-                        listener = object : HexKeyboardView.Listener {
+                        listener = object : KeyboardView.Listener {
                             override fun onChar(text: String) {}
                             override fun onDelete() {}
                             override fun onEnter() {}
                             override fun onLongPressSelect(char: String) {}
                             override fun onSymbolPageChange(page: String) {}
-                            override fun onKeyClick(key: HexLayoutEngine.Key) {
+                            override fun onKeyClick(key: KeyboardLayoutEngine.Key) {
                                 onKeyClick?.invoke(key)
                             }
                         }

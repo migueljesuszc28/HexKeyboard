@@ -26,12 +26,12 @@ import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.logic.managers.FeedbackManager
 import com.example.hexkeyboard.ui.keyboard.panels.CredentialsPanel
 import com.example.hexkeyboard.ui.keyboard.panels.LanguagePanel
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.service.KeyboardService
 import com.example.hexkeyboard.ui.keyboard.panels.ClipboardPanel
 import com.example.hexkeyboard.ui.keyboard.panels.EmojiPanel
 import com.example.hexkeyboard.ui.keyboard.panels.FunctionsPanel
-import com.example.hexkeyboard.ui.keyboard.components.HexLayoutEngine
-import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
+import com.example.hexkeyboard.ui.keyboard.components.KeyboardLayoutEngine
+import com.example.hexkeyboard.ui.keyboard.components.KeyboardView
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import kotlinx.coroutines.flow.map
@@ -52,7 +52,7 @@ fun KeyboardMainSection(
     val keyboardVisible = currentView == "keyboard" || isSearchActive
 
     val context = LocalContext.current
-    val service = context as? HexKeyboardService
+    val service = context as? KeyboardService
     val dataStore = ThemeUtils.getDataStore(context)
     
     val fontPathFlow = remember { dataStore.data.map { it[stringPreferencesKey("custom_font_path")] ?: "system" } }
@@ -82,7 +82,7 @@ fun KeyboardMainSection(
 
     AndroidView(
         factory = { ctx ->
-            HexKeyboardView(ctx).apply {
+            KeyboardView(ctx).apply {
                 this.sharedTypeface = nunitoTypeface
                 this.symbolPages = service?.symbolPages ?: emptyMap()
                 this.fontPages = service?.fontPages ?: emptyList()
@@ -90,9 +90,9 @@ fun KeyboardMainSection(
                 this.language = currentLocale
                 this.layoutType = layoutType
                 this.isSplitMode = isSplitMode
-                service?.mHexKeyboardView = this
+                service?.mKeyboardView = this
                 this.drawBackground = !hasBackgroundImage
-                listener = object : HexKeyboardView.Listener {
+                listener = object : KeyboardView.Listener {
                     override fun onChar(text: String) { viewModel.onCharTyped(text) }
                     override fun onCharWithPoint(text: String, x: Float, y: Float) {
                         service?.recordTouchPoint(text, x, y)
@@ -110,12 +110,12 @@ fun KeyboardMainSection(
                     override fun onLiveGesture(points: List<PointF>) {
                         service?.handleLiveGesture(points, allKeys)
                     }
-                    override fun onKeyClick(key: HexLayoutEngine.Key) {
+                    override fun onKeyClick(key: KeyboardLayoutEngine.Key) {
                         when(key.type) {
-                            HexLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
-                            HexLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
-                            HexLayoutEngine.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
-                            HexLayoutEngine.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
+                            KeyboardLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
+                            KeyboardLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
+                            KeyboardLayoutEngine.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
+                            KeyboardLayoutEngine.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
                             else -> {}
                         }
                     }
@@ -146,7 +146,7 @@ fun KeyboardMainSection(
                 view.isMultiLine = isMultiLine
             }
 
-            view.listener = object : HexKeyboardView.Listener {
+            view.listener = object : KeyboardView.Listener {
                 override fun onChar(text: String) { viewModel.onCharTyped(text) }
                 override fun onCharWithPoint(text: String, x: Float, y: Float) {
                     service?.recordTouchPoint(text, x, y)
@@ -161,12 +161,12 @@ fun KeyboardMainSection(
                 override fun onGesture(points: List<PointF>) {
                     service?.handleGesture(points, view.allKeys)
                 }
-                override fun onKeyClick(key: HexLayoutEngine.Key) {
+                override fun onKeyClick(key: KeyboardLayoutEngine.Key) {
                     when(key.type) {
-                        HexLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
-                        HexLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
-                        HexLayoutEngine.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
-                        HexLayoutEngine.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
+                        KeyboardLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
+                        KeyboardLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
+                        KeyboardLayoutEngine.KeyType.FUNCTIONS -> viewModel.setCurrentView("functions")
+                        KeyboardLayoutEngine.KeyType.TOGGLE -> service?.symbolsTypedCount = 0
                         else -> {}
                     }
                 }

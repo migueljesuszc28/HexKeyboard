@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import kotlinx.coroutines.CoroutineScope
-import com.example.hexkeyboard.logic.managers.ClipboardItem
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -46,7 +45,7 @@ import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import com.example.hexkeyboard.logic.managers.ClipboardHistoryManager
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.service.KeyboardService
 import com.example.hexkeyboard.ui.keyboard.panels.ClipboardImageThumbnail
 import com.example.hexkeyboard.ui.settings.ClipboardEditActivity
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
@@ -69,7 +68,7 @@ import kotlinx.coroutines.withContext
 fun KeyboardScreen(viewModel: KeyboardViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val service = context as? HexKeyboardService
+    val service = context as? KeyboardService
     val dataStore = ThemeUtils.getDataStore(context)
     val keyboardThemeOpt by viewModel.keyboardTheme.collectAsState()
     val keyboardTheme = keyboardThemeOpt ?: return
@@ -360,12 +359,6 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                                             dampingRatio = 0.82f,
                                             stiffness = 380f
                                         )
-                                    ) + scaleIn(
-                                        initialScale = 0.93f,
-                                        animationSpec = spring(
-                                            dampingRatio = 0.82f,
-                                            stiffness = 380f
-                                        )
                                     ) + fadeIn(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing))).togetherWith(
                                         fadeOut(animationSpec = tween(200, easing = FastOutLinearInEasing))
                                     )
@@ -373,9 +366,6 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                                     fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)).togetherWith(
                                         slideOutVertically(
                                             targetOffsetY = { (it * 0.12f).toInt() },
-                                            animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
-                                        ) + scaleOut(
-                                            targetScale = 0.95f,
                                             animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
                                         ) + fadeOut(animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing))
                                     )
@@ -426,7 +416,7 @@ private fun ClipboardOptionsMenuOverlay(
     keyboardTheme: KeyboardTheme,
     currentLocale: String,
     context: Context,
-    service: HexKeyboardService?,
+    service: KeyboardService?,
     scope: CoroutineScope,
     viewModel: KeyboardViewModel,
     isFloating: Boolean,

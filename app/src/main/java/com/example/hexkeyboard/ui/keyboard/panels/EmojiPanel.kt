@@ -33,16 +33,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -53,7 +51,7 @@ import com.example.hexkeyboard.data.repository.EmojiProvider
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.service.KeyboardService
 import com.example.hexkeyboard.ui.component.GlassEffectConfig
 import com.example.hexkeyboard.ui.component.LocalAppBackdrop
 import com.example.hexkeyboard.ui.component.LocalGlassEffectConfig
@@ -62,11 +60,8 @@ import com.example.hexkeyboard.ui.component.liquidGlass
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.bounceClick
 import com.example.hexkeyboard.viewmodel.KeyboardViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -133,15 +128,15 @@ fun EmojiPanel(
 
     LaunchedEffect(gridState.isScrollInProgress) {
         if (gridState.isScrollInProgress) {
-            val service = context as? HexKeyboardService
-            service?.mHexKeyboardView?.hidePopup()
+            val service = context as? KeyboardService
+            service?.mKeyboardView?.hidePopup()
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            val service = context as? HexKeyboardService
-            service?.mHexKeyboardView?.hidePopup()
+            val service = context as? KeyboardService
+            service?.mKeyboardView?.hidePopup()
         }
     }
 
@@ -304,7 +299,7 @@ fun EmojiPanel(
 
                     EmojiDeleteButton(
                         onDelete = {
-                            val service = context as? HexKeyboardService
+                            val service = context as? KeyboardService
                             service?.handleDelete()
                         },
                         theme = theme,
@@ -526,10 +521,6 @@ fun EmojiDeleteButton(
     }
 }
 
-private class CellCoordsHolder {
-    var coords: LayoutCoordinates? = null
-}
-
 @Composable
 fun EmojiItem(
     canonical: String,
@@ -541,7 +532,7 @@ fun EmojiItem(
     viewModel: KeyboardViewModel? = null
 ) {
     val context = LocalContext.current
-    val service = context as? HexKeyboardService
+    val service = context as? KeyboardService
     val scope = rememberCoroutineScope()
     val viewConfiguration = LocalViewConfiguration.current
     val currentOnEmojiSelected by rememberUpdatedState(onEmojiSelected)
@@ -564,7 +555,7 @@ fun EmojiItem(
     val hasVariations = remember(canonical) { EmojiProvider.hasVariations(canonical) }
     val flatVariations = remember(variationGrid) { variationGrid.flatten() }
 
-    val coordsHolder = remember { CellCoordsHolder() }
+    var currentCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -581,7 +572,7 @@ fun EmojiItem(
                 scaleY = scale
             }
             .onGloballyPositioned { coordinates ->
-                coordsHolder.coords = coordinates
+                currentCoordinates = coordinates
             }
             .clip(RoundedCornerShape(12.dp))
             .pointerInput(displayEmoji, hasVariations, longPressTimeoutMs) {
@@ -590,7 +581,7 @@ fun EmojiItem(
                         val down = awaitFirstDown(requireUnconsumed = false)
                         if (down.isConsumed) continue
 
-                        service?.mHexKeyboardView?.hidePopup()
+                        service?.mKeyboardView?.hidePopup()
 
                         isPressed = true
                         val downTime = System.currentTimeMillis()
@@ -601,17 +592,17 @@ fun EmojiItem(
                         val longPressJob = scope.launch {
                             delay(longPressTimeoutMs.milliseconds)
                             if (isActive && hasVariations) {
-                                val keyboardView = service?.mHexKeyboardView
-                                val cellCoords = coordsHolder.coords
+                                val keyboardView = service?.mKeyboardView
+                                val cellCoords = currentCoordinates
                                 if (keyboardView != null && cellCoords != null && cellCoords.isAttached) {
                                     FeedbackManager.triggerFeedback(context, FeedbackManager.HapticType.LONG_PRESS)
 
-                                    val cellPosInWindow = cellCoords.positionInWindow()
-                                    val cellW = cellCoords.size.width.toFloat()
-                                    val cellH = cellCoords.size.height.toFloat()
+                                    val boundsInWin = cellCoords.boundsInWindow()
+                                    val cellW = boundsInWin.width
+                                    val cellH = boundsInWin.height
 
-                                    val screenX = cellPosInWindow.x + cellW / 2f
-                                    val screenY = cellPosInWindow.y + cellH / 2f
+                                    val screenX = boundsInWin.center.x
+                                    val screenY = boundsInWin.center.y
 
                                     keyboardView.showPopupForAlternatives(
                                         screenX = screenX,
@@ -648,12 +639,15 @@ fun EmojiItem(
                                         }
                                     } else {
                                         change.consume()
-                                        val cellCoords = coordsHolder.coords
-                                        if (cellCoords != null && cellCoords.isAttached) {
-                                            val cellPosInWindow = cellCoords.positionInWindow()
-                                            val screenX = cellPosInWindow.x + change.position.x
-                                            val screenY = cellPosInWindow.y + change.position.y
-                                            service?.mHexKeyboardView?.onLongPressDrag(screenX, screenY)
+                                        val dist = (change.position - downPos).getDistance()
+                                        if (dist > viewConfiguration.touchSlop) {
+                                            val cellCoords = currentCoordinates
+                                            if (cellCoords != null && cellCoords.isAttached) {
+                                                val boundsInWin = cellCoords.boundsInWindow()
+                                                val screenX = boundsInWin.left + change.position.x
+                                                val screenY = boundsInWin.top + change.position.y
+                                                service?.mKeyboardView?.onLongPressDrag(screenX, screenY)
+                                            }
                                         }
                                     }
                                 } else {
@@ -661,7 +655,7 @@ fun EmojiItem(
                                     longPressJob.cancel()
                                     if (isLongPressActive) {
                                         change.consume()
-                                        service?.mHexKeyboardView?.onLongPressRelease()
+                                        service?.mKeyboardView?.onLongPressRelease()
                                     } else {
                                         val duration = System.currentTimeMillis() - downTime
                                         val dist = (change.position - downPos).getDistance()

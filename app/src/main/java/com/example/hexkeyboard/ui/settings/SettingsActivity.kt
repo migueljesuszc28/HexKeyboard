@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
@@ -59,7 +58,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.datastore.preferences.core.*
 import com.example.hexkeyboard.data.repository.ThemeUtils
 import com.example.hexkeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.service.KeyboardService
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.example.hexkeyboard.ui.settings.fontselector.FontSelectorActivity
@@ -744,8 +743,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                         icon = Icons.Default.CameraAlt,
                         context = context,
                         onCheckedChange = { enabled ->
-                            if (enabled && !HexKeyboardService.hasMediaPermission(context)) {
-                                HexKeyboardService.requestMediaPermission(context)
+                            if (enabled && !KeyboardService.hasMediaPermission(context)) {
+                                KeyboardService.requestMediaPermission(context)
                             }
                         }
                     )

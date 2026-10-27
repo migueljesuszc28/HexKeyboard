@@ -173,8 +173,15 @@ class PatternLearningManager(private val context: Context) {
             }
             root.put("trigrams", tgObj)
 
-            val file = File(context.filesDir, FILE_NAME)
-            file.writeText(root.toString())
+            val targetFile = File(context.filesDir, FILE_NAME)
+            val tempFile = File(context.filesDir, "$FILE_NAME.tmp")
+            tempFile.bufferedWriter().use { writer ->
+                writer.write(root.toString())
+            }
+            if (tempFile.exists()) {
+                if (targetFile.exists()) targetFile.delete()
+                tempFile.renameTo(targetFile)
+            }
             Log.d(TAG, "Patrones guardados exitosamente en disco")
         } catch (e: Exception) {
             Log.e(TAG, "Error guardando patrones en disco: ${e.message}")
@@ -188,7 +195,12 @@ class PatternLearningManager(private val context: Context) {
         innerMap[low2] = (innerMap[low2] ?: 0) + weight
 
         if (bigrams.size > MAX_BIGRAMS) {
-            bigrams.remove(bigrams.keys.first())
+            val keysToRemove = bigrams.entries
+                .map { (key, inner) -> key to inner.values.sum() }
+                .sortedBy { it.second }
+                .take(50)
+                .map { it.first }
+            keysToRemove.forEach { bigrams.remove(it) }
         }
     }
 
@@ -199,7 +211,12 @@ class PatternLearningManager(private val context: Context) {
         innerMap[low3] = (innerMap[low3] ?: 0) + weight
 
         if (trigrams.size > MAX_TRIGRAMS) {
-            trigrams.remove(trigrams.keys.first())
+            val keysToRemove = trigrams.entries
+                .map { (key, inner) -> key to inner.values.sum() }
+                .sortedBy { it.second }
+                .take(50)
+                .map { it.first }
+            keysToRemove.forEach { trigrams.remove(it) }
         }
     }
 

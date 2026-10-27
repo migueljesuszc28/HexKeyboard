@@ -85,7 +85,8 @@ object EmojiProvider {
     private var allEmojis: List<EmojibaseItem> = emptyList()
     private val emojiToFamily = mutableMapOf<String, EmojiFamily>()
     private var emojiMap: Map<String, EmojibaseItem> = emptyMap()
-    private val searchEntries = mutableListOf<EmojiSearchEntry>()
+    @Volatile
+    private var searchEntries: List<EmojiSearchEntry> = emptyList()
     private val skinToneRegex = "[\uD83C\uDFFB-\uD83C\uDFFF]".toRegex()
 
     var categories: List<EmojiCategory> = emptyList()
@@ -258,7 +259,7 @@ object EmojiProvider {
             val categoryList = mutableListOf<EmojiCategory>()
             categoryList.add(EmojiCategory("Recientes", "🕒", emptyList()))
 
-            searchEntries.clear()
+            val newSearchEntries = mutableListOf<EmojiSearchEntry>()
 
             groupNames.forEach { (groupId, name) ->
                 val emojisInGroup = loadedEmojis.filter { it.group == groupId }
@@ -304,7 +305,7 @@ object EmojiProvider {
                     }
                 }
 
-                searchEntries.add(
+                newSearchEntries.add(
                     EmojiSearchEntry(
                         unicode = unicode,
                         normalizedLabel = normLabel,
@@ -314,6 +315,7 @@ object EmojiProvider {
                 )
             }
 
+            searchEntries = newSearchEntries
             categories = categoryList
             
             // Pre-calcular lista plana para el grid

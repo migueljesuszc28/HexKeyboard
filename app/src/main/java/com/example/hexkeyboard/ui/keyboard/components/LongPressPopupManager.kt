@@ -9,7 +9,6 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.widget.PopupWindow
 import androidx.core.graphics.toColorInt
@@ -31,7 +30,7 @@ class LongPressPopupManager(private val context: Context) {
     )
 
     data class PopupLayoutInfo(
-        val key: HexLayoutEngine.Key,
+        val key: KeyboardLayoutEngine.Key,
         val isSingleSymbol: Boolean,
         val cells: List<PopupCell>,
         val width: Int,
@@ -54,7 +53,7 @@ class LongPressPopupManager(private val context: Context) {
     private var popupShadowColor: Int = "#40000000".toColorInt()
     private var typeface: Typeface = Typeface.DEFAULT
 
-    fun updateTheme(renderer: HexRenderer, theme: KeyboardTheme?) {
+    fun updateTheme(renderer: KeyboardRenderer, theme: KeyboardTheme?) {
         val bg = if (renderer.colorPopupBg != 0) renderer.colorPopupBg else (theme?.popupBackgroundColor ?: Color.WHITE)
         val text = if (renderer.colorPopupText != 0) renderer.colorPopupText else (theme?.popupTextColor ?: Color.BLACK)
         popupBgColor = if (bg != 0) bg else Color.WHITE
@@ -75,8 +74,8 @@ class LongPressPopupManager(private val context: Context) {
         )
     }
 
-    private fun getPopupAlternatives(key: HexLayoutEngine.Key): List<String> {
-        return if (key.type == HexLayoutEngine.KeyType.FONT_PAGE || key.type == HexLayoutEngine.KeyType.SYMBOL_PAGE) {
+    private fun getPopupAlternatives(key: KeyboardLayoutEngine.Key): List<String> {
+        return if (key.type == KeyboardLayoutEngine.KeyType.FONT_PAGE || key.type == KeyboardLayoutEngine.KeyType.SYMBOL_PAGE) {
             key.alternatives
         } else {
             val firstLabel = key.value
@@ -89,7 +88,7 @@ class LongPressPopupManager(private val context: Context) {
      */
     fun showLongPressPopup(
         parentView: View,
-        key: HexLayoutEngine.Key,
+        key: KeyboardLayoutEngine.Key,
         keyWindowX: Float,
         keyWindowY: Float,
         popupScale: Float = 1.0f
@@ -107,8 +106,8 @@ class LongPressPopupManager(private val context: Context) {
         val g = sW * 0.12f
         val p = sW * 0.4f
 
-        val parentWidth = if (parentView.width > 0) parentView.width else context.resources.displayMetrics.widthPixels
-        val maxW = parentWidth - p * 2f
+        val screenWidth = context.resources.displayMetrics.widthPixels
+        val maxW = screenWidth - p * 2f
         var cols = when {
             alternatives.size <= 5 -> alternatives.size
             alternatives.size <= 10 -> 5
@@ -121,7 +120,7 @@ class LongPressPopupManager(private val context: Context) {
         val tw = if (rows > 1) cols * sW + (cols - 1) * g else alternatives.size * sW + (alternatives.size - 1) * g
         val th = rows * sH + (rows - 1) * g
 
-        val w = (tw + p * 2.2f).toInt().coerceAtMost(parentWidth)
+        val w = (tw + p * 2.2f).toInt().coerceAtMost(screenWidth)
         val h = (th + p * 1.5f).toInt()
 
         val px = w / 2f
@@ -141,10 +140,10 @@ class LongPressPopupManager(private val context: Context) {
         }
 
         var x = (keyWindowX - w / 2f).toInt()
-        val y = (keyWindowY - key.ry * (1.1f + 0.3f * popupScale) - h).toInt()
+        val y = (keyWindowY - key.ry * (0.2f + 0.8f * popupScale) - h).toInt()
 
         if (x < 12) x = 12
-        if (x + w > parentWidth - 12) x = parentWidth - w - 12
+        if (x + w > screenWidth - 12) x = screenWidth - w - 12
 
         // Posición inicial seleccionada: la primera variante alternativa si existe, o el carácter base
         val isSingleSymbol = alternatives.size == 1
@@ -197,7 +196,8 @@ class LongPressPopupManager(private val context: Context) {
             popupWindow?.update(x, y, w, h)
         } else {
             try {
-                popupWindow?.showAtLocation(parentView, Gravity.NO_GRAVITY, x, y)
+                val anchor = parentView.rootView ?: parentView
+                popupWindow?.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
             } catch (e: Exception) {
                 android.util.Log.e("HexKB", "Error showing long press popup", e)
             }
@@ -214,23 +214,10 @@ class LongPressPopupManager(private val context: Context) {
         val localX = screenX - layout.popupX
         val localY = screenY - layout.popupY
 
-        var newIndex = layout.cells.indexOfFirst { cell ->
+        val newIndex = layout.cells.indexOfFirst { cell ->
             val expandedRect = RectF(cell.bounds)
-            expandedRect.inset(-20f, -20f)
+            expandedRect.inset(-12f, -12f)
             expandedRect.contains(localX, localY)
-        }
-
-        if (newIndex == -1 && localY >= -60f && localY <= layout.height + 120f) {
-            var minDist = Float.MAX_VALUE
-            layout.cells.forEachIndexed { i, cell ->
-                val dx = localX - cell.centerX
-                val dy = localY - cell.centerY
-                val dist = dx * dx + dy * dy
-                if (dist < minDist) {
-                    minDist = dist
-                    newIndex = i
-                }
-            }
         }
 
         if (newIndex != -1 && newIndex != selectedIndex) {
@@ -262,6 +249,8 @@ class LongPressPopupManager(private val context: Context) {
             }
         } catch (_: Exception) {
         }
+        popupWindow = null
+        contentView = null
         currentLayout = null
     }
 
@@ -376,10 +365,6 @@ class LongPressPopupManager(private val context: Context) {
                 val ty = ky - (pText.ascent() + pText.descent()) / 2f
                 canvas.drawText(cell.label, kx, ty, pText)
             }
-        }
-
-        override fun onTouchEvent(event: MotionEvent): Boolean {
-            return super.onTouchEvent(event)
         }
     }
 }

@@ -46,6 +46,28 @@ class BeamSearchDecoder(
         return exp(-distSq / twoSigmaSq)
     }
 
+    private fun estimateKeyRadius(keyCenters: Map<Char, PointF>): Float {
+        if (keyCenters.size < 2) return DEFAULT_KEY_SIGMA
+        var minSq = Float.MAX_VALUE
+        val centers = keyCenters.values.toList()
+        val limit = minOf(centers.size, 12)
+        for (i in 0 until limit) {
+            for (j in i + 1 until limit) {
+                val dx = centers[i].x - centers[j].x
+                val dy = centers[i].y - centers[j].y
+                val dSq = dx * dx + dy * dy
+                if (dSq > 1f && dSq < minSq) {
+                    minSq = dSq
+                }
+            }
+        }
+        if (minSq < Float.MAX_VALUE) {
+            val dist = kotlin.math.sqrt(minSq)
+            return (dist * 0.45f).coerceIn(18.0f, 100.0f)
+        }
+        return DEFAULT_KEY_SIGMA
+    }
+
     /**
      * Evalúa una secuencia de toques táctiles contra las teclas esperadas de una palabra candidata.
      */
@@ -56,6 +78,7 @@ class BeamSearchDecoder(
     ): Double {
         if (touchPoints.isEmpty() || candidateWord.isEmpty()) return 1.0
 
+        val adaptiveSigma = estimateKeyRadius(keyCenters)
         var totalSpatialProb = 1.0
         val minLen = minOf(touchPoints.size, candidateWord.length)
 
@@ -65,7 +88,7 @@ class BeamSearchDecoder(
             val center = keyCenters[candidateChar]
 
             val spatialProb = if (center != null) {
-                calculateSpatialProbability(tp.x, tp.y, center.x, center.y)
+                calculateSpatialProbability(tp.x, tp.y, center.x, center.y, sigma = adaptiveSigma)
             } else {
                 0.25 // Probabilidad por defecto para caracteres sin centro conocido
             }

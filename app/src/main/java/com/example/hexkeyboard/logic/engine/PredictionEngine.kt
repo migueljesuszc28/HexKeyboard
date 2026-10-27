@@ -36,37 +36,24 @@ class PredictionEngine(private val context: Context) {
         private const val LEARNED_WORD_BOOST_STEP = 0.05
         private const val LEARNED_WORD_BOOST_CAP = 10
 
-        private val ACCENT_MAP_STATIC = mapOf(
-            'á' to 'a', 'é' to 'e', 'í' to 'i', 'ó' to 'o', 'ú' to 'u',
-            'ü' to 'u', 'ñ' to 'n'
-        )
-
-        fun stripAccentsStatic(str: String): String {
-            if (str.isEmpty()) return str
-            val sb = java.lang.StringBuilder(str.length)
-            for (ch in str) {
-                val mapped = ACCENT_MAP_STATIC[ch] ?: ch
-                sb.append(mapped)
-            }
-            return sb.toString()
-        }
-
         fun stripAccents(str: String): String {
             if (str.isEmpty()) return str
             val sb = java.lang.StringBuilder(str.length)
             for (ch in str) {
-                when (val c = ch.lowercaseChar()) {
-                    'á' -> sb.append('a')
-                    'é' -> sb.append('e')
-                    'í' -> sb.append('i')
-                    'ó' -> sb.append('o')
-                    'ú' -> sb.append('u')
-                    'ü' -> sb.append('u')
-                    else -> sb.append(c)
+                val replacement = when (ch) {
+                    'á', 'Á' -> if (ch.isUpperCase()) 'A' else 'a'
+                    'é', 'É' -> if (ch.isUpperCase()) 'E' else 'e'
+                    'í', 'Í' -> if (ch.isUpperCase()) 'I' else 'i'
+                    'ó', 'Ó' -> if (ch.isUpperCase()) 'O' else 'o'
+                    'ú', 'Ú', 'ü', 'Ü' -> if (ch.isUpperCase()) 'U' else 'u'
+                    else -> ch
                 }
+                sb.append(replacement)
             }
             return sb.toString()
         }
+
+        fun stripAccentsStatic(str: String): String = stripAccents(str)
     }
 
     data class Suggestion(

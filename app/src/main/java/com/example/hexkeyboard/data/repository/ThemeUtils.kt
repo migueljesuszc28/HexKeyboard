@@ -435,7 +435,7 @@ object ThemeUtils {
             return getDefaultTheme(context)
         }
 // surfaceBright surfacecontainerlowest  fondo: surfacecontainer o surfacecontainerlow
-        val backgroundColor = colorScheme.surfaceContainerHigh.toArgb()
+        val backgroundColor = colorScheme.surfaceContainer.toArgb()
         val keyBackgroundColor = colorScheme.surfaceBright.toArgb()
         val actionkeybackground = colorScheme.secondaryContainer.toArgb()
         val keyBackgroundPressedColor = colorScheme.surfaceBright.toArgb()
@@ -468,7 +468,9 @@ object ThemeUtils {
                 "123" to actionkeybackground,
                 "?123" to actionkeybackground,
                 "→" to actionkeybackground,
-                "FONT_PAGE" to actionkeybackground
+                "FONT_PAGE" to actionkeybackground,
+                "SYMBOL_PAGE" to actionkeybackground,
+                "EMOJI" to actionkeybackground
             )
         )
     }

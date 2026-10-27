@@ -10,9 +10,7 @@ import android.view.inputmethod.EditorInfo
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
-import androidx.compose.material.icons.filled.KeyboardCapslock
 import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.KeyboardCapslock
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathNode
@@ -30,7 +28,7 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
-class HexRenderer(private val context: Context) {
+class KeyboardRenderer(private val context: Context) {
 
     // Paints
     val pFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -270,12 +268,12 @@ class HexRenderer(private val context: Context) {
     var isMultiLine: Boolean = false
     var currentImeAction: Int = 0
     var language: String = "es"
-    var layoutMode: HexLayoutEngine.LayoutMode = HexLayoutEngine.LayoutMode.ALPHA
+    var layoutMode: KeyboardLayoutEngine.LayoutMode = KeyboardLayoutEngine.LayoutMode.ALPHA
     var showLongPressIndicators: Boolean = true
 
     fun drawSingleKey(
         canvas: Canvas,
-        key: HexLayoutEngine.Key,
+        key: KeyboardLayoutEngine.Key,
         theme: KeyboardTheme?,
         pressed: Boolean,
         shifted: Boolean,
@@ -288,16 +286,16 @@ class HexRenderer(private val context: Context) {
         val activeBgColor: Int
 
         val isSpecialKey = key.type in listOf(
-            HexLayoutEngine.KeyType.TOGGLE, HexLayoutEngine.KeyType.ENTER,
-            HexLayoutEngine.KeyType.SYMBOL_PAGE, HexLayoutEngine.KeyType.EMOJI,
-            HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.CLIPBOARD,
-            HexLayoutEngine.KeyType.LANGUAGE, HexLayoutEngine.KeyType.DELETE
-        ) || (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC && key.type == HexLayoutEngine.KeyType.CHAR && (key.value.isEmpty() || !key.value.first().isDigit()))
+            KeyboardLayoutEngine.KeyType.TOGGLE, KeyboardLayoutEngine.KeyType.ENTER,
+            KeyboardLayoutEngine.KeyType.SYMBOL_PAGE, KeyboardLayoutEngine.KeyType.EMOJI,
+            KeyboardLayoutEngine.KeyType.FUNCTIONS, KeyboardLayoutEngine.KeyType.CLIPBOARD,
+            KeyboardLayoutEngine.KeyType.LANGUAGE, KeyboardLayoutEngine.KeyType.DELETE
+        ) || (layoutMode == KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC && key.type == KeyboardLayoutEngine.KeyType.CHAR && (key.value.isEmpty() || !key.value.first().isDigit()))
 
         val fill = when {
             pressed -> { pPress.color = colorPress; pPress }
-            key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> { pFill.color = colorShiftActive; pFill }
-            key.type == HexLayoutEngine.KeyType.SHIFT -> { pFill.color = colorShiftInactive; pFill }
+            key.type == KeyboardLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> { pFill.color = colorShiftActive; pFill }
+            key.type == KeyboardLayoutEngine.KeyType.SHIFT -> { pFill.color = colorShiftInactive; pFill }
             individualColor != null -> { pFill.color = individualColor; pFill }
             isSpecialKey -> { pSpec.color = colorSpec; pSpec }
             else -> { pFill.color = colorFill; pFill }
@@ -308,16 +306,7 @@ class HexRenderer(private val context: Context) {
 
         canvas.drawPath(key.path, fill)
 
-        val isShiftCapsLock = key.type == HexLayoutEngine.KeyType.SHIFT && capsLock
-        if (isShiftCapsLock) {
-            val oldColor = pStroke.color
-            val oldWidth = pStroke.strokeWidth
-            pStroke.color = Color.rgb(227, 91, 18)
-            pStroke.strokeWidth = (2f * context.resources.displayMetrics.density) / appliedScale
-            canvas.drawPath(key.strokePath, pStroke)
-            pStroke.color = oldColor
-            pStroke.strokeWidth = oldWidth
-        } else if (strokeWidth > 0) {
+        if (strokeWidth > 0) {
             val oldWidth = pStroke.strokeWidth
             pStroke.strokeWidth = strokeWidth / appliedScale
             canvas.drawPath(key.strokePath, pStroke)
@@ -327,24 +316,25 @@ class HexRenderer(private val context: Context) {
         if (key.isHalfLeft || key.isHalfRight) return
         if (overrideCx != null && key.display.isEmpty()) return
 
-        val label = if (shifted && key.type == HexLayoutEngine.KeyType.CHAR && key.value.length == 1 && key.value[0].isLetter()) key.display.uppercase() else key.display
+        val label = if (shifted && key.type == KeyboardLayoutEngine.KeyType.CHAR && key.value.length == 1 && key.value[0].isLetter()) key.display.uppercase() else key.display
 
         var customLabel: String? = null
-        val isEnterWithText = key.type == HexLayoutEngine.KeyType.ENTER && layoutMode in listOf(HexLayoutEngine.LayoutMode.ALPHA, HexLayoutEngine.LayoutMode.FONTS, HexLayoutEngine.LayoutMode.SYMBOLS, HexLayoutEngine.LayoutMode.NUMERIC)
-        val isDeleteWithText = key.type == HexLayoutEngine.KeyType.DELETE && overrideCx != null
+        val isEnterWithText = key.type == KeyboardLayoutEngine.KeyType.ENTER && layoutMode in listOf(KeyboardLayoutEngine.LayoutMode.ALPHA, KeyboardLayoutEngine.LayoutMode.FONTS, KeyboardLayoutEngine.LayoutMode.SYMBOLS, KeyboardLayoutEngine.LayoutMode.NUMERIC)
+        val isDeleteWithText = key.type == KeyboardLayoutEngine.KeyType.DELETE && overrideCx != null
 
         when (key.type) {
-            HexLayoutEngine.KeyType.SHIFT -> {
+            KeyboardLayoutEngine.KeyType.SHIFT -> {
                 if (!key.isRectangular) {
-                    customLabel = context.getKeyboardString(R.string.key_label_shift, language)
+                    val labelStr = context.getKeyboardString(R.string.key_label_shift, language)
+                    customLabel = if (capsLock) labelStr.uppercase(Locale.getDefault()) else labelStr
                 }
             }
-            HexLayoutEngine.KeyType.DELETE -> {
+            KeyboardLayoutEngine.KeyType.DELETE -> {
                 if (isDeleteWithText) {
                     customLabel = context.getKeyboardString(R.string.key_label_delete, language)
                 }
             }
-            HexLayoutEngine.KeyType.ENTER -> {
+            KeyboardLayoutEngine.KeyType.ENTER -> {
                 if (isEnterWithText && !key.isRectangular) {
                     customLabel = when (currentImeAction) {
                         EditorInfo.IME_ACTION_GO -> context.getKeyboardString(R.string.key_action_go, language)
@@ -360,10 +350,10 @@ class HexRenderer(private val context: Context) {
             else -> {}
         }
 
-        val sz = if (customLabel != null) {
+        var sz = if (customLabel != null) {
             if (key.isRectangular) key.ry * 0.52f else min(key.rx, key.ry) * 0.45f
         } else if (key.isRectangular) {
-            if (key.type == HexLayoutEngine.KeyType.TOGGLE) {
+            if (key.type == KeyboardLayoutEngine.KeyType.TOGGLE) {
                 min(key.rx * 1.1f, key.ry * 0.65f)
             } else {
                 min(key.rx * 1.55f, key.ry * 0.95f)
@@ -371,8 +361,18 @@ class HexRenderer(private val context: Context) {
         } else {
             min(key.rx, key.ry) * 0.62f
         }
+
+        if (!key.isRectangular && key.type == KeyboardLayoutEngine.KeyType.SHIFT && capsLock) {
+            sz *= 1.30f
+        }
+
         pText.textSize = sz
         pText.isFakeBoldText = customLabel != null
+        pText.typeface = if (!key.isRectangular && key.type == KeyboardLayoutEngine.KeyType.SHIFT && capsLock) {
+            Typeface.create(sharedTypeface, Typeface.BOLD)
+        } else {
+            sharedTypeface
+        }
         pText.getFontMetrics(fontMetrics)
         val ty = key.cy - (fontMetrics.ascent + fontMetrics.descent) / 2f
 
@@ -380,17 +380,17 @@ class HexRenderer(private val context: Context) {
 
         val dr = if (customLabel != null) {
             null
-        } else if (themeObj.id == "default" && (key.type == HexLayoutEngine.KeyType.ENTER && layoutMode != HexLayoutEngine.LayoutMode.PURE_NUMERIC && !key.isRectangular)) {
+        } else if (themeObj.id == "default" && (key.type == KeyboardLayoutEngine.KeyType.ENTER && layoutMode != KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC && !key.isRectangular)) {
             null
         } else {
             when (key.type) {
-                HexLayoutEngine.KeyType.SHIFT -> when {
+                KeyboardLayoutEngine.KeyType.SHIFT -> when {
                     capsLock -> iconShiftFilled
                     shifted -> iconShiftActive
                     else -> iconShift
                 }
-                HexLayoutEngine.KeyType.DELETE -> if (pressed) iconDeleteFilled else iconDelete
-                HexLayoutEngine.KeyType.ENTER -> {
+                KeyboardLayoutEngine.KeyType.DELETE -> if (pressed) iconDeleteFilled else iconDelete
+                KeyboardLayoutEngine.KeyType.ENTER -> {
                     when (currentImeAction) {
                         EditorInfo.IME_ACTION_SEND -> iconSend
                         EditorInfo.IME_ACTION_SEARCH -> iconSearch
@@ -399,13 +399,13 @@ class HexRenderer(private val context: Context) {
                         else -> iconEnter
                     }
                 }
-                HexLayoutEngine.KeyType.SYMBOL_PAGE -> null
-                HexLayoutEngine.KeyType.FONT_PAGE -> null
-                HexLayoutEngine.KeyType.EMOJI -> if (themeObj.backgroundImageUri != null) iconEmojiFilled else iconEmoji
-                HexLayoutEngine.KeyType.CLIPBOARD -> null
-                HexLayoutEngine.KeyType.FUNCTIONS -> iconPuzzle
-                HexLayoutEngine.KeyType.LANGUAGE -> iconLanguage
-                HexLayoutEngine.KeyType.SPACE -> if (layoutMode == HexLayoutEngine.LayoutMode.PURE_NUMERIC) iconSpace else null
+                KeyboardLayoutEngine.KeyType.SYMBOL_PAGE -> null
+                KeyboardLayoutEngine.KeyType.FONT_PAGE -> null
+                KeyboardLayoutEngine.KeyType.EMOJI -> if (themeObj.backgroundImageUri != null) iconEmojiFilled else iconEmoji
+                KeyboardLayoutEngine.KeyType.CLIPBOARD -> null
+                KeyboardLayoutEngine.KeyType.FUNCTIONS -> iconPuzzle
+                KeyboardLayoutEngine.KeyType.LANGUAGE -> iconLanguage
+                KeyboardLayoutEngine.KeyType.SPACE -> if (layoutMode == KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC) iconSpace else null
                 else -> null
             }
         }
@@ -431,9 +431,9 @@ class HexRenderer(private val context: Context) {
             dr.setBounds((drawCx - s / 2).toInt(), (key.cy - s / 2).toInt(), (drawCx + s / 2).toInt(), (key.cy + s / 2).toInt())
             val tint = when {
                 individualColor != null -> if (isLightBg) Color.BLACK else Color.WHITE
-                key.type == HexLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> if (isLightBg) Color.BLACK else Color.WHITE
+                key.type == KeyboardLayoutEngine.KeyType.SHIFT && (shifted || capsLock) -> if (isLightBg) Color.BLACK else Color.WHITE
                 isLightBg -> Color.BLACK
-                key.type in listOf(HexLayoutEngine.KeyType.EMOJI, HexLayoutEngine.KeyType.FUNCTIONS, HexLayoutEngine.KeyType.LANGUAGE) -> colorIcon
+                key.type in listOf(KeyboardLayoutEngine.KeyType.EMOJI, KeyboardLayoutEngine.KeyType.FUNCTIONS, KeyboardLayoutEngine.KeyType.LANGUAGE) -> colorIcon
                 else -> textColorCalculated
             }
             dr.mutate().setTint(tint)
@@ -443,7 +443,7 @@ class HexRenderer(private val context: Context) {
             pText.color = textColorCalculated
             pText.alpha = 255
             var drawLabel = customLabel ?: label
-            if (customLabel == null && themeObj.id == "default" && (key.type == HexLayoutEngine.KeyType.ENTER && layoutMode != HexLayoutEngine.LayoutMode.PURE_NUMERIC)) {
+            if (customLabel == null && themeObj.id == "default" && (key.type == KeyboardLayoutEngine.KeyType.ENTER && layoutMode != KeyboardLayoutEngine.LayoutMode.PURE_NUMERIC)) {
                 drawLabel = ""
             }
             if (drawLabel.isNotEmpty()) canvas.drawText(drawLabel, drawCx, ty, pText)

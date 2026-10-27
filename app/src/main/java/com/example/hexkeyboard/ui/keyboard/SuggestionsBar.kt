@@ -5,12 +5,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Palette
@@ -35,7 +33,7 @@ import com.example.hexkeyboard.data.repository.ThemeUtils.getKeyboardString
 import com.example.hexkeyboard.logic.managers.ClipboardItem
 import com.example.hexkeyboard.logic.managers.VoiceRecognitionHelper
 import com.example.hexkeyboard.logic.managers.FeedbackManager
-import com.example.hexkeyboard.service.HexKeyboardService
+import com.example.hexkeyboard.service.KeyboardService
 import com.example.hexkeyboard.ui.keyboard.components.CredentialsSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.EmojiSearchBar
 import com.example.hexkeyboard.ui.keyboard.components.PanelHeader
@@ -53,7 +51,7 @@ fun SuggestionsBarSection(viewModel: KeyboardViewModel, theme: KeyboardTheme) {
     val suggestions by viewModel.suggestions.collectAsState()
     val emojiSearchQuery by viewModel.emojiSearchQuery.collectAsState()
     val context = LocalContext.current
-    val service = context as? HexKeyboardService
+    val service = context as? KeyboardService
     val currentLocale by viewModel.currentLocale.collectAsState()
 
     Box(modifier = Modifier.fillMaxWidth().height(46.dp)) {

@@ -26,14 +26,41 @@ import kotlin.math.min
  * Utiliza una única ventana flotante (PopupWindow) de alto rendimiento para evitar llamados
  * innecesarios a invalidate() en la vista principal del teclado.
  */
+/**
+ * Gestor desacoplado para la vista previa de teclas (Key Preview) al estilo Gboard / Material 3.
+ *
+ * Utiliza un pool de ventanas flotantes (PopupWindow) de alto rendimiento para soportar
+ * escritura rápida multitáctil (ej. alternar pulgares rápido como "jajaja") simultáneamente.
+ */
 class KeyPreviewManager(private val context: Context) {
 
-    private var popupWindow: PopupWindow? = null
-    private var previewView: KeyPreviewView? = null
-    private var exitAnimator: ValueAnimator? = null
-    private var hexRenderer: HexRenderer? = null
+    private class PreviewHolder(val context: Context) {
+        var popupWindow: PopupWindow? = null
+        var previewView: KeyPreviewView? = null
+        var exitAnimator: ValueAnimator? = null
+        var activeKey: KeyboardLayoutEngine.Key? = null
+        var activePointerId: Int = -1
 
-    private var currentKey: HexLayoutEngine.Key? = null
+        fun dismissInternal() {
+            try {
+                if (popupWindow?.isShowing == true) {
+                    popupWindow?.dismiss()
+                }
+            } catch (_: Exception) {}
+            activeKey = null
+            activePointerId = -1
+        }
+
+        fun cancelExitAnimation() {
+            exitAnimator?.removeAllListeners()
+            exitAnimator?.cancel()
+            exitAnimator = null
+        }
+    }
+
+    private val pool = mutableListOf<PreviewHolder>()
+    private var keyboardRenderer: KeyboardRenderer? = null
+
     var isEnabled: Boolean = true
 
     // Parámetros de tema/diseño
@@ -43,8 +70,8 @@ class KeyPreviewManager(private val context: Context) {
     private var popupShadowColor: Int = "#40000000".toColorInt()
     private var typeface: Typeface = Typeface.DEFAULT
 
-    fun updateTheme(renderer: HexRenderer, theme: KeyboardTheme?) {
-        this.hexRenderer = renderer
+    fun updateTheme(renderer: KeyboardRenderer, theme: KeyboardTheme?) {
+        this.keyboardRenderer = renderer
         val bg = if (renderer.colorPopupBg != 0) renderer.colorPopupBg else (theme?.popupBackgroundColor ?: Color.WHITE)
         val text = if (renderer.colorPopupText != 0) renderer.colorPopupText else (theme?.popupTextColor ?: Color.BLACK)
         popupBgColor = if (bg != 0) bg else Color.WHITE
@@ -52,28 +79,51 @@ class KeyPreviewManager(private val context: Context) {
         popupStrokeColor = if (renderer.strokeWidth > 0) renderer.colorStroke else Color.TRANSPARENT
         popupShadowColor = if (renderer.colorPopupShadow != 0) renderer.colorPopupShadow else "#40000000".toColorInt()
         typeface = renderer.sharedTypeface
-        previewView?.updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface, renderer)
+        pool.forEach { holder ->
+            holder.previewView?.updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface, renderer)
+        }
     }
 
     /**
-     * Muestra o traslada suavemente la vista previa para la tecla pulsada.
+     * Muestra o traslada suavemente la vista previa para la tecla pulsada, soportando punteros multitáctiles.
      */
     fun showPreview(
         parentView: View,
-        key: HexLayoutEngine.Key,
+        key: KeyboardLayoutEngine.Key,
         keyWindowX: Float,
         keyWindowY: Float,
         label: String,
         isRect: Boolean,
-        popupScale: Float = 1.0f
+        popupScale: Float = 1.0f,
+        pointerId: Int = 0
     ) {
-        if (!isEnabled || key.type != HexLayoutEngine.KeyType.CHAR || label.isEmpty()) {
-            dismissPreview(immediate = true)
+        if (!isEnabled || key.type != KeyboardLayoutEngine.KeyType.CHAR || label.isEmpty()) {
+            dismissPreviewForPointer(pointerId, immediate = true)
             return
         }
 
-        currentKey = key
-        cancelExitAnimation()
+        // Buscar un holder asignado a este pointerId o a esta tecla
+        var holder = pool.find { it.activePointerId == pointerId || it.activeKey == key }
+        if (holder == null) {
+            // Buscar uno inactivo
+            holder = pool.find { it.popupWindow?.isShowing != true }
+            if (holder == null) {
+                if (pool.size < 4) {
+                    holder = PreviewHolder(context)
+                    pool.add(holder)
+                } else {
+                    holder = pool.first() // Reutilizar
+                }
+            }
+        }
+
+        if (holder.activeKey != null && holder.activeKey != key && holder.popupWindow?.isShowing == true) {
+            holder.dismissInternal()
+        }
+
+        holder.activeKey = key
+        holder.activePointerId = pointerId
+        holder.cancelExitAnimation()
 
         val prx = (key.rx * 1.35f * popupScale).coerceAtLeast(36f)
         val pry = (key.ry * 1.35f * popupScale).coerceAtLeast(36f)
@@ -81,20 +131,17 @@ class KeyPreviewManager(private val context: Context) {
         val w = (prx * 2.2f).toInt()
         val h = (pry * 2.2f).toInt()
 
-        // Calcular posición X e Y en ventana para desplazar el popup hacia arriba
         var x = (keyWindowX - w / 2f).toInt()
-        val y = (keyWindowY - key.ry * (1.1f + 0.8f * popupScale) - h).toInt()
+        val y = (keyWindowY - key.ry * (0.2f + 0.8f * popupScale) - h).toInt()
 
-        // Restricción de bordes de la vista del teclado
-        val parentWidth = if (parentView.width > 0) parentView.width else context.resources.displayMetrics.widthPixels
+        val screenWidth = context.resources.displayMetrics.widthPixels
         if (x < 8) x = 8
-        if (x + w > parentWidth - 8) x = parentWidth - w - 8
+        if (x + w > screenWidth - 8) x = screenWidth - w - 8
 
-        // Inicializar vistas de popup si aún no existen
-        if (popupWindow == null) {
+        if (holder.popupWindow == null) {
             val v = KeyPreviewView(context)
-            previewView = v
-            popupWindow = PopupWindow(
+            holder.previewView = v
+            holder.popupWindow = PopupWindow(
                 v,
                 w,
                 h
@@ -109,8 +156,8 @@ class KeyPreviewManager(private val context: Context) {
             }
         }
 
-        previewView?.apply {
-            updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface, hexRenderer)
+        holder.previewView?.apply {
+            updateTheme(popupBgColor, popupTextColor, popupStrokeColor, popupShadowColor, typeface, keyboardRenderer)
             setPreviewData(label, isRect, prx, pry)
             alpha = 1.0f
             scaleX = 1.0f
@@ -118,15 +165,16 @@ class KeyPreviewManager(private val context: Context) {
             requestLayout()
         }
 
-        popupWindow?.width = w
-        popupWindow?.height = h
+        holder.popupWindow?.width = w
+        holder.popupWindow?.height = h
 
-        if (popupWindow?.isShowing == true) {
-            popupWindow?.update(x, y, w, h)
-            previewView?.invalidate()
+        if (holder.popupWindow?.isShowing == true) {
+            holder.popupWindow?.update(x, y, w, h)
+            holder.previewView?.invalidate()
         } else {
             try {
-                popupWindow?.showAtLocation(parentView, Gravity.NO_GRAVITY, x, y)
+                val anchor = parentView.rootView ?: parentView
+                holder.popupWindow?.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
             } catch (e: Exception) {
                 android.util.Log.e("HexKB", "Error showing key preview", e)
             }
@@ -134,59 +182,112 @@ class KeyPreviewManager(private val context: Context) {
     }
 
     /**
-     * Oculta el preview con animación suave de desvanecimiento (debounce ~60ms) o de forma inmediata.
+     * Oculta el preview asignado a un puntero táctil con animación suave de desvanecimiento (~60ms).
      */
-    fun dismissPreview(immediate: Boolean = false) {
-        if (popupWindow?.isShowing != true) return
+    fun dismissPreviewForPointer(pointerId: Int = 0, immediate: Boolean = false) {
+        val holdersToDismiss = pool.filter { it.activePointerId == pointerId && it.popupWindow?.isShowing == true }
+        if (holdersToDismiss.isEmpty()) return
 
-        cancelExitAnimation()
+        holdersToDismiss.forEach { holder ->
+            holder.cancelExitAnimation()
 
-        if (immediate) {
-            dismissInternal()
-            return
-        }
+            if (immediate) {
+                holder.dismissInternal()
+            } else {
+                val v = holder.previewView ?: run { holder.dismissInternal(); return@forEach }
 
-        val v = previewView ?: run { dismissInternal(); return }
-
-        // Animación de desvanecimiento + micro-escala hacia abajo estilo Gboard (60ms)
-        val anim = ValueAnimator.ofFloat(1.0f, 0.0f).apply {
-            duration = 60L
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { animator ->
-                val progress = animator.animatedValue as Float
-                v.alpha = progress
-                val scale = 0.88f + 0.12f * progress
-                v.scaleX = scale
-                v.scaleY = scale
-                v.invalidate()
-            }
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    dismissInternal()
+                val anim = ValueAnimator.ofFloat(1.0f, 0.0f).apply {
+                    duration = 60L
+                    interpolator = DecelerateInterpolator()
+                    addUpdateListener { animator ->
+                        val progress = animator.animatedValue as Float
+                        v.alpha = progress
+                        val scale = 0.88f + 0.12f * progress
+                        v.scaleX = scale
+                        v.scaleY = scale
+                        v.invalidate()
+                    }
+                    addListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            holder.dismissInternal()
+                        }
+                    })
                 }
-            })
-        }
-        exitAnimator = anim
-        anim.start()
-    }
-
-    private fun cancelExitAnimation() {
-        exitAnimator?.cancel()
-        exitAnimator = null
-    }
-
-    private fun dismissInternal() {
-        try {
-            if (popupWindow?.isShowing == true) {
-                popupWindow?.dismiss()
+                holder.exitAnimator = anim
+                anim.start()
             }
-        } catch (_: Exception) {
-            // Ignorar excepciones al cerrar
         }
-        currentKey = null
     }
 
-    val isShowing: Boolean get() = popupWindow?.isShowing == true
+    fun dismissPreviewForKey(key: KeyboardLayoutEngine.Key?, immediate: Boolean = false) {
+        if (key == null) return
+        val holdersToDismiss = pool.filter { it.activeKey == key && it.popupWindow?.isShowing == true }
+        holdersToDismiss.forEach { holder ->
+            holder.cancelExitAnimation()
+            if (immediate) {
+                holder.dismissInternal()
+            } else {
+                val v = holder.previewView ?: run { holder.dismissInternal(); return@forEach }
+                val anim = ValueAnimator.ofFloat(1.0f, 0.0f).apply {
+                    duration = 60L
+                    interpolator = DecelerateInterpolator()
+                    addUpdateListener { animator ->
+                        val progress = animator.animatedValue as Float
+                        v.alpha = progress
+                        val scale = 0.88f + 0.12f * progress
+                        v.scaleX = scale
+                        v.scaleY = scale
+                        v.invalidate()
+                    }
+                    addListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            holder.dismissInternal()
+                        }
+                    })
+                }
+                holder.exitAnimator = anim
+                anim.start()
+            }
+        }
+    }
+
+    fun dismissPreview(immediate: Boolean = false) {
+        dismissPreviewForPointer(0, immediate)
+    }
+
+    fun dismissAllPreviews(immediate: Boolean = false) {
+        pool.forEach { holder ->
+            if (holder.popupWindow?.isShowing == true) {
+                holder.cancelExitAnimation()
+                if (immediate) {
+                    holder.dismissInternal()
+                } else {
+                    val v = holder.previewView ?: run { holder.dismissInternal(); return@forEach }
+                    val anim = ValueAnimator.ofFloat(1.0f, 0.0f).apply {
+                        duration = 60L
+                        interpolator = DecelerateInterpolator()
+                        addUpdateListener { animator ->
+                            val progress = animator.animatedValue as Float
+                            v.alpha = progress
+                            val scale = 0.88f + 0.12f * progress
+                            v.scaleX = scale
+                            v.scaleY = scale
+                            v.invalidate()
+                        }
+                        addListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                holder.dismissInternal()
+                            }
+                        })
+                    }
+                    holder.exitAnimator = anim
+                    anim.start()
+                }
+            }
+        }
+    }
+
+    val isShowing: Boolean get() = pool.any { it.popupWindow?.isShowing == true }
 
     /**
      * Vista interna superpuesta para dibujar la silueta adaptativa Material 3 y el texto del preview.
@@ -197,7 +298,7 @@ class KeyPreviewManager(private val context: Context) {
         private var isRect: Boolean = false
         private var prx: Float = 0f
         private var pry: Float = 0f
-        private var renderer: HexRenderer? = null
+        private var renderer: KeyboardRenderer? = null
 
         private val path = Path()
         private val rectF = RectF()
@@ -210,7 +311,7 @@ class KeyPreviewManager(private val context: Context) {
             maskFilter = android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL)
         }
 
-        fun updateTheme(bgColor: Int, textColor: Int, strokeColor: Int, shadowColor: Int, tf: Typeface, renderer: HexRenderer? = null) {
+        fun updateTheme(bgColor: Int, textColor: Int, strokeColor: Int, shadowColor: Int, tf: Typeface, renderer: KeyboardRenderer? = null) {
             pBg.color = if (bgColor != 0) bgColor else Color.WHITE
             pText.color = if (textColor != 0) textColor else Color.BLACK
             pText.typeface = tf
@@ -246,7 +347,7 @@ class KeyPreviewManager(private val context: Context) {
             path.reset()
             val r = renderer
             if (isRect || r == null) {
-                val cr = min(prx, pry) * 0.4f
+                val cr = min(prx, pry) * 0.60f
                 rectF.set(cx - prx, cy - pry, cx + prx, cy + pry)
                 path.addRoundRect(rectF, cr, cr, Path.Direction.CW)
             } else {

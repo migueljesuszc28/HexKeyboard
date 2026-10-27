@@ -9,14 +9,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.toColorInt
 import com.example.hexkeyboard.data.repository.KeyboardTheme
 import com.example.hexkeyboard.logic.managers.ClipboardItem
-import com.example.hexkeyboard.ui.keyboard.components.HexKeyboardView
+import com.example.hexkeyboard.ui.keyboard.components.KeyboardView
 import com.example.hexkeyboard.ui.keyboard.panels.ClipboardPanel
 import com.example.hexkeyboard.ui.keyboard.panels.EmojiPanel
 import com.example.hexkeyboard.ui.keyboard.panels.FunctionsPanel
@@ -58,7 +57,7 @@ fun PreviewHexKeyboardView() {
                 Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
                     AndroidView(
                         factory = { ctx ->
-                            HexKeyboardView(ctx).apply {
+                            KeyboardView(ctx).apply {
                                 this.symbolPages = mapOf("basic" to listOf("!", "@", "#"))
                                 this.longPressAlternatives = emptyMap()
                                 this.keyboardTheme = theme

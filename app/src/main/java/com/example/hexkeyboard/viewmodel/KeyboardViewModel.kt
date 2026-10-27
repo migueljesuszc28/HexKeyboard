@@ -351,7 +351,9 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     fun saveRecentEmoji(context: Context, emoji: String) {
         val current = _recentEmojis.value
-        val newList = (listOf(emoji) + current.filter { it != emoji }).take(30)
+        val targetCanonical = EmojiProvider.getCanonicalEmoji(emoji)
+        val filtered = current.filter { EmojiProvider.getCanonicalEmoji(it) != targetCanonical }
+        val newList = (listOf(emoji) + filtered).take(30)
         _recentEmojis.value = newList
         viewModelScope.launch(Dispatchers.IO) {
             ThemeUtils.getDataStore(context).edit { prefs ->

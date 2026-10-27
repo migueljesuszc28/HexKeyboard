@@ -1,10 +1,9 @@
 package com.example.hexkeyboard.ui.keyboard.components
 
 import android.graphics.Path
-import android.graphics.PointF
 import kotlin.math.*
 
-class HexLayoutEngine {
+class KeyboardLayoutEngine {
 
     enum class KeyType { CHAR, SHIFT, DELETE, ENTER, SPACE, TOGGLE, SYMBOL_PAGE, EMOJI, CLIPBOARD, FUNCTIONS, FONT_PAGE, LANGUAGE }
     enum class LayoutMode { ALPHA, NUMERIC, SYMBOLS, PURE_NUMERIC, FONTS }
@@ -34,14 +33,22 @@ class HexLayoutEngine {
             updatePath()
         }
 
+        private companion object {
+            val tempRectF = android.graphics.RectF()
+        }
+
         fun updatePath() {
             path.reset()
             strokePath.reset()
             if (isRectangular) {
-                val rxCorner = min(rx, ry) * 0.50f
-                val rect = android.graphics.RectF(cx - rx, cy - ry, cx + rx, cy + ry)
-                path.addRoundRect(rect, rxCorner, rxCorner, Path.Direction.CW)
-                strokePath.addRoundRect(rect, rxCorner, rxCorner, Path.Direction.CW)
+                val rxCorner = when (type) {
+                    KeyType.SHIFT, KeyType.DELETE -> min(rx, ry) * 1.0f
+                    else -> min(rx, ry) * 0.60f
+                }
+
+                tempRectF.set(cx - rx, cy - ry, cx + rx, cy + ry)
+                path.addRoundRect(tempRectF, rxCorner, rxCorner, Path.Direction.CW)
+                strokePath.addRoundRect(tempRectF, rxCorner, rxCorner, Path.Direction.CW)
                 return
             }
             val s32 = 0.8660254f
@@ -315,8 +322,9 @@ class HexLayoutEngine {
         val keyW = availW / 10.0f
         val dr = (keyW / 2.0f) * keyScale
 
+        //val qwertyRowHeight = (totalH / 4.0f) * 1.0f
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -395,7 +403,7 @@ class HexLayoutEngine {
         }
 
         // --- ROW 2: SHIFT + Z X C V B N M + DELETE ---
-        val shiftW = keyW * 1.4f
+        val shiftW = keyW * 1.50f
         val drShift = (shiftW / 2.0f) * keyScale
         val shiftCxLeft = shiftW / 2.0f
         val deleteCxRight = u - shiftW / 2.0f
@@ -455,7 +463,7 @@ class HexLayoutEngine {
         // --- ROW 3: ?123 + , + 😀 + Space + . + ↩ ---
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
-        val toggleW = keyW * 1.30f
+        val toggleW = keyW * 1.50f
         val drToggle = toggleW / 2.0f - marginX
 
         val commaW = keyW * 1.0f
@@ -467,7 +475,7 @@ class HexLayoutEngine {
         val periodW = keyW * 1.0f
         val drPeriod = periodW / 2.0f - marginX
 
-        val enterW = keyW * 1.35f
+        val enterW = keyW * 1.50f
         val drEnter = enterW / 2.0f - marginX
 
         if (isSplitMode) {
@@ -529,7 +537,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -557,7 +565,7 @@ class HexLayoutEngine {
         }
 
         // --- ROW 2: 8 symbol keys + ⌫ (Delete) ---
-        val deleteW = keyW * 1.4f
+        val deleteW = keyW * 1.50f
         val drDelete = (deleteW / 2.0f) * keyScale
         val xDeleteRight = u - deleteW / 2.0f
 
@@ -576,7 +584,7 @@ class HexLayoutEngine {
         // --- ROW 3: ABC + , + 😀 + Space + . + ↩ ---
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
-        val abcW = keyW * 1.30f
+        val abcW = keyW * 1.50f
         val drAbc = abcW / 2.0f - marginX
         val commaW = keyW * 1.0f
         val drComma = commaW / 2.0f - marginX
@@ -584,7 +592,7 @@ class HexLayoutEngine {
         val drEmoji = emojiW / 2.0f - marginX
         val periodW = keyW * 1.0f
         val drPeriod = periodW / 2.0f - marginX
-        val enterW = keyW * 1.35f
+        val enterW = keyW * 1.50f
         val drEnter = enterW / 2.0f - marginX
 
         if (isSplitMode) {
@@ -646,7 +654,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -680,7 +688,7 @@ class HexLayoutEngine {
         }
 
         // --- ROW 2: 8 symbol keys + ⌫ (Delete) ---
-        val deleteW = keyW * 1.4f
+        val deleteW = keyW * 1.50f
         val drDelete = (deleteW / 2.0f) * keyScale
         val xDeleteRight = u - deleteW / 2.0f
 
@@ -699,7 +707,7 @@ class HexLayoutEngine {
         // --- ROW 3: ABC + SymbolPage + 😀 + Space + . + ↩ ---
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
-        val abcW = keyW * 1.30f
+        val abcW = keyW * 1.50f
         val drAbc = abcW / 2.0f - marginX
         val symPageW = keyW * 1.0f
         val drSymPage = symPageW / 2.0f - marginX
@@ -707,7 +715,7 @@ class HexLayoutEngine {
         val drEmoji = emojiW / 2.0f - marginX
         val periodW = keyW * 1.0f
         val drPeriod = periodW / 2.0f - marginX
-        val enterW = keyW * 1.35f
+        val enterW = keyW * 1.50f
         val drEnter = enterW / 2.0f - marginX
 
         if (isSplitMode) {
@@ -834,7 +842,7 @@ class HexLayoutEngine {
         val dr = (keyW / 2.0f) * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.94f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -884,7 +892,7 @@ class HexLayoutEngine {
             }
         }
 
-        val shiftW = keyW * 1.4f
+        val shiftW = keyW * 1.50f
         val drShift = (shiftW / 2.0f) * keyScale
         val shiftCxLeft = shiftW / 2.0f
         val deleteCxRight = u - shiftW / 2.0f
@@ -910,7 +918,7 @@ class HexLayoutEngine {
 
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
-        val abcW = keyW * 1.30f
+        val abcW = keyW * 1.50f
         val drAbc = abcW / 2.0f - marginX
         val fontPageW = keyW * 1.0f
         val drFontPage = fontPageW / 2.0f - marginX
@@ -918,7 +926,7 @@ class HexLayoutEngine {
         val drEmoji = emojiW / 2.0f - marginX
         val periodW = keyW * 1.0f
         val drPeriod = periodW / 2.0f - marginX
-        val enterW = keyW * 1.35f
+        val enterW = keyW * 1.50f
         val drEnter = enterW / 2.0f - marginX
 
         val fontDisplayStr = (fontPage + 1).toString()

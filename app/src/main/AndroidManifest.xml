@@ -115,7 +115,7 @@
 
         <!-- Declaración del InputMethodService -->
         <service
-            android:name=".service.HexKeyboardService"
+            android:name=".service.KeyboardService"
             android:exported="true"
             android:label="@string/keyboard_service_name"
             android:permission="android.permission.BIND_INPUT_METHOD"

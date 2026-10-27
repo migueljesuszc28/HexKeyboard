@@ -76,6 +76,7 @@ class UserDictionary(private val context: Context) {
                 }
             }
         }
+        evictOldAutoLearnedWords()
     }
 
     fun saveUserDictionaryDebounced() {
@@ -197,6 +198,25 @@ class UserDictionary(private val context: Context) {
         current.frequency = freq
     }
 
+    fun evictOldAutoLearnedWords(maxAgeMs: Long = 60L * 24 * 3600 * 1000L) {
+        val now = System.currentTimeMillis()
+        rwLock.write {
+            val toRemove = userWordsMap.filter { (word, data) ->
+                val count = wordCounts[word] ?: 0
+                count < 3 && (now - data.timestamp) > maxAgeMs
+            }.keys.toList()
+
+            if (toRemove.isNotEmpty()) {
+                toRemove.forEach { word ->
+                    userWordsMap.remove(word)
+                    wordCounts.remove(word)
+                }
+                rebuildTrieLocked()
+            }
+        }
+        saveUserDictionaryDebounced()
+    }
+
     private fun rebuildTrieLocked() {
         root.children.clear()
         userWordsMap.forEach { (word, data) ->
@@ -206,11 +226,16 @@ class UserDictionary(private val context: Context) {
 
     private fun evictIfOverCapacity() {
         if (userWordsMap.size >= MAX_ENTRIES) {
-            val oldest = userWordsMap.keys.firstOrNull()
-            if (oldest != null) {
-                userWordsMap.remove(oldest)
-                wordCounts.remove(oldest)
+            val toRemove = userWordsMap.entries
+                .sortedWith(compareBy<Map.Entry<String, UserWordData>> { wordCounts[it.key] ?: 0 }.thenBy { it.value.timestamp })
+                .take(100)
+                .map { it.key }
+
+            toRemove.forEach { word ->
+                userWordsMap.remove(word)
+                wordCounts.remove(word)
             }
+            rebuildTrieLocked()
         }
     }
 
