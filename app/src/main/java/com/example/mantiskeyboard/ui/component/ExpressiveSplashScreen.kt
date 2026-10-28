@@ -114,10 +114,10 @@ fun ExpressiveSplashScreen(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_hexagon),
-                            contentDescription = "Hexagon Logo",
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "Mantis Keyboard Logo",
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(56.dp)
+                            modifier = Modifier.size(80.dp)
                         )
                     }
                 }

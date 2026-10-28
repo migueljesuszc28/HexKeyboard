@@ -5,7 +5,7 @@
 <h1 align="center">Mantis Keyboard</h1>
 
 <p align="center">
-  Teclado virtual nativo para Android con disposición hexagonal ergonómica, procesamiento local de texto y personalización avanzada.
+  Teclado virtual nativo para Android con disposición hexagonal ergonómica o disposicion Qwerty Tradicional, procesamiento local de texto y personalización avanzada.
 </p>
 
 <p align="center">
@@ -37,6 +37,7 @@
 ## Características Principales
 
 - **Distribución Hexagonal Ergonómica:** Diseño geométrico optimizado para la escritura con pulgares, reduciendo errores de pulsación accidentales.
+- **Distribución QWERTY:** Disposición clásica familiar, pulida e intuitiva para usuarios que prefieren el estándar habitual sin curva de aprendizaje.
 - **Desarrollado en Jetpack Compose:** Interfaz nativa, fluida y reactiva integrada mediante interoperabilidad con `InputMethodService`.
 - **Privacidad Local sin Conexión:** Procesamiento de texto, predicciones y aprendizaje de palabras realizado estrictamente en el dispositivo, sin telemetría ni acceso a red.
 - **Motor de Predicción y Sugerencias:** Sugerencias contextuales de alta velocidad y soporte de autocorrección local.

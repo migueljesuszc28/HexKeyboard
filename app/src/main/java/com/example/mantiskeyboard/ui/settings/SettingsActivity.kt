@@ -7,8 +7,10 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.core.animateDpAsState
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
 import androidx.datastore.preferences.core.*
+import com.example.mantiskeyboard.data.repository.BackupManager
 import com.example.mantiskeyboard.data.repository.ThemeUtils
 import com.example.mantiskeyboard.data.repository.ThemeUtils.enableMaxRefreshRate
 import com.example.mantiskeyboard.service.KeyboardService
@@ -157,6 +160,62 @@ fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dataStore = ThemeUtils.getDataStore(context)
+
+    var isBackupExporting by remember { mutableStateOf(false) }
+    var isBackupImporting by remember { mutableStateOf(false) }
+    var backupResultDialogMessage by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let { destinationUri ->
+            isBackupExporting = true
+            scope.launch {
+                val result = BackupManager.exportBackup(context, destinationUri)
+                isBackupExporting = false
+                if (result.isSuccess) {
+                    val summary = result.getOrNull()
+                    val msg = "Copia exportada con éxito:\n\n" +
+                            "• Credenciales: ${summary?.credentialsCount ?: 0}\n" +
+                            "• Fuentes: ${summary?.fontsCount ?: 0}\n" +
+                            "• Temas: ${summary?.themesCount ?: 0}\n" +
+                            "• Ajustes: ${summary?.preferencesCount ?: 0}\n" +
+                            "• Diccionario: ${if (summary?.hasUserDict == true) "Sí" else "No"}"
+                    backupResultDialogMessage = msg
+                } else {
+                    Toast.makeText(context, R.string.backup_export_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { sourceUri ->
+            if (!BackupManager.isMantisDataFile(context, sourceUri)) {
+                Toast.makeText(context, R.string.backup_invalid_file, Toast.LENGTH_LONG).show()
+                return@rememberLauncherForActivityResult
+            }
+            isBackupImporting = true
+            scope.launch {
+                val result = BackupManager.importBackup(context, sourceUri)
+                isBackupImporting = false
+                if (result.isSuccess) {
+                    val summary = result.getOrNull()
+                    val msg = "Copia restaurada con éxito:\n\n" +
+                            "• Credenciales: ${summary?.credentialsCount ?: 0}\n" +
+                            "• Fuentes: ${summary?.fontsCount ?: 0}\n" +
+                            "• Temas: ${summary?.themesCount ?: 0}\n" +
+                            "• Ajustes restaurados: ${if (summary?.preferencesRestored == true) "Sí" else "No"}\n" +
+                            "• Diccionario restaurado: ${if (summary?.userDictRestored == true) "Sí" else "No"}"
+                    backupResultDialogMessage = msg
+                } else {
+                    Toast.makeText(context, R.string.backup_import_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -867,6 +926,61 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
+
+            // --- COPIA DE SEGURIDAD Y RESTAURACIÓN ---
+            item { CategoryHeader(stringResource(R.string.section_backup_title), Icons.Default.Backup) }
+            item {
+                SettingsCardContainer {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.backup_export_title), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.backup_export_summary)) },
+                        leadingContent = {
+                            if (isBackupExporting) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable(enabled = !isBackupExporting && !isBackupImporting) {
+                            val defaultFilename = "Mantis_Backup_${System.currentTimeMillis() / 1000}.mantisdata"
+                            exportLauncher.launch(defaultFilename)
+                        }
+                    )
+
+                    SettingsGap()
+
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.backup_import_title), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.backup_import_summary)) },
+                        leadingContent = {
+                            if (isBackupImporting) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable(enabled = !isBackupExporting && !isBackupImporting) {
+                            importLauncher.launch(arrayOf("*/*", "application/zip", "application/octet-stream"))
+                        }
+                    )
+                }
+            }
+        }
+
+        if (backupResultDialogMessage != null) {
+            AlertDialog(
+                onDismissRequest = { backupResultDialogMessage = null },
+                icon = { Icon(Icons.Default.Backup, contentDescription = null) },
+                title = { Text(stringResource(R.string.section_backup_title), fontWeight = FontWeight.Bold) },
+                text = { Text(backupResultDialogMessage ?: "") },
+                confirmButton = {
+                    TextButton(onClick = { backupResultDialogMessage = null }) {
+                        Text("Aceptar", fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
         }
     }
 }

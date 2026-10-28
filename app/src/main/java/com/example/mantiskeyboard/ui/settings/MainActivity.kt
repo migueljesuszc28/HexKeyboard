@@ -270,10 +270,10 @@ fun MainScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.ic_hexagon),
-                                        contentDescription = "Hexagon Logo",
+                                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                        contentDescription = "Mantis Keyboard Logo",
                                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(40.dp)
+                                        modifier = Modifier.size(80.dp)
                                     )
                                 }
                             }
@@ -291,7 +291,7 @@ fun MainScreen(
                             Spacer(modifier = Modifier.height(4.dp))
 
                             Text(
-                                text = "Teclado hexagonal optimizado, inteligente y expresivo",
+                                text = "Teclado personalizable, optimizado, inteligente y expresivo",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center

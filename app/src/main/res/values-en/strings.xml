@@ -102,4 +102,18 @@
     <string name="split_keyboard_title">Split</string>
     <string name="split_keyboard_unsplit">Merge</string>
     <string name="fn_split_keyboard">Split keyboard</string>
+
+    <!-- Backup & Restore -->
+    <string name="section_backup_title">Backup &amp; Restore</string>
+    <string name="backup_export_title">Export Backup</string>
+    <string name="backup_export_summary">Exports credentials, fonts, themes with images, settings and dictionaries to a portable .mantisdata file</string>
+    <string name="backup_import_title">Import Backup</string>
+    <string name="backup_import_summary">Restores credentials, fonts, themes, settings and dictionaries from a .mantisdata file</string>
+    <string name="backup_exporting">Exporting backup...</string>
+    <string name="backup_importing">Restoring backup...</string>
+    <string name="backup_export_success">Backup exported successfully.</string>
+    <string name="backup_export_failed">Failed to export backup.</string>
+    <string name="backup_import_success">Backup restored successfully.</string>
+    <string name="backup_import_failed">Failed to restore backup.</string>
+    <string name="backup_invalid_file">Invalid file. Only .mantisdata files are allowed</string>
 </resources>
