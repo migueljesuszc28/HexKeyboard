@@ -58,6 +58,7 @@ import com.example.mantiskeyboard.ui.component.GlassEffectConfig
 import com.example.mantiskeyboard.ui.component.liquidGlass
 import com.example.mantiskeyboard.ui.keyboard.components.FloatingKeyboardContainer
 import com.example.mantiskeyboard.ui.keyboard.components.LocalKeyBounceEnabled
+import com.example.mantiskeyboard.ui.keyboard.components.ResizeOverlay
 import com.example.mantiskeyboard.ui.keyboard.components.rememberKeyBounceEnabled
 import com.example.mantiskeyboard.ui.keyboard.components.rememberMorphingShape
 import kotlinx.coroutines.Dispatchers
@@ -134,11 +135,16 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
         onDispose {
             backgroundBitmap?.recycle()
             blurredBitmap?.recycle()
+            viewModel.cancelResizeMode()
         }
     }
 
-    val bottomOffsetFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 30 } }
-    val bottomOffset by bottomOffsetFlow.collectAsState(30)
+    val storedBottomOffsetFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 30 } }
+    val storedBottomOffset by storedBottomOffsetFlow.collectAsState(30)
+    val isResizeMode by viewModel.isResizeMode.collectAsState()
+    val tempBottomOffset by viewModel.tempBottomOffset.collectAsState()
+
+    val bottomOffset = if (isResizeMode) tempBottomOffset else storedBottomOffset
 
     val currentView by viewModel.currentView.collectAsState()
     val isEmojiSearchActive by viewModel.isEmojiSearchActive.collectAsState()
@@ -230,6 +236,16 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                             modifier = Modifier
                                 .matchParentSize()
                                 .clip(RoundedCornerShape(20.dp))
+                        )
+                    }
+
+                    val isResizeMode by viewModel.isResizeMode.collectAsState()
+                    if (isResizeMode) {
+                        ResizeOverlay(
+                            viewModel = viewModel,
+                            theme = keyboardTheme,
+                            navBarBottomDp = 0,
+                            modifier = Modifier.matchParentSize()
                         )
                     }
                 }
@@ -399,6 +415,18 @@ fun KeyboardScreen(viewModel: KeyboardViewModel) {
                         scope = scope,
                         viewModel = viewModel,
                         isFloating = false,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(glassShape)
+                    )
+                }
+
+                val isResizeMode by viewModel.isResizeMode.collectAsState()
+                if (isResizeMode) {
+                    ResizeOverlay(
+                        viewModel = viewModel,
+                        theme = keyboardTheme,
+                        navBarBottomDp = navBarBottomDp,
                         modifier = Modifier
                             .matchParentSize()
                             .clip(glassShape)

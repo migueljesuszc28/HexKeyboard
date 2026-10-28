@@ -61,6 +61,9 @@ fun KeyboardMainSection(
     val layoutTypeFlow = remember { dataStore.data.map { it[ThemeUtils.KEYBOARD_LAYOUT_TYPE] ?: "default" } }
     val layoutType by layoutTypeFlow.collectAsState("default")
 
+    val isResizeMode by viewModel.isResizeMode.collectAsState()
+    val tempKeyboardHeight by viewModel.tempKeyboardHeight.collectAsState()
+
     val nunitoTypeface = remember(fontPath) {
         when (fontPath) {
             "nunito" -> ResourcesCompat.getFont(context, R.font.nunito) ?: Typeface.DEFAULT
@@ -93,24 +96,33 @@ fun KeyboardMainSection(
                 service?.mKeyboardView = this
                 this.drawBackground = !hasBackgroundImage
                 listener = object : KeyboardView.Listener {
-                    override fun onChar(text: String) { viewModel.onCharTyped(text) }
-                    override fun onCharWithPoint(text: String, x: Float, y: Float) {
-                        service?.recordTouchPoint(text, x, y)
+                    override fun onChar(text: String) {
+                        if (!isResizeMode) viewModel.onCharTyped(text)
                     }
-                    override fun onDelete() { viewModel.onDelete() }
-                    override fun onEnter() { viewModel.onEnter() }
-                    override fun onLongPressSelect(char: String) { viewModel.onCharTyped(char) }
+                    override fun onCharWithPoint(text: String, x: Float, y: Float) {
+                        if (!isResizeMode) service?.recordTouchPoint(text, x, y)
+                    }
+                    override fun onDelete() {
+                        if (!isResizeMode) viewModel.onDelete()
+                    }
+                    override fun onEnter() {
+                        if (!isResizeMode) viewModel.onEnter()
+                    }
+                    override fun onLongPressSelect(char: String) {
+                        if (!isResizeMode) viewModel.onCharTyped(char)
+                    }
                     override fun onSymbolPageChange(page: String) {}
                     override fun onLayoutUpdated(keyCenters: Map<Char, PointF>) {
                         service?.updateKeyCenters(keyCenters)
                     }
                     override fun onGesture(points: List<PointF>) {
-                        service?.handleGesture(points, allKeys)
+                        if (!isResizeMode) service?.handleGesture(points, allKeys)
                     }
                     override fun onLiveGesture(points: List<PointF>) {
-                        service?.handleLiveGesture(points, allKeys)
+                        if (!isResizeMode) service?.handleLiveGesture(points, allKeys)
                     }
                     override fun onKeyClick(key: KeyboardLayoutEngine.Key) {
+                        if (isResizeMode) return
                         when(key.type) {
                             KeyboardLayoutEngine.KeyType.EMOJI -> viewModel.setCurrentView("emoji")
                             KeyboardLayoutEngine.KeyType.CLIPBOARD -> viewModel.setCurrentView("clipboard")
@@ -123,11 +135,15 @@ fun KeyboardMainSection(
             }
         },
         update = { view ->
+            view.isResizeMode = isResizeMode
             view.sharedTypeface = nunitoTypeface
             view.keyboardTheme = theme
             view.language = currentLocale
             view.layoutType = layoutType
             view.isSplitMode = isSplitMode
+            if (isResizeMode) {
+                view.setCustomKeyboardHeight(tempKeyboardHeight)
+            }
             view.drawBackground = !hasBackgroundImage
             view.visibility = if (keyboardVisible) View.VISIBLE else View.INVISIBLE
 

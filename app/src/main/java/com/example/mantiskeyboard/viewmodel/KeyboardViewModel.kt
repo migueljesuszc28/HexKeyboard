@@ -94,6 +94,16 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
     private val _isSplitMode = MutableStateFlow(false)
     val isSplitMode: StateFlow<Boolean> = _isSplitMode.asStateFlow()
 
+    // --- Estado Redimensionado (Resize) estilo Gboard ---
+    private val _isResizeMode = MutableStateFlow(false)
+    val isResizeMode: StateFlow<Boolean> = _isResizeMode.asStateFlow()
+
+    private val _tempKeyboardHeight = MutableStateFlow(50)
+    val tempKeyboardHeight: StateFlow<Int> = _tempKeyboardHeight.asStateFlow()
+
+    private val _tempBottomOffset = MutableStateFlow(30)
+    val tempBottomOffset: StateFlow<Int> = _tempBottomOffset.asStateFlow()
+
     private val _floatingOffsetX = MutableStateFlow(0f)
     val floatingOffsetX: StateFlow<Float> = _floatingOffsetX.asStateFlow()
 
@@ -196,6 +206,45 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
         setCurrentView("keyboard")
     }
 
+    // --- Métodos de Redimensionado (Resize Mode) ---
+    fun startResizeMode(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val prefs = ThemeUtils.getDataStore(context).data.first()
+            _tempKeyboardHeight.value = prefs[ThemeUtils.KEYBOARD_HEIGHT] ?: 50
+            _tempBottomOffset.value = prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] ?: 30
+            _isResizeMode.value = true
+            _currentView.value = "keyboard"
+        }
+    }
+
+    fun updateTempResizeValues(height: Int, bottomOffset: Int) {
+        _tempKeyboardHeight.value = height.coerceIn(30, 100)
+        _tempBottomOffset.value = bottomOffset.coerceIn(0, 100)
+    }
+
+    fun resetResizeToDefaults() {
+        _tempKeyboardHeight.value = 50
+        _tempBottomOffset.value = 30
+    }
+
+    fun saveResizeAndExit(context: Context) {
+        val h = _tempKeyboardHeight.value
+        val offset = _tempBottomOffset.value
+        viewModelScope.launch(Dispatchers.IO) {
+            ThemeUtils.getDataStore(context).edit { prefs ->
+                prefs[ThemeUtils.KEYBOARD_HEIGHT] = h
+                prefs[ThemeUtils.KEYBOARD_BOTTOM_OFFSET] = offset
+            }
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                _isResizeMode.value = false
+            }
+        }
+    }
+
+    fun cancelResizeMode() {
+        _isResizeMode.value = false
+    }
+
     fun updateFloatingPosition(x: Float, y: Float, context: Context? = null) {
         _floatingOffsetX.value = x
         _floatingOffsetY.value = y
@@ -247,6 +296,7 @@ class KeyboardViewModel @Inject constructor() : ViewModel() {
 
     fun setCurrentView(view: String, context: Context? = null) {
         _currentView.value = view
+        _isResizeMode.value = false
         _clipboardItemWithOptions.value = null
         if (view == "clipboard") {
             onActionRequested?.invoke(Action.RefreshClipboard)

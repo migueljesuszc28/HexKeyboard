@@ -351,15 +351,25 @@ class KeyboardRenderer(private val context: Context) {
         }
 
         var sz = if (customLabel != null) {
-            if (key.isRectangular) key.ry * 0.52f else min(key.rx, key.ry) * 0.45f
+            if (key.isRectangular) key.ry * 0.58f else min(key.rx, key.ry) * 0.50f
         } else if (key.isRectangular) {
+            val txt = label
             if (key.type == KeyboardLayoutEngine.KeyType.TOGGLE) {
-                min(key.rx * 1.1f, key.ry * 0.65f)
+                min(key.rx * 1.15f, key.ry * 0.70f)
+            } else if (txt.length <= 1) {
+                min(key.rx * 1.85f, key.ry * 1.18f)
+            } else if (txt.length <= 3) {
+                min(key.rx * 1.0f, key.ry * 0.75f)
             } else {
-                min(key.rx * 1.55f, key.ry * 0.95f)
+                min(key.rx * 0.72f, key.ry * 0.58f)
             }
         } else {
-            min(key.rx, key.ry) * 0.62f
+            val txt = label
+            if (txt.length <= 1) {
+                min(key.rx, key.ry) * 0.76f
+            } else {
+                min(key.rx, key.ry) * 0.55f
+            }
         }
 
         if (!key.isRectangular && key.type == KeyboardLayoutEngine.KeyType.SHIFT && capsLock) {
@@ -448,9 +458,9 @@ class KeyboardRenderer(private val context: Context) {
             }
             if (drawLabel.isNotEmpty()) canvas.drawText(drawLabel, drawCx, ty, pText)
             if (showLongPressIndicators && key.alternatives.isNotEmpty()) {
-                val dotR = key.rx * 0.08f
-                val dx = key.cx + key.rx * 0.4f
-                val dy = key.cy - key.ry * 0.5f
+                val dotR = if (key.isRectangular) min(key.rx, key.ry) * 0.085f else key.rx * 0.08f
+                val dx = if (key.isRectangular) drawCx + key.rx * 0.58f else key.cx + key.rx * 0.42f
+                val dy = if (key.isRectangular) key.cy - key.ry * 0.58f else key.cy - key.ry * 0.50f
                 pPopupBg.color = pText.color
                 pPopupBg.alpha = 150
                 canvas.drawCircle(dx, dy, dotR, pPopupBg)

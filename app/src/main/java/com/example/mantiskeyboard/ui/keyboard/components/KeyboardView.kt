@@ -127,6 +127,7 @@ class KeyboardView(context: Context, attrs: AttributeSet? = null) : View(context
     private var soundEnabled: Boolean = true
     private var cachedLongPressTimeout: Long = 259L
     private var cachedKeyboardHeight: Int = 50
+    var isResizeMode: Boolean = false
 
     private val viewScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var prefsJob: Job? = null
@@ -269,7 +270,9 @@ class KeyboardView(context: Context, attrs: AttributeSet? = null) : View(context
         vibrationEnabled = prefs[ThemeUtils.KEYBOARD_VIBRATION] ?: true
         soundEnabled = prefs[ThemeUtils.KEYBOARD_SOUND] ?: true
         cachedLongPressTimeout = (prefs[ThemeUtils.LONG_PRESS_DURATION] ?: 259).toLong()
-        cachedKeyboardHeight = prefs[ThemeUtils.KEYBOARD_HEIGHT] ?: 50
+        if (!isResizeMode) {
+            cachedKeyboardHeight = prefs[ThemeUtils.KEYBOARD_HEIGHT] ?: 50
+        }
         keyScale = (prefs[ThemeUtils.KEYBOARD_KEY_SIZE] ?: 90) / 100f
         updateColors()
         if (keys.isEmpty() && width > 0) buildLayout(width.toFloat())
@@ -316,6 +319,15 @@ class KeyboardView(context: Context, attrs: AttributeSet? = null) : View(context
         val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val baseFactor = 0.7f + (cachedKeyboardHeight / 100f) * 0.6f
         return if (isLandscape) baseFactor * 0.78f else baseFactor
+    }
+
+    fun setCustomKeyboardHeight(height: Int) {
+        if (cachedKeyboardHeight != height) {
+            cachedKeyboardHeight = height
+            if (width > 0) buildLayout(width.toFloat())
+            requestLayout()
+            invalidate()
+        }
     }
 
     var sharedTypeface: Typeface = Typeface.DEFAULT

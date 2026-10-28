@@ -116,4 +116,9 @@
     <string name="backup_import_success">Copia de seguridad restaurada correctamente.</string>
     <string name="backup_import_failed">Error al restaurar la copia de seguridad.</string>
     <string name="backup_invalid_file">Archivo no válido. Solo se permiten archivos .mantisdata</string>
+
+    <!-- Redimensionado de teclado -->
+    <string name="fn_resize">Cambiar tamaño</string>
+    <string name="btn_reset">Restablecer</string>
+    <string name="btn_done">Listo</string>
 </resources>

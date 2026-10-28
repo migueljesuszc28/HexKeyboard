@@ -806,6 +806,7 @@ class KeyboardService : InputMethodService(),
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        viewModel.cancelResizeMode()
 
         symbolsTypedCount = 0
         serviceScope.launch {
@@ -828,6 +829,7 @@ class KeyboardService : InputMethodService(),
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        viewModel.cancelResizeMode()
         serviceScope.launch {
             val resetOnClose = ThemeUtils.getDataStore(this@KeyboardService).data.first()[ThemeUtils.RESET_ON_CLOSE] ?: true
             withContext(Dispatchers.Main) {

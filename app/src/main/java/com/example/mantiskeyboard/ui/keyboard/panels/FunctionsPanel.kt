@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.outlined.CallMerge
 import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.FitScreen
 import androidx.compose.material.icons.outlined.Palette
@@ -240,6 +241,16 @@ fun FunctionsPanel(
                             },
                             onClick = {
                                 viewModel?.toggleSplitMode(context)
+                            },
+                            theme = theme
+                        )
+                    }
+                    item {
+                        FunctionItem(
+                            icon = Icons.Default.OpenWith,
+                            label = context.getKeyboardString(R.string.fn_resize, currentLocale),
+                            onClick = {
+                                viewModel?.startResizeMode(context)
                             },
                             theme = theme
                         )

@@ -586,19 +586,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             item {
                 SettingsCardContainer {
                     SliderPreference(
-                        title = "Altura del teclado",
-                        subtitle = "Ajusta la altura total del área de teclas",
-                        key = ThemeUtils.KEYBOARD_HEIGHT,
-                        defaultValue = 50,
-                        min = 0,
-                        max = 100,
-                        icon = Icons.Default.Height,
-                        context = context
-                    )
-                    SettingsGap()
-                    SliderPreference(
                         title = "Tamaño de las teclas",
-                        subtitle = "Escala visual de los hexágonos y caracteres",
+                        subtitle = "Escala visual de las teclas",
                         key = ThemeUtils.KEYBOARD_KEY_SIZE,
                         defaultValue = 90,
                         min = 50,
@@ -614,16 +603,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                         defaultValue = 85,
                         min = 70,
                         max = 120,
-                        context = context
-                    )
-                    SettingsGap()
-                    SliderPreference(
-                        title = "Margen inferior",
-                        subtitle = "Espacio entre el teclado y la barra de navegación",
-                        key = ThemeUtils.KEYBOARD_BOTTOM_OFFSET,
-                        defaultValue = 30,
-                        min = 0,
-                        max = 100,
                         context = context
                     )
                 }

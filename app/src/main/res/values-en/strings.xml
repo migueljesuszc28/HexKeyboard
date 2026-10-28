@@ -116,4 +116,9 @@
     <string name="backup_import_success">Backup restored successfully.</string>
     <string name="backup_import_failed">Failed to restore backup.</string>
     <string name="backup_invalid_file">Invalid file. Only .mantisdata files are allowed</string>
+
+    <!-- Resize keyboard -->
+    <string name="fn_resize">Resize</string>
+    <string name="btn_reset">Reset</string>
+    <string name="btn_done">Done</string>
 </resources>

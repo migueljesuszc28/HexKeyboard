@@ -42,8 +42,8 @@ class KeyboardLayoutEngine {
             strokePath.reset()
             if (isRectangular) {
                 val rxCorner = when (type) {
-                    KeyType.SHIFT, KeyType.DELETE -> min(rx, ry) * 1.0f
-                    else -> min(rx, ry) * 0.60f
+                    KeyType.SHIFT, KeyType.DELETE -> min(rx, ry) * 0.90f
+                    else -> min(rx, ry) * 0.55f
                 }
 
                 tempRectF.set(cx - rx, cy - ry, cx + rx, cy + ry)
@@ -209,7 +209,9 @@ class KeyboardLayoutEngine {
 
         fun contains(x: Float, y: Float): Boolean {
             if (isRectangular) {
-                return abs(x - cx) <= rx && abs(y - cy) <= ry
+                val fullRx = if (keyScale > 0f) rx / keyScale else rx
+                val fullRy = if (keyScale > 0f) ry / keyScale else ry
+                return abs(x - cx) <= fullRx && abs(y - cy) <= fullRy
             }
             val dx = x - cx
             val dy = abs(y - cy)
@@ -219,11 +221,12 @@ class KeyboardLayoutEngine {
 
             val limitRight = if (gapRight) r else rFull
             val limitLeft = if (gapLeft) -r else -rFull
+            val fullRy = if (keyScale > 0) ry / keyScale else ry
 
-            if (dx > limitRight || dx < limitLeft || dy > ry) return false
+            if (dx > limitRight || dx < limitLeft || dy > fullRy) return false
 
             val activeR = if (dx >= 0) (if (gapRight) r else rFull) else (if (gapLeft) r else rFull)
-            return dy * activeR + abs(dx) * (ry / 2f) <= ry * activeR
+            return dy * activeR + abs(dx) * (fullRy / 2f) <= fullRy * activeR
         }
 
         private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
@@ -320,11 +323,11 @@ class KeyboardLayoutEngine {
         val gapWidth = if (isSplitMode) u * splitGapRatio else 0f
         val availW = u - gapWidth
         val keyW = availW / 10.0f
-        val dr = (keyW / 2.0f) * keyScale
+        val dr = (keyW / 2.0f) * 0.95f * keyScale
 
-        //val qwertyRowHeight = (totalH / 4.0f) * 1.0f
+       // val qwertyRowHeight = (totalH / 4.0f) * 0.85f
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -404,7 +407,7 @@ class KeyboardLayoutEngine {
 
         // --- ROW 2: SHIFT + Z X C V B N M + DELETE ---
         val shiftW = keyW * 1.50f
-        val drShift = (shiftW / 2.0f) * keyScale
+        val drShift = (shiftW / 2.0f) * 0.95f * keyScale
         val shiftCxLeft = shiftW / 2.0f
         val deleteCxRight = u - shiftW / 2.0f
 
@@ -424,7 +427,7 @@ class KeyboardLayoutEngine {
         val row2Chars = listOf("z", "x", "c", "v", "b", "n", "m")
         val middleAvailW = availW - (shiftW * 2.0f)
         val middleKeyW = middleAvailW / 7.0f
-        val drMiddle = (middleKeyW / 2.0f) * keyScale
+        val drMiddle = (middleKeyW / 2.0f) * 0.95f * keyScale
 
         row2Chars.forEachIndexed { i, l ->
             val colX = if (gapWidth <= 0f) {
@@ -464,19 +467,19 @@ class KeyboardLayoutEngine {
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
         val toggleW = keyW * 1.50f
-        val drToggle = toggleW / 2.0f - marginX
+        val drToggle = (toggleW / 2.0f) * 0.95f * keyScale
 
         val commaW = keyW * 1.0f
-        val drComma = commaW / 2.0f - marginX
+        val drComma = (commaW / 2.0f) * 0.95f * keyScale
 
         val emojiW = keyW * 1.0f
-        val drEmoji = emojiW / 2.0f - marginX
+        val drEmoji = (emojiW / 2.0f) * 0.95f * keyScale
 
         val periodW = keyW * 1.0f
-        val drPeriod = periodW / 2.0f - marginX
+        val drPeriod = (periodW / 2.0f) * 0.95f * keyScale
 
         val enterW = keyW * 1.50f
-        val drEnter = enterW / 2.0f - marginX
+        val drEnter = (enterW / 2.0f) * 0.95f * keyScale
 
         if (isSplitMode) {
             val leftSpaceW = keyW * 1.8f
@@ -534,10 +537,10 @@ class KeyboardLayoutEngine {
         val gapWidth = if (isSplitMode) u * splitGapRatio else 0f
         val availW = u - gapWidth
         val keyW = availW / 10.0f
-        val dr = (keyW / 2.0f) * keyScale
+        val dr = (keyW / 2.0f) * 0.95f * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -566,12 +569,12 @@ class KeyboardLayoutEngine {
 
         // --- ROW 2: 8 symbol keys + ⌫ (Delete) ---
         val deleteW = keyW * 1.50f
-        val drDelete = (deleteW / 2.0f) * keyScale
+        val drDelete = (deleteW / 2.0f) * 0.95f * keyScale
         val xDeleteRight = u - deleteW / 2.0f
 
         val symAvailW = u - deleteW
         val symW = symAvailW / 8.0f
-        val drSym = (symW / 2.0f) * keyScale
+        val drSym = (symW / 2.0f) * 0.95f * keyScale
 
         val row2Syms = listOf("%", "*", "\"", "'", ":", ";", "!", "?")
         row2Syms.forEachIndexed { i, l ->
@@ -585,15 +588,15 @@ class KeyboardLayoutEngine {
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
         val abcW = keyW * 1.50f
-        val drAbc = abcW / 2.0f - marginX
+        val drAbc = (abcW / 2.0f) * 0.95f * keyScale
         val commaW = keyW * 1.0f
-        val drComma = commaW / 2.0f - marginX
+        val drComma = (commaW / 2.0f) * 0.95f * keyScale
         val emojiW = keyW * 1.0f
-        val drEmoji = emojiW / 2.0f - marginX
+        val drEmoji = (emojiW / 2.0f) * 0.95f * keyScale
         val periodW = keyW * 1.0f
-        val drPeriod = periodW / 2.0f - marginX
+        val drPeriod = (periodW / 2.0f) * 0.95f * keyScale
         val enterW = keyW * 1.50f
-        val drEnter = enterW / 2.0f - marginX
+        val drEnter = (enterW / 2.0f) * 0.95f * keyScale
 
         if (isSplitMode) {
             val leftSpaceW = keyW * 1.8f
@@ -651,10 +654,10 @@ class KeyboardLayoutEngine {
         val gapWidth = if (isSplitMode) u * splitGapRatio else 0f
         val availW = u - gapWidth
         val keyW = availW / 10.0f
-        val dr = (keyW / 2.0f) * keyScale
+        val dr = (keyW / 2.0f) * 0.95f * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -689,12 +692,12 @@ class KeyboardLayoutEngine {
 
         // --- ROW 2: 8 symbol keys + ⌫ (Delete) ---
         val deleteW = keyW * 1.50f
-        val drDelete = (deleteW / 2.0f) * keyScale
+        val drDelete = (deleteW / 2.0f) * 0.95f * keyScale
         val xDeleteRight = u - deleteW / 2.0f
 
         val symAvailW = u - deleteW
         val symW = symAvailW / 8.0f
-        val drSym = (symW / 2.0f) * keyScale
+        val drSym = (symW / 2.0f) * 0.95f * keyScale
 
         for (i in 0 until 8) {
             val s = nextSym()
@@ -708,15 +711,15 @@ class KeyboardLayoutEngine {
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
         val abcW = keyW * 1.50f
-        val drAbc = abcW / 2.0f - marginX
+        val drAbc = (abcW / 2.0f) * 0.95f * keyScale
         val symPageW = keyW * 1.0f
-        val drSymPage = symPageW / 2.0f - marginX
+        val drSymPage = (symPageW / 2.0f) * 0.95f * keyScale
         val emojiW = keyW * 1.0f
-        val drEmoji = emojiW / 2.0f - marginX
+        val drEmoji = (emojiW / 2.0f) * 0.95f * keyScale
         val periodW = keyW * 1.0f
-        val drPeriod = periodW / 2.0f - marginX
+        val drPeriod = (periodW / 2.0f) * 0.95f * keyScale
         val enterW = keyW * 1.50f
-        val drEnter = enterW / 2.0f - marginX
+        val drEnter = (enterW / 2.0f) * 0.95f * keyScale
 
         if (isSplitMode) {
             val leftSpaceW = keyW * 1.8f
@@ -839,10 +842,10 @@ class KeyboardLayoutEngine {
         val gapWidth = if (isSplitMode) u * splitGapRatio else 0f
         val availW = u - gapWidth
         val keyW = availW / 10.0f
-        val dr = (keyW / 2.0f) * keyScale
+        val dr = (keyW / 2.0f) * 0.95f * keyScale
 
         val qwertyRowHeight = totalH / 4.0f
-        val dry = (qwertyRowHeight / 2.0f) * 0.90f * keyScale
+        val dry = (qwertyRowHeight / 2.0f) * 0.86f * keyScale
 
         fun ry(row: Int) = (row + 0.5f) * qwertyRowHeight
 
@@ -893,7 +896,7 @@ class KeyboardLayoutEngine {
         }
 
         val shiftW = keyW * 1.50f
-        val drShift = (shiftW / 2.0f) * keyScale
+        val drShift = (shiftW / 2.0f) * 0.95f * keyScale
         val shiftCxLeft = shiftW / 2.0f
         val deleteCxRight = u - shiftW / 2.0f
 
@@ -901,7 +904,7 @@ class KeyboardLayoutEngine {
 
         val middleAvailW = availW - (shiftW * 2.0f)
         val middleKeyW = middleAvailW / 7.0f
-        val drMiddle = (middleKeyW / 2.0f) * keyScale
+        val drMiddle = (middleKeyW / 2.0f) * 0.95f * keyScale
 
         for (i in 0 until 7) {
             val char = nextChar()
@@ -919,15 +922,15 @@ class KeyboardLayoutEngine {
         val marginX = (keyW * (1.0f - keyScale)) / 2.0f
 
         val abcW = keyW * 1.50f
-        val drAbc = abcW / 2.0f - marginX
+        val drAbc = (abcW / 2.0f) * 0.95f * keyScale
         val fontPageW = keyW * 1.0f
-        val drFontPage = fontPageW / 2.0f - marginX
+        val drFontPage = (fontPageW / 2.0f) * 0.95f * keyScale
         val emojiW = keyW * 1.0f
-        val drEmoji = emojiW / 2.0f - marginX
+        val drEmoji = (emojiW / 2.0f) * 0.95f * keyScale
         val periodW = keyW * 1.0f
-        val drPeriod = periodW / 2.0f - marginX
+        val drPeriod = (periodW / 2.0f) * 0.95f * keyScale
         val enterW = keyW * 1.50f
-        val drEnter = enterW / 2.0f - marginX
+        val drEnter = (enterW / 2.0f) * 0.95f * keyScale
 
         val fontDisplayStr = (fontPage + 1).toString()
         val fontPageAlternatives = (1..10).map { it.toString() }
@@ -1269,14 +1272,12 @@ class KeyboardLayoutEngine {
 
         var closestKey: Key? = null
         var minDistanceSq = Float.MAX_VALUE
-        val sampleRx = keys.firstOrNull()?.rx ?: 50f
-        val maxThresholdSq = (sampleRx * 2.8f) * (sampleRx * 2.8f)
 
         for (key in keys) {
             val dx = x - key.cx
             val dy = y - key.cy
             val distSq = dx * dx + dy * dy
-            if (distSq < minDistanceSq && distSq <= maxThresholdSq) {
+            if (distSq < minDistanceSq) {
                 minDistanceSq = distSq
                 closestKey = key
             }

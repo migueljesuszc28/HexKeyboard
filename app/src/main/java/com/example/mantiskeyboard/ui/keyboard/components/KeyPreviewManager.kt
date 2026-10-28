@@ -347,7 +347,7 @@ class KeyPreviewManager(private val context: Context) {
             path.reset()
             val r = renderer
             if (isRect || r == null) {
-                val cr = min(prx, pry) * 0.60f
+                val cr = min(prx, pry) * 0.55f
                 rectF.set(cx - prx, cy - pry, cx + prx, cy + pry)
                 path.addRoundRect(rectF, cr, cr, Path.Direction.CW)
             } else {
