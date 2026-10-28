@@ -27,9 +27,11 @@
   <img src="art/screenshots/settings.jpg" width="28%" alt="Ajustes y Personalización" />
   <img src="art/screenshots/themes.jpg" width="28%" alt="Pantalla de Temas" />
   <img src="art/screenshots/keyboard.jpg" width="28%" alt="Vista Principal del Teclado Hexagonal" />
+  <img src="art/screenshots/qwerty.jpg" width="28%" alt="Vista Principal del Teclado Qwerty" />
   <img src="art/screenshots/symbols.jpg" width="28%" alt="Panel de Símbolos" />
   <img src="art/screenshots/fonts.jpg" width="28%" alt="Panel de Fuentes" />
   <img src="art/screenshots/emojis.jpg" width="28%" alt="Panel de Emojis" />
+  <img src="art/screenshots/functions.jpg" width="28%" alt="Panel de Funciones" />
 </p>
 
 ---
