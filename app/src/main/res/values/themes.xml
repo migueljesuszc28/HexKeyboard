@@ -3,10 +3,10 @@
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="postSplashScreenTheme">@style/Theme.HexKeyboard</item>
+        <item name="postSplashScreenTheme">@style/Theme.MantisKeyboard</item>
     </style>
 
-    <style name="Theme.HexKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.MantisKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="isLightTheme">true</item>
         <item name="android:fontFamily">@font/nunito</item>
         <item name="fontFamily">@font/nunito</item>
@@ -56,7 +56,7 @@
         <item name="thumbIconTint">?attr/colorPrimary</item>
     </style>
 
-    <style name="Theme.HexKeyboard.Transparent" parent="Theme.HexKeyboard">
+    <style name="Theme.MantisKeyboard.Transparent" parent="Theme.MantisKeyboard">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowAnimationStyle">@null</item>

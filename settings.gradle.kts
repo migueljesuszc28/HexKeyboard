@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HexKeyboard"
+rootProject.name = "MantisKeyboard"
 include(":app")

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Hex Keyboard</string>
+    <string name="app_name">Mantis Keyboard</string>
+    <string name="launcher_app_name">Mantis</string>
 
     <string name="test_keyboard_hint">Prueba el teclado aquí...</string>
     <string name="emoji_button_description">Cambiar a emojis</string>
@@ -13,12 +14,12 @@
     <string name="settings_title">Ajustes del teclado</string>
 
     <string name="enable_keyboard_title">Habilitar teclado</string>
-    <string name="enable_keyboard_summary">Activa Hex Keyboard en los ajustes del sistema</string>
+    <string name="enable_keyboard_summary">Activa Mantis Keyboard en los ajustes del sistema</string>
 
     <string name="select_keyboard_title">Seleccionar teclado</string>
-    <string name="select_keyboard_summary">Elige Hex Keyboard como método de entrada activo</string>
+    <string name="select_keyboard_summary">Elige Mantis Keyboard como método de entrada activo</string>
 
-    <string name="keyboard_service_name">Hex Keyboard</string>
+    <string name="keyboard_service_name">Mantis Keyboard</string>
     <string name="keyboard_service_description">Teclado hexagonal optimizado con sugerencias y gestos</string>
     <string name="themes_title">Temas</string>
     <string name="create_theme">Crear Tema</string>

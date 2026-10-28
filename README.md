@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="art/logo.png" width="128" height="128" alt="HexKeyboard Logo" />
+  <img src="art/logo.png" width="128" height="128" alt="Mantis Keyboard Logo" />
 </p>
 
-<h1 align="center">HexKeyboard</h1>
+<h1 align="center">Mantis Keyboard</h1>
 
 <p align="center">
   Teclado virtual nativo para Android con disposición hexagonal ergonómica, procesamiento local de texto y personalización avanzada.
 </p>
 
 <p align="center">
-  <a href="https://github.com/migueljesuszc28/hexkeyboard/releases/latest">
-    <img src="https://img.shields.io/github/v/release/migueljesuszc28/hexkeyboard?style=flat-square&color=blue" alt="Última versión" />
+  <a href="https://github.com/migueljesuszc28/mantiskeyboard/releases/latest">
+    <img src="https://img.shields.io/github/v/release/migueljesuszc28/mantiskeyboard?style=flat-square&color=blue" alt="Última versión" />
   </a>
   <img src="https://img.shields.io/badge/Plataforma-Android-brightgreen?style=flat-square&logo=android" alt="Plataforma Android" />
   <img src="https://img.shields.io/badge/Lenguaje-Kotlin-purple?style=flat-square&logo=kotlin" alt="Kotlin" />
@@ -38,7 +38,7 @@
 
 - **Distribución Hexagonal Ergonómica:** Diseño geométrico optimizado para la escritura con pulgares, reduciendo errores de pulsación accidentales.
 - **Desarrollado en Jetpack Compose:** Interfaz nativa, fluida y reactiva integrada mediante interoperabilidad con `InputMethodService`.
-- **Privacidad Local sin Conexión:** Procesamiento de texto, predicciones y aprendizaje de palabras realizado strictly en el dispositivo, sin telemetría ni acceso a red.
+- **Privacidad Local sin Conexión:** Procesamiento de texto, predicciones y aprendizaje de palabras realizado estrictamente en el dispositivo, sin telemetría ni acceso a red.
 - **Motor de Predicción y Sugerencias:** Sugerencias contextuales de alta velocidad y soporte de autocorrección local.
 - **Panel de Emojis Integrado:** Navegación por categorías, variantes de tono de piel y gestión de emojis frecuentes.
 - **Gestión de Credenciales y Portapapeles:** Historial local seguro y autocompletado de datos frecuentes.
@@ -48,7 +48,7 @@
 
 ## Sistema de Interfaz Liquid Glass
 
-HexKeyboard incorpora un sistema de diseño visual translúcido con desenfoque de fondo y refracción en tiempo real.
+Mantis Keyboard incorpora un sistema de diseño visual translúcido con desenfoque de fondo y refracción en tiempo real.
 
 ### Arquitectura Técnica del Efecto:
 1. **Captura de Fondo (`Backdrop`):** Mediante `rememberLayerBackdrop()` y `Modifier.layerBackdrop(...)`, la aplicación registra los píxeles renderizados en las capas inferiores de la vista.
@@ -69,12 +69,12 @@ Este proyecto hace uso de soluciones de la comunidad de código abierto:
 
 Puedes descargar el archivo APK ejecutable de la versión más reciente desde la sección de lanzamientos del repositorio:
 
-[Descargar APK (Última versión)](https://github.com/migueljesuszc28/hexkeyboard/releases/latest)
+[Descargar APK (Última versión)](https://github.com/migueljesuszc28/mantiskeyboard/releases/latest)
 
 ### Configuración en el dispositivo:
-1. Instala el archivo `HexKeyboard.apk` en tu dispositivo Android.
+1. Instala el archivo `MantisKeyboard.apk` en tu dispositivo Android.
 2. Abre **Ajustes** > **Sistema** > **Idiomas e introducción de texto** > **Teclado en pantalla**.
-3. Activa **HexKeyboard** en la lista de teclados disponibles.
+3. Activa **Mantis Keyboard** en la lista de teclados disponibles.
 4. Selecciónalo como método de entrada predeterminado.
 
 ---
@@ -95,10 +95,10 @@ Para clonar y compilar el proyecto localmente utilizando Android Studio o la con
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/migueljesuszc28/hexkeyboard.git
+git clone https://github.com/migueljesuszc28/mantiskeyboard.git
 
 # Acceder al directorio del proyecto
-cd hexkeyboard
+cd mantiskeyboard
 
 # Compilar el archivo APK de depuración
 ./gradlew assembleDebug

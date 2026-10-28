@@ -7,16 +7,16 @@ plugins {
 }
 
 android {
-    namespace = "com.example.hexkeyboard"
+    namespace = "com.example.mantiskeyboard"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.cozu0628.hexkeyboard"
+        applicationId = "dev.cozu0628.mantiskeyboard"
         minSdk = 26
         //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 1
-        versionName = "12.2.0"
+        versionName = "13.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
